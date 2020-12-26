@@ -37,7 +37,7 @@ This formulation applies to University of Udine (Italy) and to many Italian and 
 The solution of the problem is an assignment of a period (day and timeslot) and a room
     to all lectures of each course.
 
-#### Hard constraints
+### Hard constraints
 
 **Lectures**: All lectures of a course must be scheduled, and they must be assigned to distinct
    periods. A violation occurs if a lecture is not scheduled.
@@ -54,7 +54,7 @@ one violation. Three conflicting lectures count as 3 violations: one for each pa
 period, then no lectures of the course can be scheduled at that period. Each lecture in
 a period unavailable for that course is one violation.
 
-#### Soft constraints
+### Soft constraints
 
 **RoomCapacity**: For each lecture, the number of students that attend the course must be
        less or equal than the number of seats of all the rooms that host its lectures.Each student
