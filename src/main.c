@@ -77,7 +77,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "args.h"
 #include "verbose.h"
 #include <string.h>
-#include "itc2007_parser.h"
+#include "parser.h"
 
 const char *argp_program_version = "0.1";
 static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
@@ -120,6 +120,8 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
     return 0;
 }
 
+#ifndef TEST
+
 int main (int argc, char **argv) {
     struct argp argp = { options, parse_option, args_doc, doc };
 
@@ -134,10 +136,14 @@ int main (int argc, char **argv) {
     args_dump_indent(&args, dump, 256, "  ");
     verbose("Arguments:\n%s", dump);
 
-    if (itc2007_parse(args.input) != 0) {
+    model m;
+
+    if (parse(args.input, &m) != 0) {
         fprintf(stderr, "ERROR: failed to open '%s' (%s)\n", args.input, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     return 0;
 }
+
+#endif

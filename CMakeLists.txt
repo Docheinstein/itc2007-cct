@@ -8,6 +8,16 @@ file(GLOB_RECURSE sources
         "src/*.h"
 )
 
-include_directories(src)
+file(GLOB_RECURSE tests
+        "tests/*.c"
+        "tests/*.h"
+)
 
-add_executable(itc2007-cct ${sources})
+file(GLOB_RECURSE munit
+        "externals/munit/*.c"
+        "externals/munit/*.h"
+)
+
+include_directories(src externals)
+
+add_executable(itc2007-cct ${sources} ${tests} ${munit})
