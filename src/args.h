@@ -10,6 +10,7 @@ typedef struct args {
 } args;
 
 int args_dump(args *args, char *dump, int size);
+int args_dump_indent(args *args, char *dump, int size, const char *indent);
 void args_init(args *args);
 
 

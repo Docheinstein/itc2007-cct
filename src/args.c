@@ -1,15 +1,20 @@
 #include <stdio.h>
 #include "args.h"
 
+
 int args_dump(args *args, char *dump, int size) {
+    return args_dump_indent(args, dump, size, "");
+}
+
+int args_dump_indent(args *args, char *dump, int size, const char *indent) {
     return snprintf(dump, size,
-       "input = %s\n"
-       "output = %s\n"
-       "verbose = %d"
+       "%sinput = %s\n"
+       "%soutput = %s\n"
+       "%sverbose = %d"
        ,
-       args->input,
-       args->output,
-       args->verbose
+       indent, args->input,
+       indent, args->output,
+       indent, args->verbose
    );
 }
 

@@ -3,9 +3,11 @@
 
 #include <stdbool.h>
 
-static is_verbose;
+static int is_verbose;
 void set_verbose(bool yes);
 
-int verbose(const char *fmt, ...);
+int verbosef(const char *fmt, ...);
+
+#define verbose(format, ...) verbosef(format "\n", __VA_ARGS__)
 
 #endif // VERBOSE_H

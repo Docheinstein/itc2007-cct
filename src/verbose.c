@@ -6,7 +6,7 @@ void set_verbose(bool yes) {
     is_verbose = yes;
 }
 
-int verbose(const char *fmt, ...) {
+int verbosef(const char *fmt, ...) {
     if (!is_verbose)
         return 0;
 

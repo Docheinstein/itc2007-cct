@@ -71,11 +71,13 @@ CurriculumCompactness: Lectures belonging to a curriculum should be adjacent to 
 RoomStability: All lectures of a course should be given in the same room. Each distinct
         room used for the lectures of a course, but the first, counts as 1 point of penalty.
  */
-
+#include <stdlib.h>
 #include <argp.h>
 #include <stdbool.h>
 #include "args.h"
 #include "verbose.h"
+#include <string.h>
+#include "itc2007_parser.h"
 
 const char *argp_program_version = "0.1";
 static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
@@ -107,6 +109,8 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
 
       break;
     case ARGP_KEY_END:
+        if (state->arg_num < 1)
+            argp_usage(state);
         break;
 
     default:
@@ -127,8 +131,13 @@ int main (int argc, char **argv) {
     set_verbose(args.verbose);
 
     char dump[256];
-    args_dump(&args, dump, 256);
-    verbose("%s\n", dump);
+    args_dump_indent(&args, dump, 256, "  ");
+    verbose("Arguments:\n%s", dump);
+
+    if (itc2007_parse(args.input) != 0) {
+        fprintf(stderr, "ERROR: failed to open '%s' (%s)\n", args.input, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 
     return 0;
 }
