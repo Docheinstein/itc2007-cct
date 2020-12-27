@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(itc2007_cct C)
+project(itc2007-cct C)
 
 set(CMAKE_C_STANDARD 99)
 

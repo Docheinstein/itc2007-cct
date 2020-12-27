@@ -72,9 +72,60 @@ RoomStability: All lectures of a course should be given in the same room. Each d
         room used for the lectures of a course, but the first, counts as 1 point of penalty.
  */
 
-#include <stdio.h>
+#include <argp.h>
+#include <stdbool.h>
+#include "args.h"
 
-int main() {
-    printf("Hello, World!\n");
+const char *argp_program_version = "0.1";
+static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
+static char args_doc[] = "INPUT OUTPUT";
+
+static struct argp_option options[] = {
+  { "verbose", 'v', 0, 0, "Print debugging information" },
+  { 0 }
+};
+
+static error_t parse_option(int key, char *arg, struct argp_state *state) {
+    struct args *args = state->input;
+
+    switch (key) {
+    case 'v':
+        args->verbose = true;
+        break;
+    case ARGP_KEY_ARG:
+        switch (state->arg_num) {
+        case 0:
+            args->input = arg;
+            break;
+        case 1:
+            args->output = arg;
+            break;
+        default:
+            argp_usage(state);
+        }
+
+      break;
+    case ARGP_KEY_END:
+        break;
+
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+int main (int argc, char **argv) {
+    struct argp argp = { options, parse_option, args_doc, doc };
+
+    struct args args;
+    args_init(&args);
+
+    argp_parse(&argp, argc, argv, 0, 0, &args);
+
+    char dump[256];
+    args_dump(&args, dump, 256);
+    printf("%s\n", dump);
+
     return 0;
 }
