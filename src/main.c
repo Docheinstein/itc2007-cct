@@ -75,6 +75,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <argp.h>
 #include <stdbool.h>
 #include "args.h"
+#include "verbose.h"
 
 const char *argp_program_version = "0.1";
 static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
@@ -123,9 +124,11 @@ int main (int argc, char **argv) {
 
     argp_parse(&argp, argc, argv, 0, 0, &args);
 
+    set_verbose(args.verbose);
+
     char dump[256];
     args_dump(&args, dump, 256);
-    printf("%s\n", dump);
+    verbose("%s\n", dump);
 
     return 0;
 }
