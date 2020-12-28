@@ -1,6 +1,7 @@
 #ifdef TEST
 
 #include <stdio.h>
+#include <errno.h>
 #include "utils.h"
 #include "munit/munit.h"
 
@@ -67,6 +68,22 @@ MUNIT_TEST(test_strtrim) {
     return MUNIT_OK;
 }
 
+MUNIT_TEST(test_strtoint) {
+    bool ok;
+
+    munit_assert_int(strtoint("10", &ok), ==, 10); munit_assert_true(ok);
+    munit_assert_int(strtoint("+10", &ok), ==, 10); munit_assert_true(ok);
+    munit_assert_int(strtoint("0", &ok), ==, 0); munit_assert_true(ok);
+    munit_assert_int(strtoint("-10", &ok), ==, -10); munit_assert_true(ok);
+
+    strtoint("10a", &ok); munit_assert_false(ok);
+    strtoint("a10", &ok); munit_assert_false(ok);
+    strtoint("abc", &ok); munit_assert_false(ok);
+
+
+    return MUNIT_OK;
+}
+
 // ======================= END TESTS =======================
 
 static MunitTest tests[] = {
@@ -74,6 +91,7 @@ static MunitTest tests[] = {
     { "test_strltrim", test_strltrim, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strrtrim", test_strrtrim, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strtrim", test_strtrim, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_strtoint", test_strtoint, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     MUNIT_TESTS_END
 };
 

@@ -12,5 +12,7 @@ typedef struct model {
 } model;
 
 void model_init(model *model);
+void model_dump(model *model, char *dump, int size);
+void model_dump_indent(model *model, char *dump, int size, const char *indent);
 
 #endif // MODEL_H

@@ -2,7 +2,8 @@
 #define PARSER_H
 
 #include "model.h"
+#include <stdbool.h>
 
-int parse(char *input, model *model);
+bool parse(char *input, model *model);
 
 #endif // PARSER_H

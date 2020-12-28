@@ -78,6 +78,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "log/verbose.h"
 #include <string.h>
 #include "parser.h"
+#include "utils.h"
 
 const char *argp_program_version = "0.1";
 static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
@@ -132,16 +133,18 @@ int main (int argc, char **argv) {
 
     set_verbose(args.verbose);
 
-    char dump[256];
-    args_dump_indent(&args, dump, 256, "  ");
+    char dump[4096];
+    args_dump_indent(&args, dump, LENGTH(dump), "  ");
     verbose("Arguments:\n%s", dump);
 
     model m;
+    model_init(&m);
 
-    if (parse(args.input, &m) != 0) {
-        fprintf(stderr, "ERROR: failed to open '%s' (%s)\n", args.input, strerror(errno));
+    if (!parse(args.input, &m))
         exit(EXIT_FAILURE);
-    }
+
+    model_dump_indent(&m, dump, LENGTH(dump), "  ");
+    verbose("Model:\n%s", dump);
 
     return 0;
 }
