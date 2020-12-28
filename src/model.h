@@ -18,12 +18,12 @@ typedef struct room {
     int capacity;
 } room;
 
-// <curricula> := <CurriculumID> <# Courses> <MemberID> ... <MemberID>
+// <curricula> := <CurriculumID> <# Courses> <CourseID> ... <CourseID>
 // e.g.        :=      q000         4         c0001 c0002 c0004 c0005 
 typedef struct curricula {
     char *id;
     int n_courses;
-    char **member_ids;
+    char **courses;
 } curricula;
 
 // <unavailability_constraint> := <CourseID> <Day> <Day_Period>
@@ -40,7 +40,7 @@ typedef struct model {
     int n_rooms;
     int n_days;
     int n_periods_per_day;
-    int n_curricula;
+    int n_curriculas;
     int n_unavailability_constraints;
     course *courses;
     room *rooms;
@@ -48,12 +48,20 @@ typedef struct model {
     unavailability_constraint *unavailability_constraints;
 } model;
 
-void course_init(course *course);
-void course_dump(const course *course, char *dump, int size, const char *indent);
-
 void model_init(model *model);
-void model_destroy(model *model);
 
+void course_destroy(const course *c);
+void room_destroy(const room *r);
+void curricula_destroy(const curricula *q);
+void unavailability_constraint_destroy(const unavailability_constraint *uc);
+void model_destroy(const model *model);
+
+void course_dump(const course *c, char *dump, int size, const char *indent);
+void room_dump(const room *r, char *dump, int size, const char *indent);
+void curricula_dump(const curricula *q, char *dump, int size, const char *indent);
+void unavailability_constraint_dump(const unavailability_constraint *uc,
+                                    char *dump, int size, const char *indent);
 void model_dump(const model *model, char *dump, int size, const char *indent);
+
 
 #endif // MODEL_H

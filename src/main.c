@@ -76,7 +76,6 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <stdbool.h>
 #include "args.h"
 #include "log/verbose.h"
-#include <string.h>
 #include "parser.h"
 #include "utils.h"
 
@@ -131,18 +130,20 @@ int main (int argc, char **argv) {
 
     set_verbose(args.verbose);
 
-    char dump[4096];
+    char dump[65536];
     args_dump(&args, dump, LENGTH(dump), "  ");
     verbose("Arguments:\n%s", dump);
 
     model m;
     model_init(&m);
 
-    if (!parse(args.input, &m))
+    if (!parse_model(args.input, &m))
         exit(EXIT_FAILURE);
 
-    model_dump(&m, dump, LENGTH(dump), "  ");
-    verbose("Model:\n%s", dump);
+    if (is_verbose) {
+        model_dump(&m, dump, LENGTH(dump), "  ");
+        verbose("Model:\n%s", dump);
+    }
 
     model_destroy(&m);
 

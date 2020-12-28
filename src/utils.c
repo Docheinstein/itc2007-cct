@@ -60,8 +60,8 @@ int strtoint(const char *str, bool *ok) {
     return ret;
 }
 
-int strsplit(char *str, const char *delimiters, char **tokens, size_t size) {
-    if (size <= 1)
+int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens) {
+    if (max_tokens <= 1)
         return 0;
 
     int i = 0;
@@ -72,7 +72,26 @@ int strsplit(char *str, const char *delimiters, char **tokens, size_t size) {
 
     do {
         tokens[i++] = token;
-    } while ((token = strtok(NULL, delimiters)) && i < size);
+    } while ((token = strtok(NULL, delimiters)) && i < max_tokens);
 
     return i;
+}
+
+char *strjoin(char **strs, size_t size, const char *joiner) {
+    const int joiner_len = (int) strlen(joiner);
+    int buflen = 0;
+
+    for (int i = 0; i < size - 1; i++)
+        buflen += (int) strlen(strs[i]) + joiner_len;
+    buflen += (int) strlen(strs[size - 1]);            // last, without joiner
+    buflen += 1;                                       // '\0'
+
+    char *s = malloc(sizeof(char) * buflen);
+    s[0] = '\0';
+
+    for (int i = 0; i < size - 1; i++)
+        strappendf(s, buflen, "%s%s", strs[i], joiner);
+    strappendf(s, buflen, "%s", strs[size - 1]);       // last, without joiner
+
+    return s; // must be freed outside
 }

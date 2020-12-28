@@ -153,6 +153,24 @@ MUNIT_TEST(test_strsplit) {
     return MUNIT_OK;
 }
 
+MUNIT_TEST(test_strjoin) {
+    char *strings[] = {
+        "first",
+        "second",
+        "third"
+    };
+
+    char *s = strjoin(strings, 3, ", ");
+    munit_assert_string_equal(s, "first, second, third");
+    free(s);
+
+    char *s2 = strjoin(strings, 3, "");
+    munit_assert_string_equal(s, "firstsecondthird");
+    free(s2);
+
+    return MUNIT_OK;
+}
+
 // ======================= END TESTS =======================
 
 static MunitTest tests[] = {
@@ -164,6 +182,7 @@ static MunitTest tests[] = {
     { "test_strappend", test_strappend, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strappendf", test_strappendf, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strsplit", test_strsplit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_strjoin", test_strjoin, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     MUNIT_TESTS_END
 };
 

@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #define LENGTH(a) (sizeof(a) / sizeof((a)[0]))
 #define eprintf(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
@@ -26,6 +27,8 @@ char * strtrim(char *str);
 
 int strtoint(const char *str, bool *ok);
 
-int strsplit(char *str, const char *delimiters, char **tokens, size_t size);
+int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens);
+
+char * strjoin(char **strs, size_t size, const char *joiner);
 
 #endif // UTILS_H
