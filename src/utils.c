@@ -9,6 +9,10 @@ bool streq(const char *s1, const char *s2) {
     return strcmp(s1, s2) == 0;
 }
 
+bool strempty(const char *str) {
+    return strcmp(str, "") == 0;
+}
+
 int strpos(const char *str, char character) {
     const char *c = strchr(str, character);
 
@@ -54,4 +58,21 @@ int strtoint(const char *str, bool *ok) {
         *ok = (errno == 0 && str && endptr && *endptr == '\0');
 
     return ret;
+}
+
+int strsplit(char *str, const char *delimiters, char **tokens, size_t size) {
+    if (size <= 1)
+        return 0;
+
+    int i = 0;
+    char *token = strtok(str, delimiters);
+
+    if (!token)
+        return 0;
+
+    do {
+        tokens[i++] = token;
+    } while ((token = strtok(NULL, delimiters)) && i < size);
+
+    return i;
 }

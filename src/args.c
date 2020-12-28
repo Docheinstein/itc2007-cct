@@ -1,12 +1,7 @@
 #include <stdio.h>
 #include "args.h"
 
-
-void args_dump(args *args, char *dump, int size) {
-    args_dump_indent(args, dump, size, "");
-}
-
-void args_dump_indent(args *args, char *dump, int size, const char *indent) {
+void args_dump(args *args, char *dump, int size, const char *indent) {
     snprintf(dump, size,
        "%sinput = %s\n"
        "%soutput = %s\n"

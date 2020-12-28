@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 #include "log/debug.h"
 #include "log/verbose.h"
 #include "utils.h"
@@ -43,6 +44,15 @@
     <unavailability_constraint> := <CourseID> <Day> <Day_Period>
 */
 
+#define SECTION_NONE            0
+#define SECTION_COURSES         1
+#define SECTION_ROOMS           2
+#define SECTION_CURRICULA       3
+#define SECTION_CONSTRAINTS     4
+
+#define DELIMITERS " \t"
+#define COURSE_FIELDS 5
+
 bool parse(char *input, model *model) {
     verbose("Opening input file: '%s'", input);
 
@@ -53,30 +63,54 @@ bool parse(char *input, model *model) {
         return false;
     }
 
-    int line_num = 1;
+    int line_num = 0;
     char line[256];
 
     char key_[256];
     char value_[256];
 
+    int section = SECTION_NONE;
+    int section_entry = 0;
+
     bool ok = true;
 
-    while (fgets(line, LENGTH(line), file)) {
-        verbosef("<< %s", line);
+    while (fgets(line, LENGTH(line), file) && ok) {
+        ++line_num;
+        line[strlen(line) - 1] = '\0';
+        verbose("<< %s", line);
+
+        // Inside section?
+        if (section == SECTION_COURSES) {
+            char *course_tokens[COURSE_FIELDS];
+            if (strsplit(line, DELIMITERS, course_tokens, COURSE_FIELDS) == COURSE_FIELDS) {
+                course *c = &model->courses[section_entry++];
+                course_init(c);
+                int f = 0;
+                c->id = strdup(course_tokens[f++]);
+                c->teacher = strdup(course_tokens[f++]);
+                c->n_lectures = strtoint(course_tokens[f++], &ok); if (!ok) break;
+                c->min_working_days = strtoint(course_tokens[f++], &ok); if (!ok) break;
+                c->n_students = strtoint(course_tokens[f++], &ok); if (!ok) break;
+                continue;
+            }
+        }
+
+        // Outside section?
         int colon = strpos(line, ':');
 
         if (colon > 0) {
             strncpy(key_, line, colon);
             key_[colon] = '\0';
 
-            strncpy(value_, &line[colon + 1], strlen(line) - colon - 2);
-            value_[strlen(line) - colon - 2] = '\0';
+            strncpy(value_, &line[colon + 1], strlen(line) - colon - 1);
+            value_[strlen(line) - colon - 1] = '\0';
 
             char *key = strtrim(key_);
             char *value = strtrim(value_);
 
             debug("(key='%s', value='%s')", key, value);
 
+            // Preliminary fields
             if (streq("Name", key))
                 model->name = strdup(value);
             else if (streq("Courses", key))
@@ -90,13 +124,27 @@ bool parse(char *input, model *model) {
             else if (streq("Curricula", key))
                 model->n_curricula = strtoint(value, &ok);
             else if (streq("Constraints", key))
-                model->n_constraints = strtoint(value, &ok);
+                model->n_unavailability_constraints = strtoint(value, &ok);
 
-            if (!ok)
-                break;
+            // Sections begin
+            else if (streq("COURSES", key) && strempty(value)) {
+                section = SECTION_COURSES;
+                model->courses = malloc(sizeof(course) * model->n_courses);
+            }
+            else if (streq("ROOMS", key) && strempty(value)) {
+                section = SECTION_ROOMS;
+                model->rooms = malloc(sizeof(course) * model->n_rooms);
+            }
+            else if (streq("CURRICULA", key) && strempty(value)) {
+                section = SECTION_CURRICULA;
+                model->curriculas = malloc(sizeof(course) * model->n_curricula);
+            }
+            else if (streq("UNAVAILABILITY_CONSTRAINTS", key) && strempty(value)) {
+                section = SECTION_CONSTRAINTS;
+                model->unavailability_constraints =
+                        malloc(sizeof(course) * model->n_unavailability_constraints);
+            }
         }
-
-        ++line_num;
     }
 
     verbose("Closing file: '%s'", input);

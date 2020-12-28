@@ -121,8 +121,6 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
     return 0;
 }
 
-#ifndef TEST
-
 int main (int argc, char **argv) {
     struct argp argp = { options, parse_option, args_doc, doc };
 
@@ -134,7 +132,7 @@ int main (int argc, char **argv) {
     set_verbose(args.verbose);
 
     char dump[4096];
-    args_dump_indent(&args, dump, LENGTH(dump), "  ");
+    args_dump(&args, dump, LENGTH(dump), "  ");
     verbose("Arguments:\n%s", dump);
 
     model m;
@@ -143,10 +141,10 @@ int main (int argc, char **argv) {
     if (!parse(args.input, &m))
         exit(EXIT_FAILURE);
 
-    model_dump_indent(&m, dump, LENGTH(dump), "  ");
+    model_dump(&m, dump, LENGTH(dump), "  ");
     verbose("Model:\n%s", dump);
+
+    model_destroy(&m);
 
     return 0;
 }
-
-#endif
