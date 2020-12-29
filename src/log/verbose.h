@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-static int is_verbose;
+bool is_verbose();
 void set_verbose(bool yes);
 
 int verbosef(const char *fmt, ...);

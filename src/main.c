@@ -140,7 +140,7 @@ int main (int argc, char **argv) {
     if (!parse_model(args.input, &m))
         exit(EXIT_FAILURE);
 
-    if (is_verbose) {
+    if (is_verbose()) {
         model_dump(&m, dump, LENGTH(dump), "  ");
         verbose("Model:\n%s", dump);
     }
