@@ -30,10 +30,12 @@ int strtoint(const char *str, bool *ok);
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens);
 char * strjoin(char **strs, size_t size, const char *joiner);
 
-char * strmake(const char * fmt, ...);
+//char * strmake(const char * fmt, ...);
 
 void strappend_realloc(char **dest, size_t *size, const char *fmt, ...);
 
-void *mallocx();
+void *mallocx(size_t size);
+
+char *fileread(const char *filename);
 
 #endif // UTILS_H

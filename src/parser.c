@@ -112,7 +112,7 @@ bool parse_model(char *input, model *model) {
                 course *c = &model->courses[section_entry++];
                 int f = 0;
                 c->id = strdup(tokens[f++]);
-                c->teacher = strdup(tokens[f++]);
+                c->teacher_id = strdup(tokens[f++]);
                 c->n_lectures = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
                 c->min_working_days = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
                 c->n_students = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
@@ -147,9 +147,9 @@ bool parse_model(char *input, model *model) {
                 if (q->n_courses != n_tokens - CURRICULA_FIXED_FIELDS)
                     ABORT_PARSE("unexpected curricula fields count");
 
-                q->courses = mallocx(sizeof(char *) * q->n_courses);
+                q->courses_ids = mallocx(sizeof(char *) * q->n_courses);
                 for (int i = 0; i < q->n_courses; i++) {
-                    q->courses[i] = strdup(tokens[f++]);
+                    q->courses_ids[i] = strdup(tokens[f++]);
                 }
             }
         } else if (section == SECTION_CONSTRAINTS) {
@@ -162,7 +162,7 @@ bool parse_model(char *input, model *model) {
                 unavailability_constraint *uc =
                         &model->unavailability_constraints[section_entry++];
                 int f = 0;
-                uc->course = strdup(tokens[f++]);
+                uc->course_id = strdup(tokens[f++]);
                 uc->day = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
                 uc->day_period = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
             }

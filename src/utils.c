@@ -97,6 +97,7 @@ char *strjoin(char **strs, size_t size, const char *joiner) {
     return s; // must be freed outside
 }
 
+/*
 char *strmake(const char *fmt, ...) {
     va_list args, args2;
     va_start(args, fmt);
@@ -112,6 +113,7 @@ char *strmake(const char *fmt, ...) {
 
     return s;
 }
+*/
 
 void strappend_realloc(char **dest, size_t *size, const char *fmt, ...) {
     if (!dest)
@@ -119,8 +121,11 @@ void strappend_realloc(char **dest, size_t *size, const char *fmt, ...) {
 
     static const size_t DEFAULT_BUFFER_SIZE = 256;
 
-    if (!*dest)
+    if (!*dest) {
+        *size = DEFAULT_BUFFER_SIZE;
         *dest = mallocx(DEFAULT_BUFFER_SIZE);
+        *dest[0] = '\0';
+    }
 
     va_list args, args2;
     va_start(args, fmt);
@@ -140,6 +145,20 @@ void strappend_realloc(char **dest, size_t *size, const char *fmt, ...) {
 
     va_end(args);
     va_end(args2);
+}
+
+char *fileread(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    fseek(f, 0, SEEK_END);
+    long filesize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char *content = mallocx(filesize + 1);
+    fread(content, sizeof(char), filesize, f);
+    fclose(f);
+
+    content[filesize] = '\0';
+    return content; // must be freed outside
 }
 
 void *mallocx(size_t size) {

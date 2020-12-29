@@ -22,7 +22,7 @@ void model_init(model *model) {
 
 void course_destroy(const course *c) {
     free(c->id);
-    free(c->teacher);
+    free(c->teacher_id);
 }
 
 void room_destroy(const room *r) {
@@ -32,12 +32,12 @@ void room_destroy(const room *r) {
 void curricula_destroy(const curricula *q) {
     free(q->id);
     for (int i = 0; i < q->n_courses; i++)
-        free(q->courses[i]);
-    free(q->courses);
+        free(q->courses_ids[i]);
+    free(q->courses_ids);
 }
 
 void unavailability_constraint_destroy(const unavailability_constraint *uc) {
-    free(uc->course);
+    free(uc->course_id);
 }
 
 void model_destroy(const model *model) {
@@ -63,7 +63,7 @@ void model_destroy(const model *model) {
 void course_to_string(const course *course, char *buffer, size_t buflen) {
     snprintf(buffer, buflen,
              "(id=%s, teacher=%s, n_lectures=%d, min_working_days=%d, n_students=%d)",
-             course->id, course->teacher, course->n_lectures,
+             course->id, course->teacher_id, course->n_lectures,
              course->min_working_days, course->n_students
     );
 }
@@ -77,7 +77,7 @@ void room_to_string(const room *r, char *buffer, size_t buflen) {
 
 
 void curricula_to_string(const curricula *q, char *buffer, size_t buflen) {
-    char *courses_str = strjoin(q->courses, q->n_courses, ", ");
+    char *courses_str = strjoin(q->courses_ids, q->n_courses, ", ");
 
     snprintf(buffer, buflen,
              "(id=%s, n_courses=%d, courses=[%s])",
@@ -91,7 +91,7 @@ void unavailability_constraint_to_string(const unavailability_constraint *uc,
                                          char *buffer, size_t buflen) {
     snprintf(buffer, buflen,
              "(course=%s, day=%d, day_period=%d)",
-             uc->course, uc->day, uc->day_period
+             uc->course_id, uc->day, uc->day_period
     );
 }
 
@@ -106,10 +106,9 @@ void unavailability_constraint_to_string(const unavailability_constraint *uc,
 } while(0)
 
 char * model_to_string(const model *model) {
-    size_t buflen = 256;
-    char *buffer = mallocx(sizeof(char) * buflen);
+    char *buffer = NULL;
+    size_t buflen;
 
-    buffer[0] = '\0';
     strappend_realloc(&buffer, &buflen,
          "name = %s\n"
          "# courses = %d\n"
@@ -148,4 +147,61 @@ char * model_to_string(const model *model) {
 
 
     return buffer; // must be freed outside
+}
+
+void course_set(course *c,
+                char *id, char *teacher_id, int n_lectures,
+                int min_working_days, int n_students) {
+    c->id = id;
+    c->teacher_id = teacher_id;
+    c->n_lectures = n_lectures;
+    c->min_working_days = min_working_days;
+    c->n_students = n_students;
+}
+
+void room_set(room *r,
+              char *id, int capacity) {
+    r->id = id;
+    r->capacity = capacity;
+}
+
+void curricula_set(curricula *q,
+                   char *id, int n_courses, char **courses_ids) {
+    q->id = id;
+    q->n_courses = n_courses;
+    q->courses_ids = courses_ids;
+}
+
+void unavailability_constraint_set(unavailability_constraint *uc,
+                                   char *course_id, int day, int day_period) {
+    uc->course_id = course_id;
+    uc->day = day;
+    uc->day_period = day_period;
+}
+
+course *model_course_by_id(const model *model, char *id) {
+    for (int i = 0; i < model->n_courses; i++) {
+        course *c = &model->courses[i];
+        if (streq(id, c->id))
+            return c;
+    }
+    return NULL;
+}
+
+room *model_room_by_id(const model *model, char *id) {
+    for (int i = 0; i < model->n_rooms; i++) {
+        room *r = &model->rooms[i];
+        if (streq(id, r->id))
+            return r;
+    }
+    return NULL;
+}
+
+curricula *model_curricula_by_id(const model *model, char *id) {
+    for (int i = 0; i < model->n_curriculas; i++) {
+        curricula *q = &model->curriculas[i];
+        if (streq(id, q->id))
+            return q;
+    }
+    return NULL;
 }

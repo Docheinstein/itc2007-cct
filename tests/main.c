@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <solution.h>
+#include <parser.h>
 #include "utils.h"
 #include "munit/munit.h"
 
@@ -166,13 +168,13 @@ MUNIT_TEST(test_strjoin) {
     return MUNIT_OK;
 }
 
-MUNIT_TEST(test_strmake) {
-    char * s = strmake("String of unknown length created dynamically");
-    munit_assert_string_equal(s, "String of unknown length created dynamically");
-    free(s);
-
-    return MUNIT_OK;
-}
+//MUNIT_TEST(test_strmake) {
+//    char * s = strmake("String of unknown length created dynamically");
+//    munit_assert_string_equal(s, "String of unknown length created dynamically");
+//    free(s);
+//
+//    return MUNIT_OK;
+//}
 
 MUNIT_TEST(test_strappend_realloc) {
     size_t size = 8;
@@ -196,6 +198,80 @@ MUNIT_TEST(test_strappend_realloc) {
     return MUNIT_OK;
 }
 
+MUNIT_TEST(test_parser) {
+    model m;
+    model_init(&m);
+    parse_model("datasets/toy.ctt", &m);
+
+    munit_assert_int(m.n_courses, ==, 4);
+    munit_assert_int(m.n_rooms, ==, 2);
+    munit_assert_int(m.n_days, ==, 5);
+    munit_assert_int(m.n_periods_per_day, ==, 4);
+    munit_assert_int(m.n_curriculas, ==, 2);
+    munit_assert_int(m.n_unavailability_constraints, ==, 8);
+
+    munit_assert_string_equal("SceCosC", model_course_by_id(&m, "SceCosC")->id);
+    munit_assert_string_equal("ArcTec", model_course_by_id(&m, "ArcTec")->id);
+    munit_assert_string_equal("TecCos", model_course_by_id(&m, "TecCos")->id);
+    munit_assert_string_equal("Geotec", model_course_by_id(&m, "Geotec")->id);
+
+    munit_assert_string_equal("A", model_room_by_id(&m, "A")->id);
+    munit_assert_string_equal("B", model_room_by_id(&m, "B")->id);
+
+    munit_assert_string_equal("Cur1", model_curricula_by_id(&m, "Cur1")->id);
+    munit_assert_string_equal("Cur2", model_curricula_by_id(&m, "Cur2")->id);
+
+    model_destroy(&m);
+
+    return MUNIT_OK;
+}
+
+#define ASSIGNMENT(course, room, day, day_period) \
+    assignment_new(                               \
+        (model_course_by_id(&m, course)),         \
+        (model_room_by_id(&m, room)),             \
+        (day),                                    \
+        (day_period)                              \
+    )
+
+MUNIT_TEST(test_toy_solution) {
+    solution sol;
+    solution_init(&sol);
+
+    model m;
+    model_init(&m);
+    parse_model("datasets/toy.ctt", &m);
+
+    FILE *file = fopen("solutions/toy.ctt.sol", "r");
+    munit_assert_not_null("solutions/toy.ctt.sol");
+
+    char line[256];
+    while (fgets(line, LENGTH(line), file)) {
+        line[strlen(line) - 1] = '\0';
+        if (strempty(line))
+            continue;
+        char *F[4];
+        bool ok;
+        munit_assert_int(strsplit(line, " ", F, 4), ==, 4);
+        solution_add_assignment(&sol,
+            ASSIGNMENT(F[0], F[1], strtoint(F[2], &ok), strtoint(F[3], &ok))
+        );
+        munit_assert_true(ok);
+    }
+
+    char *output = strtrim(solution_print(&sol));
+    char *expected_solution = strtrim(fileread("solutions/toy.ctt.sol"));
+
+    munit_assert_string_equal(output, expected_solution);
+
+    free(output);
+    free(expected_solution);
+    model_destroy(&m);
+    solution_destroy(&sol);
+
+    return MUNIT_OK;
+}
+
 // ======================= END TESTS =======================
 
 static MunitTest tests[] = {
@@ -208,8 +284,10 @@ static MunitTest tests[] = {
     { "test_strappend", test_strappend, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strsplit", test_strsplit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strjoin", test_strjoin, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    { "test_strmake", test_strmake, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+//    { "test_strmake", test_strmake, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strappend_realloc", test_strappend_realloc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_parser", test_parser, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_toy_solution", test_toy_solution, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     MUNIT_TESTS_END
 };
 

@@ -7,7 +7,7 @@
 // e.g.     :=   c0001       t000         6            4               130
 typedef struct course {
     char *id;
-    char *teacher;
+    char *teacher_id;
     int n_lectures;
     int min_working_days;
     int n_students;
@@ -25,13 +25,13 @@ typedef struct room {
 typedef struct curricula {
     char *id;
     int n_courses;
-    char **courses;
+    char **courses_ids;
 } curricula;
 
 // <unavailability_constraint> := <CourseID> <Day> <Day_Period>
 // e.g.                        :=    c0001     4       0
 typedef struct unavailability_constraint {
-    char *course;
+    char *course_id;
     int day;
     int day_period;
 } unavailability_constraint;
@@ -52,6 +52,14 @@ typedef struct model {
 
 void model_init(model *model);
 
+void course_set(course *c,
+                char *id, char *teacher_id, int n_lectures,
+                int min_working_days, int n_students);
+void room_set(room *r, char *id, int capacity);
+void curricula_set(curricula* q, char *id, int n_courses, char **courses_ids);
+void unavailability_constraint_set(unavailability_constraint *uc,
+                                   char *course_id, int day, int day_period);
+
 void course_destroy(const course *c);
 void room_destroy(const room *r);
 void curricula_destroy(const curricula *q);
@@ -66,5 +74,8 @@ void unavailability_constraint_to_string(const unavailability_constraint *uc,
 
 char * model_to_string(const model *model);
 
+course *model_course_by_id(const model *model, char *id);
+room *model_room_by_id(const model *model, char *id);
+curricula *model_curricula_by_id(const model *model, char *id);
 
 #endif // MODEL_H
