@@ -106,19 +106,14 @@ MUNIT_TEST(test_strappend) {
     strappend(s6, BUFLEN, s5);
     munit_assert_string_equal(s6, "FirstSecond");
 
-    return MUNIT_OK;
-}
+    char s11[BUFLEN];
+    snprintf(s11, BUFLEN, "First");
+    strappend(s11, BUFLEN, "Second %d", 10);
+    munit_assert_string_equal(s11, "FirstSecond 10");
 
-MUNIT_TEST(test_strappendf) {
-    char s[BUFLEN];
-
-    snprintf(s, BUFLEN, "First");
-    strappendf(s, BUFLEN, "Second %d", 10);
-    munit_assert_string_equal(s, "FirstSecond 10");
-
-    char s2[5] = "he";
-    strappendf(s2, 5, "%s%d", "h", 10);
-    munit_assert_string_equal(s2, "heh1");
+    char s12[5] = "he";
+    strappend(s12, 5, "%s%d", "h", 10);
+    munit_assert_string_equal(s12, "heh1");
 
     return MUNIT_OK;
 }
@@ -171,6 +166,36 @@ MUNIT_TEST(test_strjoin) {
     return MUNIT_OK;
 }
 
+MUNIT_TEST(test_strmake) {
+    char * s = strmake("String of unknown length created dynamically");
+    munit_assert_string_equal(s, "String of unknown length created dynamically");
+    free(s);
+
+    return MUNIT_OK;
+}
+
+MUNIT_TEST(test_strappend_realloc) {
+    size_t size = 8;
+    char *s1 = mallocx(sizeof(char) * size);
+    char *s2 = s1;
+    snprintf(s1, 8, "buffer");
+    strappend_realloc(&s2, &size, "!");
+    munit_assert_int(size, ==, 8);
+    munit_assert_ptr_equal(s1, s2);
+    munit_assert_string_equal(s2, "buffer!");
+    free(s1);
+
+    char *s11 = mallocx(sizeof(char) * size);
+    char *s12 = s11;
+    snprintf(s11, size, "buffer");
+    strappend_realloc(&s12, &size, "full");
+    munit_assert_int(size, >, 8);
+    munit_assert_string_equal(s12, "bufferfull");
+    free(s12);
+
+    return MUNIT_OK;
+}
+
 // ======================= END TESTS =======================
 
 static MunitTest tests[] = {
@@ -180,9 +205,11 @@ static MunitTest tests[] = {
     { "test_strtrim", test_strtrim, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strtoint", test_strtoint, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strappend", test_strappend, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    { "test_strappendf", test_strappendf, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_strappend", test_strappend, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strsplit", test_strsplit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strjoin", test_strjoin, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_strmake", test_strmake, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_strappend_realloc", test_strappend_realloc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     MUNIT_TESTS_END
 };
 

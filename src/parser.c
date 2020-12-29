@@ -147,9 +147,8 @@ bool parse_model(char *input, model *model) {
                 if (q->n_courses != n_tokens - CURRICULA_FIXED_FIELDS)
                     ABORT_PARSE("unexpected curricula fields count");
 
-                q->courses = malloc(sizeof(char *) * q->n_courses);
+                q->courses = mallocx(sizeof(char *) * q->n_courses);
                 for (int i = 0; i < q->n_courses; i++) {
-                    debug("Setting course %d of %d", i + 1, q->n_courses);
                     q->courses[i] = strdup(tokens[f++]);
                 }
             }
@@ -204,37 +203,37 @@ bool parse_model(char *input, model *model) {
             else if (streq("COURSES", key) && strempty(value)) {
                 section = SECTION_COURSES;
                 section_entry = 0;
-                model->courses = malloc(sizeof(course) * model->n_courses);
+                model->courses = mallocx(sizeof(course) * model->n_courses);
             }
             else if (streq("ROOMS", key) && strempty(value)) {
                 section = SECTION_ROOMS;
                 section_entry = 0;
-                model->rooms = malloc(sizeof(course) * model->n_rooms);
+                model->rooms = mallocx(sizeof(course) * model->n_rooms);
             }
             else if (streq("CURRICULA", key) && strempty(value)) {
                 section = SECTION_CURRICULAS;
                 section_entry = 0;
-                model->curriculas = malloc(sizeof(course) * model->n_curriculas);
+                model->curriculas = mallocx(sizeof(course) * model->n_curriculas);
             }
             else if (streq("UNAVAILABILITY_CONSTRAINTS", key) && strempty(value)) {
                 section = SECTION_CONSTRAINTS;
                 section_entry = 0;
                 model->unavailability_constraints =
-                        malloc(sizeof(course) * model->n_unavailability_constraints);
+                        mallocx(sizeof(course) * model->n_unavailability_constraints);
             }
         }
     }
 
     verbose("Closing file: '%s'", input);
     if (fclose(file) != 0)
-        eprint("WARN: failed to close '%s' (%s)\n", input, strerror(errno));
+        eprint("WARN: failed to close '%s' (%s)", input, strerror(errno));
 
     if (!ok) {
         if (!strempty(error_reason))
-            eprintf("ERROR: failed to parse_model input file (%s), error at line %d\n"
+            eprint("ERROR: failed to parse_model input file (%s), error at line %d"
                     "%s", error_reason, line_num, line_copy);
         else
-            eprintf("ERROR: failed to parse_model input file, error at line %d\n"
+            eprint("ERROR: failed to parse_model input file, error at line %d"
                     "%s", line_num, line_copy);
     }
     return ok;

@@ -9,13 +9,13 @@
 #define eprintf(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
 #define eprint(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__)
 
-#define strappend(dest, size, str) do { \
+#define strappend(dest, size, fmt, ...) do { \
     const int _len = strlen(dest); \
-    snprintf(&dest[_len], (int) (size - _len), "%s", str); } while(0);
+    snprintf(&(dest)[_len], (int) ((size) - _len), fmt, ##__VA_ARGS__); } while(0);
 
-#define strappendf(dest, size, fmt, ...) do { \
+#define vstrappend(dest, size, fmt, args) do { \
     const int _len = strlen(dest); \
-    snprintf(&dest[_len], (int) (size - _len), fmt, ##__VA_ARGS__); } while(0);
+    vsnprintf(&(dest)[_len], (int) ((size) - _len), fmt, args); } while(0);
 
 bool streq(const char *s1, const char *s2);
 bool strempty(const char *str);
@@ -28,7 +28,12 @@ char * strtrim(char *str);
 int strtoint(const char *str, bool *ok);
 
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens);
-
 char * strjoin(char **strs, size_t size, const char *joiner);
+
+char * strmake(const char * fmt, ...);
+
+void strappend_realloc(char **dest, size_t *size, const char *fmt, ...);
+
+void *mallocx();
 
 #endif // UTILS_H

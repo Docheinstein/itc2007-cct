@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <stdarg.h>
 #include "log/debug.h"
 
 bool streq(const char *s1, const char *s2) {
@@ -86,12 +87,64 @@ char *strjoin(char **strs, size_t size, const char *joiner) {
     buflen += (int) strlen(strs[size - 1]);            // last, without joiner
     buflen += 1;                                       // '\0'
 
-    char *s = malloc(sizeof(char) * buflen);
+    char *s = mallocx(sizeof(char) * buflen);
     s[0] = '\0';
 
     for (int i = 0; i < size - 1; i++)
-        strappendf(s, buflen, "%s%s", strs[i], joiner);
-    strappendf(s, buflen, "%s", strs[size - 1]);       // last, without joiner
+        strappend(s, buflen, "%s%s", strs[i], joiner);
+    strappend(s, buflen, "%s", strs[size - 1]);       // last, without joiner
 
     return s; // must be freed outside
+}
+
+char *strmake(const char *fmt, ...) {
+    va_list args, args2;
+    va_start(args, fmt);
+    va_copy(args2, args);
+
+    int buflen = snprintf(NULL, 0, fmt, args) + 1;
+
+    char *s = mallocx(sizeof(char) * buflen);
+    snprintf(s, buflen, fmt, args2);
+
+    va_end(args);
+    va_end(args2);
+
+    return s;
+}
+
+void strappend_realloc(char **dest, size_t *size, const char *fmt, ...) {
+    if (!dest)
+        return;
+
+    static const size_t DEFAULT_BUFFER_SIZE = 256;
+
+    if (!*dest)
+        *dest = mallocx(DEFAULT_BUFFER_SIZE);
+
+    va_list args, args2;
+    va_start(args, fmt);
+    va_copy(args2, args);
+
+    const size_t required_size =
+            strlen(*dest) + vsnprintf(NULL, 0, fmt, args) + 1;
+
+    if (*size < required_size) {
+        while (*size < required_size)
+            *size *= 2; // grow buffer length exponentially for avoid realloc
+
+        *dest = realloc(*dest, *size);
+    }
+
+    vstrappend(*dest, *size, fmt, args2);
+
+    va_end(args);
+    va_end(args2);
+}
+
+void *mallocx(size_t size) {
+    void *ptr = malloc(size);
+    if (!ptr)
+        eprint("ERROR: malloc failed");
+    return ptr;
 }

@@ -1,16 +1,15 @@
 #include <stdio.h>
 #include "args.h"
 
-void args_dump(args *args, char *dump, int size, const char *indent) {
-    snprintf(dump, size,
-       "%sinput = %s\n"
-       "%soutput = %s\n"
-       "%sverbose = %d"
-       ,
-       indent, args->input,
-       indent, args->output,
-       indent, args->verbose
-   );
+void args_to_string(const args *args, char *buffer, size_t buflen) {
+    snprintf(buffer, buflen,
+        "input = %s\n"
+        "output = %s\n"
+        "verbose = %d",
+        args->input,
+        args->output,
+        args->verbose
+    );
 }
 
 void args_init(args *args) {

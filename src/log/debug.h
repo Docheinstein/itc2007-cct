@@ -2,10 +2,9 @@
 #define DEBUG_H
 
 #ifdef DEBUG
-int debugf(const char *fmt, ...);
-#define debug(format, ...) debugf(format "\n", ##__VA_ARGS__)
+#define debugf(fmt, ...) printf(fmt, ##__VA_ARGS__)
+#define debug(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #else
-#define debugf(format, ...)
 #define debug(format, ...)
 #endif
 

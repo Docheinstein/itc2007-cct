@@ -130,9 +130,11 @@ int main (int argc, char **argv) {
 
     set_verbose(args.verbose);
 
-    char dump[65536];
-    args_dump(&args, dump, LENGTH(dump), "  ");
-    verbose("Arguments:\n%s", dump);
+    char buffer[256];
+    args_to_string(&args, buffer, LENGTH(buffer));
+    verbose("=== ARGUMENTS ===\n"
+            "%s\n"
+            "=================", buffer);
 
     model m;
     model_init(&m);
@@ -141,8 +143,11 @@ int main (int argc, char **argv) {
         exit(EXIT_FAILURE);
 
     if (is_verbose()) {
-        model_dump(&m, dump, LENGTH(dump), "  ");
-        verbose("Model:\n%s", dump);
+        char * s = model_to_string(&m);
+        verbose("=== MODEL ====\n"
+                "%s\n"
+                "==============", s);
+        free(s);
     }
 
     model_destroy(&m);

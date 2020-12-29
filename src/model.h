@@ -1,6 +1,8 @@
 #ifndef MODEL_H
 #define MODEL_H
 
+#include <stddef.h>
+
 // <course> := <CourseID> <Teacher> <# Lectures> <MinWorkingDays> <# Students>
 // e.g.     :=   c0001       t000         6            4               130
 typedef struct course {
@@ -56,12 +58,13 @@ void curricula_destroy(const curricula *q);
 void unavailability_constraint_destroy(const unavailability_constraint *uc);
 void model_destroy(const model *model);
 
-void course_dump(const course *c, char *dump, int size, const char *indent);
-void room_dump(const room *r, char *dump, int size, const char *indent);
-void curricula_dump(const curricula *q, char *dump, int size, const char *indent);
-void unavailability_constraint_dump(const unavailability_constraint *uc,
-                                    char *dump, int size, const char *indent);
-void model_dump(const model *model, char *dump, int size, const char *indent);
+void course_to_string(const course *c, char *buffer, size_t buflen);
+void room_to_string(const room *r, char *buffer, size_t buflen);
+void curricula_to_string(const curricula *q, char *buffer, size_t buflen);
+void unavailability_constraint_to_string(const unavailability_constraint *uc,
+                                         char *buffer, size_t buflen);
+
+char * model_to_string(const model *model);
 
 
 #endif // MODEL_H

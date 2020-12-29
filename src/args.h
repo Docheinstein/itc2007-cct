@@ -9,7 +9,7 @@ typedef struct args {
     bool verbose;
 } args;
 
-void args_dump(args *args, char *dump, int size, const char *indent);
+void args_to_string(const args *args, char *buffer, size_t buflen);
 void args_init(args *args);
 
 

@@ -60,105 +60,92 @@ void model_destroy(const model *model) {
     free(model->unavailability_constraints);
 }
 
-void course_dump(const course *course, char *dump, int size, const char *indent) {
-    snprintf(dump, size,
-             "%s(id=%s, teacher=%s, n_lectures=%d, min_working_days=%d, n_students=%d)",
-             indent,
+void course_to_string(const course *course, char *buffer, size_t buflen) {
+    snprintf(buffer, buflen,
+             "(id=%s, teacher=%s, n_lectures=%d, min_working_days=%d, n_students=%d)",
              course->id, course->teacher, course->n_lectures,
              course->min_working_days, course->n_students
     );
 }
 
-void room_dump(const room *room, char *dump, int size, const char *indent) {
-    snprintf(dump, size,
-             "%s(id=%s, capacity=%d)",
-             indent,
-             room->id, room->capacity
+void room_to_string(const room *r, char *buffer, size_t buflen) {
+    snprintf(buffer, buflen,
+             "(id=%s, capacity=%d)",
+             r->id, r->capacity
     );
 }
 
 
-void curricula_dump(const curricula *q, char *dump, int size, const char *indent) {
+void curricula_to_string(const curricula *q, char *buffer, size_t buflen) {
     char *courses_str = strjoin(q->courses, q->n_courses, ", ");
 
-    snprintf(dump, size,
-             "%s(id=%s, n_courses=%d, courses=[%s])",
-             indent,
+    snprintf(buffer, buflen,
+             "(id=%s, n_courses=%d, courses=[%s])",
              q->id, q->n_courses, courses_str
     );
 
     free(courses_str);
 }
 
-void unavailability_constraint_dump(const unavailability_constraint *uc,
-                                    char *dump, int size, const char *indent) {
-    snprintf(dump, size,
-             "%s(course=%s, day=%d, day_period=%d)",
-             indent,
+void unavailability_constraint_to_string(const unavailability_constraint *uc,
+                                         char *buffer, size_t buflen) {
+    snprintf(buffer, buflen,
+             "(course=%s, day=%d, day_period=%d)",
              uc->course, uc->day, uc->day_period
     );
 }
 
-void model_dump(const model *model, char *dump, int size, const char *indent) {
-    char two_indent[strlen(indent) * 2 + 1];
-    snprintf(two_indent, strlen(indent) * 2 + 1, "%s%s", indent, indent);
+#define MODEL_APPEND_SECTION(header, n_entries, entries, to_string_func) do { \
+    if (entries) { \
+        strappend_realloc(&buffer, &buflen, header); \
+        for (int i = 0; i < (n_entries); ++i) { \
+            to_string_func(&(entries)[i], tmp, tmp_buffer_length); \
+            strappend_realloc(&buffer, &buflen, "%s\n", tmp); \
+        } \
+    } \
+} while(0)
 
-    snprintf(dump, size,
-             "%sname = %s\n"
-             "%s# courses = %d\n"
-             "%s# rooms = %d\n"
-             "%s# days = %d\n"
-             "%s# n_periods_per_day = %d\n"
-             "%s# n_curricula = %d\n"
-             "%s# n_constraints = %d\n",
-             indent, model->name,
-             indent, model->n_courses,
-             indent, model->n_rooms,
-             indent, model->n_days,
-             indent, model->n_periods_per_day,
-             indent, model->n_curriculas,
-             indent, model->n_unavailability_constraints
+char * model_to_string(const model *model) {
+    size_t buflen = 256;
+    char *buffer = mallocx(sizeof(char) * buflen);
+
+    buffer[0] = '\0';
+    strappend_realloc(&buffer, &buflen,
+         "name = %s\n"
+         "# courses = %d\n"
+         "# rooms = %d\n"
+         "# days = %d\n"
+         "# periods_per_day = %d\n"
+         "# curricula = %d\n"
+         "# constraints = %d\n",
+         model->name,
+         model->n_courses,
+         model->n_rooms,
+         model->n_days,
+         model->n_periods_per_day,
+         model->n_curriculas,
+         model->n_unavailability_constraints
     );
 
-    if (model->courses) {
-        strappendf(dump, size, "%sCOURSES\n", indent);
+    static const size_t tmp_buffer_length = 512;
+    char tmp[tmp_buffer_length];
 
-        for (int i = 0; i < model->n_courses; ++i) {
-            course_dump(&model->courses[i], &dump[strlen(dump)],
-                        (int) (size - strlen(dump)), two_indent);
-            strappend(dump, size, "\n");
-        }
-    }
+    MODEL_APPEND_SECTION("COURSES\n",
+                         model->n_courses, model->courses,
+                         course_to_string);
+    MODEL_APPEND_SECTION("ROOMS\n",
+                         model->n_rooms, model->rooms,
+                         room_to_string);
+    MODEL_APPEND_SECTION("CURRICULAS\n",
+                         model->n_curriculas, model->curriculas,
+                         curricula_to_string);
+    MODEL_APPEND_SECTION("UNAVAILABILITY_CONSTRAINTS\n",
+                         model->n_unavailability_constraints,
+                         model->unavailability_constraints,
+                         unavailability_constraint_to_string);
 
-    if (model->rooms) {
-        strappendf(dump, size, "%sROOMS\n", indent);
+    buffer[strlen(buffer) - 1] = '\0';
 
-        for (int i = 0; i < model->n_rooms; ++i) {
-            room_dump(&model->rooms[i], &dump[strlen(dump)],
-                      (int) (size - strlen(dump)), two_indent);
-            strappend(dump, size, "\n");
-        }
-    }
 
-    if (model->curriculas) {
-        strappendf(dump, size, "%sCURRICULAS\n", indent);
-
-        for (int i = 0; i < model->n_curriculas; ++i) {
-            curricula_dump(&model->curriculas[i], &dump[strlen(dump)],
-                           (int) (size - strlen(dump)), two_indent);
-            strappend(dump, size, "\n");
-        }
-    }
-
-    if (model->unavailability_constraints) {
-        strappendf(dump, size, "%sUNAVAILABILITY_CONSTRAINTS\n", indent);
-
-        for (int i = 0; i < model->n_unavailability_constraints; ++i) {
-            unavailability_constraint_dump(
-                    &model->unavailability_constraints[i], &dump[strlen(dump)],
-                    (int) (size - strlen(dump)), two_indent);
-            strappend(dump, size, "\n");
-        }
-    }
-    dump[strlen(dump) - 1] = '\0';
+    return buffer; // must be freed outside
 }
