@@ -181,8 +181,6 @@ bool parse_model(char *input, model *model) {
             char *key = strtrim(key_);
             char *value = strtrim(value_);
 
-            debug("(key='%s', value='%s')", key, value);
-
             // Preliminary fields
             if (streq("Name", key))
                 model->name = strdup(value);

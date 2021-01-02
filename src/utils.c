@@ -72,7 +72,8 @@ int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens
         return 0;
 
     do {
-        tokens[i++] = token;
+        if (!strempty(token))
+            tokens[i++] = token;
     } while ((token = strtok(NULL, delimiters)) && i < max_tokens);
 
     return i;
@@ -149,6 +150,9 @@ void strappend_realloc(char **dest, size_t *size, const char *fmt, ...) {
 
 char *fileread(const char *filename) {
     FILE *f = fopen(filename, "rb");
+    if (!f)
+        return NULL;
+
     fseek(f, 0, SEEK_END);
     long filesize = ftell(f);
     fseek(f, 0, SEEK_SET);
@@ -159,6 +163,19 @@ char *fileread(const char *filename) {
 
     content[filesize] = '\0';
     return content; // must be freed outside
+}
+
+int filewrite(const char *filename, const char *data) {
+    FILE *f = fopen(filename, "wb");
+    if (!f)
+        return 0;
+
+    int ret = fputs(data, f);
+    fclose(f);
+
+    return ret;
+
+
 }
 
 void *mallocx(size_t size) {

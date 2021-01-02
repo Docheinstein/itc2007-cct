@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #define LENGTH(a) (sizeof(a) / sizeof((a)[0]))
+#define print(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #define eprintf(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
 #define eprint(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__)
 
@@ -37,5 +38,6 @@ void strappend_realloc(char **dest, size_t *size, const char *fmt, ...);
 void *mallocx(size_t size);
 
 char *fileread(const char *filename);
+int filewrite(const char *filename, const char *data);
 
 #endif // UTILS_H

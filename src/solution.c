@@ -20,11 +20,10 @@ void solution_init(solution *sol) {
 }
 
 void solution_destroy(solution *sol) {
-    // TODO free assignments
-    g_list_free(sol->assignments);
+    g_list_free_full(sol->assignments, g_free);
 }
 
-static char * solution_dump(const solution *sol, const char *fmt) {
+static char * solution_to_string_fmt(const solution *sol, const char *fmt) {
     char *buffer = NULL;
     size_t buflen;
 
@@ -38,14 +37,44 @@ static char * solution_dump(const solution *sol, const char *fmt) {
 }
 
 
-char * solution_print(const solution *sol) {
-    return solution_dump(sol, "%s %s %d %d\n");
+char * solution_to_string(const solution *sol) {
+    char *buffer = solution_to_string_fmt(sol, "%s %s %d %d\n");
+    buffer[strlen(buffer) - 1] = '\0';
+    return buffer;
 }
 
-char * solution_to_string(const solution *sol) {
-    return solution_dump(sol, "(course=%s, room=%s, day=%d, day_period=%d)\n");
+char * solution_to_string_debug(const solution *sol) {
+    char *buffer = solution_to_string_fmt(sol, "(course=%s, room=%s, day=%d, day_period=%d)\n");
+    buffer[strlen(buffer) - 1] = '\0';
+    return buffer;
+
 }
 
 void solution_add_assignment(solution *sol, assignment *a) {
     sol->assignments = g_list_append(sol->assignments, a);
+}
+
+bool solution_satisfy_hard_constraints(const solution *sol) {
+    return
+        solution_satisfy_hard_constraint_lectures(sol) &&
+        solution_satisfy_hard_constraint_room_occupancy(sol) &&
+        solution_satisfy_hard_constraint_conflicts(sol) &&
+        solution_satisfy_hard_constraint_availabilities(sol)
+    ;
+}
+
+bool solution_satisfy_hard_constraint_lectures(const solution *sol) {
+    return 0;
+}
+
+bool solution_satisfy_hard_constraint_room_occupancy(const solution *sol) {
+    return 0;
+}
+
+bool solution_satisfy_hard_constraint_conflicts(const solution *sol) {
+    return 0;
+}
+
+bool solution_satisfy_hard_constraint_availabilities(const solution *sol) {
+    return 0;
 }

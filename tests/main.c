@@ -3,6 +3,8 @@
 #include <parser.h>
 #include "utils.h"
 #include "munit/munit.h"
+#include <unistd.h>
+#include <log/verbose.h>
 
 #define BUFLEN 128
 
@@ -242,8 +244,8 @@ MUNIT_TEST(test_toy_solution) {
     model_init(&m);
     parse_model("datasets/toy.ctt", &m);
 
-    FILE *file = fopen("solutions/toy.ctt.sol", "r");
-    munit_assert_not_null("solutions/toy.ctt.sol");
+    FILE *file = fopen("tests/solutions/toy.ctt.sol", "r");
+    munit_assert_not_null("tests/solutions/toy.ctt.sol");
 
     char line[256];
     while (fgets(line, LENGTH(line), file)) {
@@ -258,9 +260,8 @@ MUNIT_TEST(test_toy_solution) {
         );
         munit_assert_true(ok);
     }
-
-    char *output = strtrim(solution_print(&sol));
-    char *expected_solution = strtrim(fileread("solutions/toy.ctt.sol"));
+    char *output = strtrim(solution_to_string(&sol));
+    char *expected_solution = strtrim(fileread("tests/solutions/toy.ctt.sol"));
 
     munit_assert_string_equal(output, expected_solution);
 
@@ -296,5 +297,6 @@ static const MunitSuite suite = {
 };
 
 int main (int argc, char **argv) {
+//    set_verbose(true);
     return munit_suite_main(&suite, NULL, argc, argv);
 }
