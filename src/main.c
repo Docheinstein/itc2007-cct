@@ -71,18 +71,17 @@ CurriculumCompactness: Lectures belonging to a curriculum should be adjacent to 
 RoomStability: All lectures of a course should be given in the same room. Each distinct
         room used for the lectures of a course, but the first, counts as 1 point of penalty.
  */
+
 #include <stdlib.h>
 #include <argp.h>
 #include <stdbool.h>
 #include <exact_solver.h>
-#include <debug.h>
 #include <io_utils.h>
 #include "args.h"
 #include "verbose.h"
 #include "parser.h"
 #include "solution.h"
-#include "mem_utils.h"
-#include "def_utils.h"
+#include "array_utils.h"
 
 const char *argp_program_version = "0.1";
 static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
@@ -145,24 +144,27 @@ int main (int argc, char **argv) {
         model_destroy(&m);
         exit(EXIT_FAILURE);
     }
+    model_finalize(&m);
 
     solution sol;
     solution_init(&sol);
-    solver_solve(&m, &sol);
 
-    char * sol_str = solution_to_string(&sol);
-    print(
-        "=== SOLUTION ===\n"
-        "%s",
-        sol_str
-    );
+    if (solver_solve(&m, &sol)) {
+        char * sol_str = solution_to_string(&sol);
+        print(
+            "=== SOLUTION ===\n"
+            "%s",
+            sol_str
+        );
 
-    if (!filewrite(args.output, sol_str)) {
-        eprint("ERROR: failed to write output solution to '%s' (%s)",
-               args.output, strerror(errno));
+        if (!filewrite(args.output, sol_str)) {
+            eprint("ERROR: failed to write output solution to '%s' (%s)",
+                   args.output, strerror(errno));
+        }
+
+        free(sol_str);
     }
 
-    free(sol_str);
     solution_destroy(&sol);
     model_destroy(&m);
 

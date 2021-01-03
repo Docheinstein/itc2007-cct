@@ -2,13 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <stdlib.h>
 #include <io_utils.h>
 #include <str_utils.h>
-#include <def_utils.h>
 #include "verbose.h"
 #include "model.h"
 #include "mem_utils.h"
+#include "array_utils.h"
 
 /*
     INPUT FILE SYNTAX
@@ -168,7 +167,7 @@ bool parse_model(char *input, model *model) {
                 int f = 0;
                 uc->course_id = strdup(tokens[f++]);
                 uc->day = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
-                uc->day_period = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
+                uc->slot = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
             }
         }
 
@@ -196,7 +195,7 @@ bool parse_model(char *input, model *model) {
             else if (streq("Days", key)) {
                 model->n_days = strtoint(value, &ok); if (!ok) ABORT_PARSE_INT_FAIL(); }
             else if (streq("Periods_per_day", key)) {
-                model->n_periods_per_day = strtoint(value, &ok); if (!ok) ABORT_PARSE_INT_FAIL(); }
+                model->n_slots = strtoint(value, &ok); if (!ok) ABORT_PARSE_INT_FAIL(); }
             else if (streq("Curricula", key)) {
                 model->n_curriculas = strtoint(value, &ok); if (!ok) ABORT_PARSE_INT_FAIL(); }
             else if (streq("Constraints", key)) {

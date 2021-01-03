@@ -209,7 +209,7 @@ MUNIT_TEST(test_parser) {
     munit_assert_int(m.n_courses, ==, 4);
     munit_assert_int(m.n_rooms, ==, 2);
     munit_assert_int(m.n_days, ==, 5);
-    munit_assert_int(m.n_periods_per_day, ==, 4);
+    munit_assert_int(m.n_slots, ==, 4);
     munit_assert_int(m.n_curriculas, ==, 2);
     munit_assert_int(m.n_unavailability_constraints, ==, 8);
 

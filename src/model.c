@@ -5,13 +5,15 @@
 #include <string.h>
 #include <str_utils.h>
 #include "mem_utils.h"
+#include "array_utils.h"
+#include "debug.h"
 
 void model_init(model *model) {
     model->name = NULL;
     model->n_courses = 0;
     model->n_rooms = 0;
     model->n_days = 0;
-    model->n_periods_per_day = 0;
+    model->n_slots = 0;
     model->n_curriculas = 0;
     model->n_unavailability_constraints = 0;
     model->courses = NULL;
@@ -56,6 +58,12 @@ void model_destroy(const model *model) {
     for (int i = 0; i < model->n_unavailability_constraints; i++)
         unavailability_constraint_destroy(&model->unavailability_constraints[i]);
     free(model->unavailability_constraints);
+
+    free(model->course_lectures);
+    free(model->course_belongs_to_curricula);
+    free(model->teachers);
+    free(model->course_taught_by_teacher);
+    free(model->course_availabilities);
 }
 
 void course_to_string(const course *course, char *buffer, size_t buflen) {
@@ -89,7 +97,7 @@ void unavailability_constraint_to_string(const unavailability_constraint *uc,
                                          char *buffer, size_t buflen) {
     snprintf(buffer, buflen,
              "(course=%s, day=%d, day_period=%d)",
-             uc->course_id, uc->day, uc->day_period
+             uc->course_id, uc->day, uc->slot
     );
 }
 
@@ -119,7 +127,7 @@ char * model_to_string(const model *model) {
          model->n_courses,
          model->n_rooms,
          model->n_days,
-         model->n_periods_per_day,
+         model->n_slots,
          model->n_curriculas,
          model->n_unavailability_constraints
     );
@@ -174,7 +182,88 @@ void unavailability_constraint_set(unavailability_constraint *uc,
                                    char *course_id, int day, int day_period) {
     uc->course_id = course_id;
     uc->day = day;
-    uc->day_period = day_period;
+    uc->slot = day_period;
+}
+
+void model_finalize(model *model) {
+    // Compute redundant data (for faster access)
+    const int C = model->n_courses;
+    const int R = model->n_rooms;
+    const int Q = model->n_curriculas;
+    const int U = model->n_unavailability_constraints;
+    const int D = model->n_days;
+    const int S = model->n_slots;
+
+    static const int TMP_LEN = 256;
+    char tmp[TMP_LEN];
+
+    // l_c
+    model->course_lectures = mallocx(sizeof(int) * C);
+    for (int c = 0; c < C; c++) {
+        model->course_lectures[c] = model->courses[c].n_lectures;
+    }
+
+    // b_cq
+    model->course_belongs_to_curricula = mallocx(sizeof(bool) * Q * C);
+    for (int q = 0; q < Q; q++) {
+        const curricula *curricula = &model->curriculas[q];
+
+        for (int c = 0; c < C; c++) {
+            const course *course = &model->courses[c];
+            model->course_belongs_to_curricula[INDEX2(q, Q, c, C)] = 0;
+
+            for (int qc = 0; qc < curricula->n_courses; qc++) {
+                if (streq(course->id, curricula->courses_ids[qc])) {
+                    model->course_belongs_to_curricula[INDEX2(q, Q, c, C)] = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    // T
+    GHashTable *teachers_set = g_hash_table_new(g_str_hash, g_str_equal);
+
+    for (int c = 0; c < C; c++)
+        g_hash_table_add(teachers_set, model->courses[c].teacher_id);
+
+    uint T;
+    model->teachers = (char **) g_hash_table_get_keys_as_array(teachers_set, &T);
+    model->n_teachers = T;
+    g_hash_table_destroy(teachers_set);
+
+    // e_ct
+    model->course_taught_by_teacher = mallocx(sizeof(bool) * C * T);
+    for (int c = 0; c < C; c++) {
+        const char *course_teacher = model->courses[c].teacher_id;
+        for (int t = 0; t < T; t++) {
+            model->course_taught_by_teacher[INDEX2(c, C, t, T)] =
+                    streq(course_teacher, model->teachers[t]);
+        }
+    }
+
+    // a_cds
+
+    GHashTable *unavailabilities_set = g_hash_table_new_full(g_str_hash, g_str_equal, free, NULL);
+//    GHashTable *unavailabilities_set = g_hash_table_new(g_str_hash, g_str_equal);
+
+    for (int u = 0; u < U; u++) {
+        const struct unavailability_constraint *uc = &model->unavailability_constraints[u];
+        g_hash_table_add(unavailabilities_set, strmake("%s_%d_%d", uc->course_id, uc->day, uc->slot));
+    }
+
+    model->course_availabilities = mallocx(sizeof(bool) * C * D * S);
+    for (int c = 0; c < C; c++) {
+        for (int d = 0; d < D; d++) {
+            for (int s = 0; s < S; s++) {
+                snprintf(tmp, TMP_LEN, "%s_%d_%d", model->courses[c].id, d, s);
+                model->course_availabilities[INDEX3(c, C, d, D, s, S)] =
+                        !g_hash_table_contains(unavailabilities_set, tmp);
+            }
+        }
+    }
+
+    g_hash_table_destroy(unavailabilities_set);
 }
 
 course *model_course_by_id(const model *model, char *id) {
@@ -202,4 +291,23 @@ curricula *model_curricula_by_id(const model *model, char *id) {
             return q;
     }
     return NULL;
+}
+
+int model_course_lectures(const model *model, int course_idx) {
+    return model->course_lectures[course_idx];
+}
+
+int model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx) {
+    return model->course_belongs_to_curricula[
+            INDEX2(curricula_idx, model->n_curriculas, course_idx, model->n_courses)];
+}
+
+int model_course_taught_by_teacher(const model *model, int course_idx, int teacher_idx) {
+    return model->course_taught_by_teacher[
+            INDEX2(course_idx, model->n_courses, teacher_idx, model->n_teachers)];
+}
+
+int model_course_is_available_on_period(const model *model, int course_idx, int day, int slot) {
+    return model->course_availabilities[
+            INDEX3(course_idx, model->n_courses, day, model->n_days, slot, model->n_slots)];
 }

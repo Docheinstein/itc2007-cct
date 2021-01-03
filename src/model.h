@@ -2,6 +2,8 @@
 #define MODEL_H
 
 #include <stddef.h>
+#include <stdbool.h>
+#include <glib.h>
 
 // <course> := <CourseID> <Teacher> <# Lectures> <MinWorkingDays> <# Students>
 // e.g.     :=   c0001       t000         6            4               130
@@ -33,7 +35,7 @@ typedef struct curricula {
 typedef struct unavailability_constraint {
     char *course_id;
     int day;
-    int day_period;
+    int slot;
 } unavailability_constraint;
 
 typedef struct model {
@@ -41,13 +43,22 @@ typedef struct model {
     int n_courses;
     int n_rooms;
     int n_days;
-    int n_periods_per_day;
+    int n_slots;
     int n_curriculas;
     int n_unavailability_constraints;
     course *courses;
     room *rooms;
     curricula *curriculas;
     unavailability_constraint *unavailability_constraints;
+
+    // Redundant data (for faster access)
+    int * course_lectures;                  // l_c
+    bool * course_belongs_to_curricula;     // b_cq
+    char ** teachers;                       // T
+    int n_teachers;
+    bool * course_taught_by_teacher;        // e_ct
+    bool * course_availabilities;           // e_cds
+
 } model;
 
 void model_init(model *model);
@@ -74,8 +85,15 @@ void unavailability_constraint_to_string(const unavailability_constraint *uc,
 
 char * model_to_string(const model *model);
 
+void model_finalize(model *model);
+
 course *model_course_by_id(const model *model, char *id);
 room *model_room_by_id(const model *model, char *id);
 curricula *model_curricula_by_id(const model *model, char *id);
+
+int model_course_lectures(const model *model, int course_idx);
+int model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx);
+int model_course_taught_by_teacher(const model *model, int course_idx, int teacher_idx);
+int model_course_is_available_on_period(const model *model, int course_idx, int day, int slot);
 
 #endif // MODEL_H
