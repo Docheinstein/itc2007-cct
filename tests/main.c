@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <solution.h>
 #include <parser.h>
-#include "utils.h"
 #include "munit/munit.h"
-#include <unistd.h>
-#include <log/verbose.h>
+#include <verbose.h>
+#include <str_utils.h>
+#include <def_utils.h>
+#include <io_utils.h>
 
 #define BUFLEN 128
 
@@ -180,7 +181,7 @@ MUNIT_TEST(test_strjoin) {
 
 MUNIT_TEST(test_strappend_realloc) {
     size_t size = 8;
-    char *s1 = mallocx(sizeof(char) * size);
+    char *s1 = malloc(sizeof(char) * size);
     char *s2 = s1;
     snprintf(s1, 8, "buffer");
     strappend_realloc(&s2, &size, "!");
@@ -189,7 +190,7 @@ MUNIT_TEST(test_strappend_realloc) {
     munit_assert_string_equal(s2, "buffer!");
     free(s1);
 
-    char *s11 = mallocx(sizeof(char) * size);
+    char *s11 = malloc(sizeof(char) * size);
     char *s12 = s11;
     snprintf(s11, size, "buffer");
     strappend_realloc(&s12, &size, "full");
@@ -298,5 +299,5 @@ static const MunitSuite suite = {
 
 int main (int argc, char **argv) {
 //    set_verbose(true);
-    return munit_suite_main(&suite, NULL, argc, argv);
+    munit_suite_main(&suite, NULL, argc, argv);
 }

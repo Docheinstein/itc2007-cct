@@ -1,9 +1,12 @@
 #include <stdio.h>
-#include "log/verbose.h"
-#include "utils.h"
-#include "log/debug.h"
-#include "solver.h"
+#include <def_utils.h>
+#include <io_utils.h>
+#include "verbose.h"
+#include "debug.h"
+#include "exact_solver.h"
 #include "gurobi/gurobi_c.h"
+#include "mem_utils.h"
+#include "str_utils.h"
 
 #define GRB_CHECK(op) do { \
     error = op; \
@@ -64,7 +67,7 @@ bool solver_solve(model *itc, solution *sol) {
     int optimal_status;
     double obj_value;
     bool error;
-
+//
     const int C = itc->n_courses;
     const int R = itc->n_rooms;
     const int D = itc->n_days;
@@ -73,16 +76,16 @@ bool solver_solve(model *itc, solution *sol) {
     GRB_CHECK0(GRBemptyenv(&env));
     GRB_CHECK0(GRBstartenv(env));
     GRB_CHECK0(GRBnewmodel(env, &model, "itc2007", 0, NULL, NULL, NULL, NULL, NULL));
-//    GRB_CHECK(GRBreadmodel(env, "/home/stefano/Temp/itc/toy.lp", &model));
 
     // ===================
     // --- VARS ---
     static const int VAR_NAME_LENGTH = 16;
     // X_crds
     const int x_count = C * R * D *S;
-    double *X = malloc(sizeof(double) * x_count);
-    char * x_vtypes = malloc(sizeof(char) * x_count);
-    char ** x_vnames = malloc(sizeof(char *) * x_count);
+    double *X = mallocx(sizeof(double) * x_count);
+    char * x_vtypes = mallocx(sizeof(char) * x_count);
+    char ** x_vnames = mallocx(sizeof(char *) * x_count);
+
 
     verbose("|X|=%d", x_count);
 
@@ -92,8 +95,9 @@ bool solver_solve(model *itc, solution *sol) {
             for (int d = 0; d < D; d++)
                 for (int s = 0; s < S; s++) {
                     int i = col4(c, C, r, R, d, D, s, S);
-                    x_vnames[i] = malloc(sizeof(char) * VAR_NAME_LENGTH);
-                    snprintf(x_vnames[i], VAR_NAME_LENGTH, "X_%d%d%d%d", c, r, d, s);
+//                  x_vnames[i] = mallocx(sizeof(char) * VAR_NAME_LENGTH);
+//                  snprintf(x_vnames[i], VAR_NAME_LENGTH, "X_%d%d%d%d", c, r, d, s);
+                    x_vnames[i] = strmake("X_%d%d%d%d", c, r, d, s);
                 }
 
     GRBaddvars(model, x_count, 0, NULL, NULL, NULL, NULL, NULL, NULL, x_vtypes, x_vnames);
@@ -103,8 +107,8 @@ bool solver_solve(model *itc, solution *sol) {
     int index;
 
     // H1: sum r€R, d€D, s€S X_crds = l_c     for c€C
-    int * indexes = malloc(sizeof(int) * R * D * S);
-    double * values = malloc(sizeof(double) * R * D * S);
+    int * indexes = mallocx(sizeof(int) * R * D * S);
+    double * values = mallocx(sizeof(double) * R * D * S);
 
     for (int c = 0; c < itc->n_courses; c++) {
         index = 0;
@@ -164,10 +168,7 @@ CLEAN:
     // Free data
     free(X);
     free(x_vtypes);
-    for (int i = 0; i < x_count; i++)
-        free(x_vnames[i]);
-    free(x_vnames);
-
+    freearray(x_vnames, x_count);
     free(indexes);
     free(values);
 

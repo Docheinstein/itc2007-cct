@@ -1,10 +1,11 @@
-#include "utils.h"
+#include "str_utils.h"
+#include "mem_utils.h"
+#include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <stdarg.h>
-#include "log/debug.h"
+#include <stdlib.h>
 
 bool streq(const char *s1, const char *s2) {
     return strcmp(s1, s2) == 0;
@@ -45,8 +46,7 @@ char *strltrim(char *str) {
 
 char *strtrim(char *str) {
     char *start = strltrim(str);
-    strrtrim(start);
-    return start;
+    return strrtrim(start);
 }
 
 int strtoint(const char *str, bool *ok) {
@@ -98,25 +98,43 @@ char *strjoin(char **strs, size_t size, const char *joiner) {
     return s; // must be freed outside
 }
 
-/*
+
 char *strmake(const char *fmt, ...) {
     va_list args, args2;
     va_start(args, fmt);
     va_copy(args2, args);
 
-    int buflen = snprintf(NULL, 0, fmt, args) + 1;
+    int buflen = vsnprintf(NULL, 0, fmt, args) + 1;
 
     char *s = mallocx(sizeof(char) * buflen);
-    snprintf(s, buflen, fmt, args2);
+    vsnprintf(s, buflen, fmt, args2);
 
     va_end(args);
     va_end(args2);
 
     return s;
 }
-*/
 
 void strappend_realloc(char **dest, size_t *size, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vstrappend_realloc(dest, size, fmt, args);
+    va_end(args);
+}
+
+void strappend(char *dest, size_t size, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vstrappend(dest, size, fmt, args);
+    va_end(args);
+}
+
+void vstrappend(char *dest, size_t size, const char *fmt, va_list args) {
+    const size_t _len = strlen(dest);
+    vsnprintf(&dest[_len], (int) ((size) - _len), fmt, args);
+}
+
+void vstrappend_realloc(char **dest, size_t *size, const char *fmt, va_list args) {
     if (!dest)
         return;
 
@@ -128,9 +146,8 @@ void strappend_realloc(char **dest, size_t *size, const char *fmt, ...) {
         *dest[0] = '\0';
     }
 
-    va_list args, args2;
-    va_start(args, fmt);
-    va_copy(args2, args);
+    va_list args_copy;
+    va_copy(args_copy, args);
 
     const size_t required_size =
             strlen(*dest) + vsnprintf(NULL, 0, fmt, args) + 1;
@@ -142,45 +159,8 @@ void strappend_realloc(char **dest, size_t *size, const char *fmt, ...) {
         *dest = realloc(*dest, *size);
     }
 
-    vstrappend(*dest, *size, fmt, args2);
+    vstrappend(*dest, *size, fmt, args_copy);
 
-    va_end(args);
-    va_end(args2);
+    va_end(args_copy);
 }
 
-char *fileread(const char *filename) {
-    FILE *f = fopen(filename, "rb");
-    if (!f)
-        return NULL;
-
-    fseek(f, 0, SEEK_END);
-    long filesize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char *content = mallocx(filesize + 1);
-    fread(content, sizeof(char), filesize, f);
-    fclose(f);
-
-    content[filesize] = '\0';
-    return content; // must be freed outside
-}
-
-int filewrite(const char *filename, const char *data) {
-    FILE *f = fopen(filename, "wb");
-    if (!f)
-        return 0;
-
-    int ret = fputs(data, f);
-    fclose(f);
-
-    return ret;
-
-
-}
-
-void *mallocx(size_t size) {
-    void *ptr = malloc(size);
-    if (!ptr)
-        eprint("ERROR: malloc failed");
-    return ptr;
-}

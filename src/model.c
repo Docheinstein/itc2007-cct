@@ -1,10 +1,10 @@
 #include "model.h"
-#include "utils.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <str_utils.h>
+#include "mem_utils.h"
 
 void model_init(model *model) {
     model->name = NULL;
@@ -31,9 +31,7 @@ void room_destroy(const room *r) {
 
 void curricula_destroy(const curricula *q) {
     free(q->id);
-    for (int i = 0; i < q->n_courses; i++)
-        free(q->courses_ids[i]);
-    free(q->courses_ids);
+    freearray(q->courses_ids, q->n_courses);
 }
 
 void unavailability_constraint_destroy(const unavailability_constraint *uc) {

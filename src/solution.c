@@ -1,5 +1,6 @@
+#include <str_utils.h>
 #include "solution.h"
-#include "utils.h"
+#include "mem_utils.h"
 
 
 assignment *assignment_new(course *course, room *room, int day, int day_period) {
@@ -20,7 +21,7 @@ void solution_init(solution *sol) {
 }
 
 void solution_destroy(solution *sol) {
-    g_list_free_full(sol->assignments, g_free);
+    g_list_free_full(sol->assignments, free);
 }
 
 static char * solution_to_string_fmt(const solution *sol, const char *fmt) {

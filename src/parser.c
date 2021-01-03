@@ -3,10 +3,12 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-#include "log/debug.h"
-#include "log/verbose.h"
-#include "utils.h"
+#include <io_utils.h>
+#include <str_utils.h>
+#include <def_utils.h>
+#include "verbose.h"
 #include "model.h"
+#include "mem_utils.h"
 
 /*
     INPUT FILE SYNTAX
@@ -82,7 +84,9 @@ bool parse_model(char *input, model *model) {
     char line_copy[MAX_LINE_LENGTH];
 
     char key_[MAX_LINE_LENGTH];
+    key_[MAX_LINE_LENGTH - 1] = '\0';
     char value_[MAX_LINE_LENGTH];
+    value_[MAX_LINE_LENGTH - 1] = '\0';
 
     int section = SECTION_NONE;
     int section_entry = 0;
@@ -180,6 +184,7 @@ bool parse_model(char *input, model *model) {
 
             char *key = strtrim(key_);
             char *value = strtrim(value_);
+//            char *value = value_;
 
             // Preliminary fields
             if (streq("Name", key))

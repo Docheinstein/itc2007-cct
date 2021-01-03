@@ -23,8 +23,7 @@ add_executable(itc2007-cct-tests ${sources} ${munit} "tests/main.c")
 add_executable(itc2007-cct-validator "validator/main.cpp")
 
 target_include_directories(itc2007-cct PRIVATE ${GLIB_INCLUDE_DIRS})
-target_link_libraries(itc2007-cct ${GLIB_LIBRARIES} -lgurobi91)
-target_link_libraries(itc2007-cct-tests ${GLIB_LIBRARIES} -lgurobi91)
-
 target_include_directories(itc2007-cct-tests PRIVATE ${GLIB_INCLUDE_DIRS})
-target_link_libraries(itc2007-cct-tests ${GLIB_LIBRARIES})
+
+target_link_libraries(itc2007-cct ${CMAKE_DL_LIBS} ${GLIB_LIBRARIES} -lgurobi91)
+target_link_libraries(itc2007-cct-tests ${CMAKE_DL_LIBS} ${GLIB_LIBRARIES} -lgurobi91)

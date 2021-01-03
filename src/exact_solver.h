@@ -1,9 +1,9 @@
-#ifndef SOLVER_H
-#define SOLVER_H
+#ifndef EXACT_SOLVER_H
+#define EXACT_SOLVER_H
 
 #include "model.h"
 #include "solution.h"
 
 bool solver_solve(model *model, solution *solution);
 
-#endif // SOLVER_H
+#endif // EXACT_SOLVER_H

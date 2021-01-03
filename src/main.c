@@ -74,12 +74,15 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <stdlib.h>
 #include <argp.h>
 #include <stdbool.h>
-#include <exact/solver.h>
+#include <exact_solver.h>
+#include <debug.h>
+#include <io_utils.h>
 #include "args.h"
-#include "log/verbose.h"
+#include "verbose.h"
 #include "parser.h"
-#include "utils.h"
 #include "solution.h"
+#include "mem_utils.h"
+#include "def_utils.h"
 
 const char *argp_program_version = "0.1";
 static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
@@ -127,9 +130,7 @@ int main (int argc, char **argv) {
 
     struct args args;
     args_init(&args);
-
     argp_parse(&argp, argc, argv, 0, 0, &args);
-
     set_verbose(args.verbose);
 
     char buffer[256];
@@ -140,16 +141,9 @@ int main (int argc, char **argv) {
 
     model m;
     model_init(&m);
-
-    if (!parse_model(args.input, &m))
+    if (!parse_model(args.input, &m)) {
+        model_destroy(&m);
         exit(EXIT_FAILURE);
-
-    if (is_verbose()) {
-        char * s = model_to_string(&m);
-        verbose("=== MODEL ====\n"
-                "%s\n"
-                "==============", s);
-        free(s);
     }
 
     solution sol;
@@ -162,12 +156,13 @@ int main (int argc, char **argv) {
         "%s",
         sol_str
     );
+
     if (!filewrite(args.output, sol_str)) {
         eprint("ERROR: failed to write output solution to '%s' (%s)",
                args.output, strerror(errno));
     }
-    free(sol_str);
 
+    free(sol_str);
     solution_destroy(&sol);
     model_destroy(&m);
 
