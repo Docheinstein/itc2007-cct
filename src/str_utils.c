@@ -8,11 +8,11 @@
 #include <stdlib.h>
 
 bool streq(const char *s1, const char *s2) {
-    return strcmp(s1, s2) == 0;
+    return (!s1 && !s2) || s1 && s2 && strcmp(s1, s2) == 0;
 }
 
 bool strempty(const char *str) {
-    return strcmp(str, "") == 0;
+    return !str || strcmp(str, "") == 0;
 }
 
 int strpos(const char *str, char character) {

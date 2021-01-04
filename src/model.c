@@ -20,6 +20,12 @@ void model_init(model *model) {
     model->rooms = NULL;
     model->curriculas = NULL;
     model->unavailability_constraints = NULL;
+
+    model->course_belongs_to_curricula = NULL;
+    model->teachers = NULL;
+    model->n_teachers = 0;
+    model->course_taught_by_teacher = NULL;
+    model->course_availabilities = NULL;
 }
 
 void course_destroy(const course *c) {

@@ -66,6 +66,8 @@ void solution_destroy(solution *solution);
 char * solution_to_string_debug(const solution *sol);
 char * solution_to_string(const solution *sol);
 
+double solution_cost(const solution *sol);
+
 void solution_add_assignment(solution *sol, assignment *a);
 
 bool solution_satisfy_hard_constraints(const solution *sol);

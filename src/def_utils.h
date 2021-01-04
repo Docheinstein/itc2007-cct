@@ -7,6 +7,8 @@
 #define LONG_TO_PTR(i) ((void *)(i))
 #define PTR_TO_LONG(p) ((long) (p))
 
+#define BOOL_TO_STR(var) ((var) ? "true" : "false")
+
 #ifndef MAX
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 #endif // MIN

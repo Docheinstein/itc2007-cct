@@ -73,7 +73,6 @@ RoomStability: All lectures of a course should be given in the same room. Each d
  */
 
 #include <stdlib.h>
-#include <argp.h>
 #include <stdbool.h>
 #include <exact_solver.h>
 #include <io_utils.h>
@@ -82,85 +81,75 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "parser.h"
 #include "solution.h"
 #include "array_utils.h"
-#include "config.h"
-
-const char *argp_program_version = "0.1";
-static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
-static char args_doc[] = "INPUT OUTPUT";
-
-static struct argp_option options[] = {
-  { "verbose", 'v', 0, 0, "Print debugging information" },
-  { 0 }
-};
-
-static error_t parse_option(int key, char *arg, struct argp_state *state) {
-    struct args *args = state->input;
-
-    switch (key) {
-    case 'v':
-        args->verbose = true;
-        break;
-    case ARGP_KEY_ARG:
-        switch (state->arg_num) {
-        case 0:
-            args->input = arg;
-            break;
-        case 1:
-            args->output = arg;
-            break;
-        default:
-            argp_usage(state);
-        }
-
-      break;
-    case ARGP_KEY_END:
-        if (state->arg_num < 1)
-            argp_usage(state);
-        break;
-
-    default:
-        return ARGP_ERR_UNKNOWN;
-    }
-
-    return 0;
-}
 
 int main (int argc, char **argv) {
-    struct argp argp = { options, parse_option, args_doc, doc };
-
-    struct args args;
+    args args;
     args_init(&args);
-    argp_parse(&argp, argc, argv, 0, 0, &args);
+    args_parse(&args, argc, argv);
+
     set_verbose(args.verbose);
 
     char buffer[256];
     args_to_string(&args, buffer, LENGTH(buffer));
-    verbose("=== ARGUMENTS ===\n"
-            "%s\n"
-            "=================", buffer);
+    verbose("====== ARGUMENTS ======\n"
+            "%s",
+            buffer);
 
     model m;
     model_init(&m);
-    if (!parse_model(args.input, &m)) {
-        model_destroy(&m);
+
+    parser p;
+    parser_init(&p);
+    if (!parser_parse(&p, args.input, &m)) {
+        eprint("ERROR: failed to parse input file '%s' (%s)", args.input, parser_get_error(&p));
         exit(EXIT_FAILURE);
     }
+
+    parser_destroy(&p);
+
     model_finalize(&m);
 
     solution sol;
     solution_init(&sol);
 
-    exact_solver_config conf;
-    exact_solver_config_init(&conf,
-                             ROOM_CAPACITY_COST, MIN_WORKING_DAYS_COST,
-                             CURRICULUM_COMPACTNESS_COST, ROOM_STABILITY_COST
-    );
+    bool solved = false;
+    double cost = 0;
 
-    if (exact_solver_solve(&conf, &m, &sol)) {
+    if (args.method == ITC2007_METHOD_EXACT) {
+        exact_solver solver;
+        exact_solver_init(&solver);
+
+        exact_solver_config conf;
+        exact_solver_config_init(&conf);
+        conf.grb_write_lp = args.write_lp;
+        conf.grb_verbose = args.verbose;
+        conf.grb_time_limit = args.time_limit;
+
+        solved = exact_solver_solve(&solver, &conf, &m, &sol);
+        if (solved) {
+            verbose("Model solved: cost = %g", solver.objective);
+            cost = solver.objective;
+        }
+        else
+            eprint("ERROR: failed to solve model (%s)", exact_solver_get_error(&solver));
+
+        exact_solver_config_destroy(&conf);
+        exact_solver_destroy(&solver);
+    } else if (args.method == ITC2007_METHOD_TABU) {
+        eprint("ERROR: not implemented yet");
+        exit(EXIT_FAILURE);
+    }
+
+    if (solved) {
         char * sol_str = solution_to_string(&sol);
+        // TODO
+        // cost = solution_cost(&sol);
         print(
             "====== SOLUTION ======\n"
+            "Cost: %g\n"
+            "----------------------\n"
             "%s",
+            cost,
             sol_str
         );
 
@@ -176,6 +165,7 @@ int main (int argc, char **argv) {
 
     solution_destroy(&sol);
     model_destroy(&m);
+    args_destroy(&args);
 
     return 0;
 }

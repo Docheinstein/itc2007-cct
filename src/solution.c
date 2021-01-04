@@ -79,3 +79,8 @@ bool solution_satisfy_hard_constraint_conflicts(const solution *sol) {
 bool solution_satisfy_hard_constraint_availabilities(const solution *sol) {
     return 0;
 }
+
+double solution_cost(const solution *sol) {
+    exit(2);
+    return 0;
+}

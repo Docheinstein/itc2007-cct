@@ -60,39 +60,53 @@
 #define CURRICULA_FIXED_FIELDS              2
 #define UNAVAILABILITY_CONSTRAINTS_FIELDS   3
 
-#define ABORT_PARSE(err) do { \
-    ok = false; \
-    strappend(error_reason, MAX_ERROR_LENGTH, err); \
-    break; \
+
+void parser_init(parser *parser) {
+    parser->error = NULL;
+}
+
+void parser_destroy(parser *parser) {
+    free(parser->error);
+}
+
+const char *parser_get_error(parser *parser) {
+    return parser->error;
+}
+
+bool parser_parse(parser *parser, char *input, model *model) {
+
+#define ABORT_PARSE(errfmt, ...) do { \
+    snprintf(error_reason, MAX_ERROR_LENGTH, errfmt, ##__VA_ARGS__); \
+    goto QUIT; \
 } while(0)
 
 #define ABORT_PARSE_INT_FAIL() ABORT_PARSE("integer conversion failed")
 
-bool parse_model(char *input, model *model) {
-    verbose("Opening input file: '%s'", input);
-
-    FILE *file = fopen(input, "r");
-
-    if (!file) {
-        eprint("ERROR: failed to open '%s' (%s)\n", input, strerror(errno));
-        return false;
-    }
-
+    char error_reason[MAX_ERROR_LENGTH];
+    error_reason[0] = '\0';
     int line_num = 0;
+
     char line[MAX_LINE_LENGTH];
     char line_copy[MAX_LINE_LENGTH];
 
     char key_[MAX_LINE_LENGTH];
-    key_[MAX_LINE_LENGTH - 1] = '\0';
     char value_[MAX_LINE_LENGTH];
-    value_[MAX_LINE_LENGTH - 1] = '\0';
+    // ??? needed ???
+//    key_[MAX_LINE_LENGTH - 1] = '\0';
+//    value_[MAX_LINE_LENGTH - 1] = '\0';
+
 
     int section = SECTION_NONE;
     int section_entry = 0;
 
-    char error_reason[MAX_ERROR_LENGTH] = "\0";
-
     bool ok = true;
+
+    verbose("Opening input file: '%s'", input);
+
+    FILE *file = fopen(input, "r");
+
+    if (!file)
+        ABORT_PARSE("failed to open '%s' (%s)\n", input, strerror(errno));
 
     while (ok && fgets(line, LENGTH(line), file)) {
         ++line_num;
@@ -228,15 +242,11 @@ bool parse_model(char *input, model *model) {
 
     verbose("Closing file: '%s'", input);
     if (fclose(file) != 0)
-        eprint("WARN: failed to close '%s' (%s)", input, strerror(errno));
+        verbose("WARN: failed to close '%s' (%s)", input, strerror(errno));
 
-    if (!ok) {
-        if (!strempty(error_reason))
-            eprint("ERROR: failed to parse_model input file (%s), error at line %d"
-                    "%s", error_reason, line_num, line_copy);
-        else
-            eprint("ERROR: failed to parse_model input file, error at line %d"
-                    "%s", line_num, line_copy);
-    }
-    return ok;
+QUIT:
+    if (!strempty(error_reason))
+        parser->error = strmake("parse error at line %d (%s)", line_num, error_reason);
+
+    return !parser->error;
 }

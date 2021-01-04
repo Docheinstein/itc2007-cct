@@ -6,42 +6,88 @@
 #include "gurobi/gurobi_c.h"
 #include "mem_utils.h"
 #include "array_utils.h"
+#include "config.h"
+#include "def_utils.h"
 
 static const char * status_to_string(int status) {
-    static const char * STATUSES[] = {
-        "",
-        "Model is loaded, but no solution information is available",
-        "Model was solved to optimality (subject to tolerances), and an optimal solution is available",
-        "Model was proven to be infeasible.",
-        "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize.",
-    };
-
-    if (status < LENGTH(STATUSES))
-        return STATUSES[status];
-
-    return "unknown error";
+    switch (status) {
+    case GRB_LOADED:
+         return "model is loaded, but no solution information is available";
+    case GRB_OPTIMAL:
+        return "model was solved to optimality (subject to tolerances), and an optimal solution is available";
+    case GRB_INFEASIBLE:
+        return "model was proven to be infeasible";
+    case GRB_INF_OR_UNBD:
+        return "model was proven to be either infeasible or unbounded";
+    case GRB_UNBOUNDED:
+        return "model was proven unbounded";
+    case GRB_CUTOFF:
+        return "optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available";
+    case GRB_ITERATION_LIMIT:
+        return "optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter";
+    case GRB_NODE_LIMIT:
+        return "optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter";
+    case GRB_TIME_LIMIT:
+        return "optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter";
+    case GRB_SOLUTION_LIMIT:
+        return "optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter";
+    case GRB_INTERRUPTED:
+        return "optimization was terminated by the user";
+    case GRB_NUMERIC:
+        return "optimization was terminated due to unrecoverable numerical difficulties";
+    case GRB_SUBOPTIMAL:
+        return "unable to satisfy optimality tolerances; a sub-optimal solution is available";
+    case GRB_INPROGRESS:
+        return "an asynchronous optimization call was made, but the associated optimization run is not yet complete";
+    case GRB_USER_OBJ_LIMIT:
+        return "user specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached";
+    default:
+        return "unknown error";
+    }
 }
 
+void exact_solver_init(exact_solver *solver) {
+    solver->objective = 0;
+    solver->error = NULL;
+}
 
-void exact_solver_config_init(exact_solver_config *config,
-                              double s_room_capacity, double s_minimum_working_days,
-                              double s_curriculum_compactness, double s_room_stability) {
+void exact_solver_config_init(exact_solver_config *config) {
+    config->grb_verbose = true;
+    config->grb_time_limit = GRB_INFINITY;
+    config->grb_write_lp = NULL;
+
     config->h_lectures = true;
     config->h_room_occupancy = true;
     config->h_conflicts = true;
     config->h_availability = true;
 
-    config->s_room_capacity = s_room_capacity;
-    config->s_minimum_working_days = s_minimum_working_days;
-    config->s_curriculum_compactness = s_curriculum_compactness;
-    config->s_room_stability = s_room_stability;
+    config->s_room_capacity = ROOM_CAPACITY_COST;
+    config->s_minimum_working_days = MIN_WORKING_DAYS_COST;
+    config->s_curriculum_compactness = CURRICULUM_COMPACTNESS_COST;
+    config->s_room_stability = ROOM_STABILITY_COST;
 }
 
-bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solution) {
+void exact_solver_config_destroy(exact_solver_config *config) {
+
+}
+
+void exact_solver_destroy(exact_solver *solver) {
+
+}
+
+bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
+                        model *itc, solution *solution) {
 
 #define GRB_CHECK(op) do { \
     error = op; \
-    if (error) goto CLEAN; \
+    if (error) goto QUIT; \
+} while(0)
+
+#define GRB_ADD_VAR(term, lb, ub, type, fmt, ...) do { \
+    snprintf(name, LENGTH(name), fmt, ##__VA_ARGS__); \
+    debug("Adding var '%s'", name); \
+    GRB_CHECK(GRBaddvar(model, 0, NULL, NULL, term, lb, ub, type, name)); \
+    var_index++; \
 } while(0)
 
 #define GRB_ADD_BINARY_VAR(term, fmt, ...) do { \
@@ -78,20 +124,23 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
 #define GRB_SET_OBJECTIVE_TERM(index, term) \
     GRB_CHECK(GRBsetdblattrelement(model, "Obj", (index), (term)))
 
+#define GRB_GET_VARS(begin, count, dest) \
+    GRB_CHECK(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, begin, count, dest));
+
     verbose(
-        "=== EXACT SOLVER ===\n"
-        "H1: Lectures = %d\n"
-        "H2: RoomOccupancy = %d\n"
-        "H3: Conflicts = %d\n"
-        "H4: Availabilities = %d\n"
+        "====== EXACT SOLVER ======\n"
+        "H1: Lectures = %s\n"
+        "H2: RoomOccupancy = %s\n"
+        "H3: Conflicts = %s\n"
+        "H4: Availabilities = %s\n"
         "S1: RoomCapacity = %g\n"
         "S2: MinWorkingDays = %g\n"
         "S3: CurriculumCompactnes = %g\n"
         "S4: RoomStability = %g\n",
-        config->h_lectures,
-        config->h_room_occupancy,
-        config->h_conflicts,
-        config->h_availability,
+        BOOL_TO_STR(config->h_lectures),
+        BOOL_TO_STR(config->h_room_occupancy),
+        BOOL_TO_STR(config->h_conflicts),
+        BOOL_TO_STR(config->h_availability),
         config->s_room_capacity,
         config->s_minimum_working_days,
         config->s_curriculum_compactness,
@@ -101,8 +150,6 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
     GRBenv *env = NULL;
     GRBmodel *model = NULL;
 
-    int optimal_status;
-    double obj_value;
     bool error;
     const int C = itc->n_courses;
     const int R = itc->n_rooms;
@@ -118,10 +165,19 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
 
     GRB_CHECK(GRBemptyenv(&env));
     GRB_CHECK(GRBstartenv(env));
-    GRB_CHECK(GRBnewmodel(env, &model, "itc2007", 0, NULL, NULL, NULL, NULL, NULL));
+    GRB_CHECK(GRBsetintparam(env, GRB_INT_PAR_OUTPUTFLAG, config->grb_verbose));
+    GRB_CHECK(GRBsetdblparam(env, GRB_DBL_PAR_TIMELIMIT, config->grb_time_limit));
+    GRB_CHECK(GRBnewmodel(env, &model, "itc2007_cct", 0, NULL, NULL, NULL, NULL, NULL));
+
+    verbose("Creating model...");
 
     // ===================
-    // --- VARS ---
+
+    // ------- VARS -------
+
+    // Constants
+    const int One_begin = var_index;
+    GRB_ADD_VAR(0.0, 1.0, 1.0, GRB_INTEGER, "One");
 
     // X_crds
     const int X_begin = var_index;
@@ -195,7 +251,8 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
         }
     }
 
-    // --- INDICATOR CONSTRAINTS ---
+    // ------- INDICATOR CONSTRAINTS -------
+
     // Z_NOT_qds_Indicator
     for (int q = 0; q < Q; q++) {
         for (int d = 0; d < D; d++) {
@@ -307,7 +364,8 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
         }
     }
 
-    // --- SOFT CONSTRAINTS (objective function) ---
+    // ------- SOFT CONSTRAINTS (objective function) -------
+
     debug("Setting soft constraints (objective function terms)");
 
     // S1: RoomCapacity
@@ -366,7 +424,7 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
     }
 
     // S4; RoomStability
-    // RS: sum c€C r€R w_cr
+    // RS: sum c€C (r€R w_cr - 1)
     if (config->s_room_stability) {
        for (int c = 0; c < C; c++) {
             for (int r = 0; r < R; r++) {
@@ -375,10 +433,12 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
                         config->s_room_stability
                 );
             }
-        }
+       }
+
+       GRB_SET_OBJECTIVE_TERM(One_begin, (double) - itc->n_courses); // -c
     }
 
-    // --- HARD CONSTRAINTS ---
+    // ------- HARD CONSTRAINTS -------
 
     // H1: Lectures
     // L: for c€C  |  sum r€R, d€D, s€S X_crds = l_c
@@ -534,22 +594,26 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
 
 
     // ===================
+
     GRB_CHECK(GRBsetintattr(model, GRB_INT_ATTR_MODELSENSE, GRB_MINIMIZE));
 
-    debug("Writing .lp");
-    GRB_CHECK(GRBwrite(model, "/home/stefano/Temp/itc_c/itc_c.lp"));
+    if (config->grb_write_lp) {
+        verbose("Writing model to '%s'", config->grb_write_lp);
+        GRB_CHECK(GRBwrite(model, config->grb_write_lp));
+    }
 
-    debug("Starting optimization...");
+    verbose("Starting optimization...");
     GRB_CHECK(GRBoptimize(model));
+
+    int optimal_status;
     GRB_CHECK(GRBgetintattr(model, GRB_INT_ATTR_STATUS, &optimal_status));
 
     if (optimal_status == GRB_OPTIMAL) {
-        // ...
-        GRB_CHECK(GRBgetdblattr(model, GRB_DBL_ATTR_OBJVAL, &obj_value););
-        print("Model solved: objective value = %g", obj_value);
+        GRB_CHECK(GRBgetdblattr(model, GRB_DBL_ATTR_OBJVAL, &solver->objective));
+        debug("Model solved: objective = %g", solver->objective);
 
-        // X
-        GRB_CHECK(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, X_begin, X_count, values));
+        // Create solution from X
+        GRB_GET_VARS(X_begin, X_count, values);
         for (int c = 0; c < C; c++) {
             for (int r = 0; r < R; r++) {
                 for (int d = 0; d < D; d++) {
@@ -559,13 +623,13 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
                             debug("X[%s,%s,%d,%d]=%g",
                                   itc->courses[c].id, itc->rooms[r].id, d, s,
                                   Xval);
-                            solution_add_assignment(solution, assignment_new(&itc->courses[c], &itc->rooms[r], d, s));
+                            solution_add_assignment(solution,
+                                                    assignment_new(&itc->courses[c], &itc->rooms[r], d, s));
                         }
                     }
                 }
             }
         }
-
 
         for (int d = 0; d < D; d++) {
             debug("DAY %d", d);
@@ -581,60 +645,15 @@ bool exact_solver_solve(exact_solver_config *config, model *itc, solution *solut
                 }
             }
         }
-
-        GRB_CHECK(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, Z_begin, Q * D * S, values));
-
-        for (int q = 0; q < Q; q++) {
-            for (int d = 0; d < D; d++) {
-                for (int s = 0; s < S; s++) {
-                    debug("Z[%s][%d][%d]=%g",
-                          itc->curriculas[q].id, d, s, values[INDEX3(q, Q, d, D, s, S)]);
-                }
-            }
-        }
-
-        GRB_CHECK(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, Z_NOT_begin, Q * D * S, values));
-
-        for (int q = 0; q < Q; q++) {
-            for (int d = 0; d < D; d++) {
-                for (int s = 0; s < S; s++) {
-                    debug("Z_NOT[%s][%d][%d]=%g",
-                          itc->curriculas[q].id, d, s, values[INDEX3(q, Q, d, D, s, S)]);
-                }
-            }
-        }
-
-        GRB_CHECK(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, I3_begin, Q * D * S, values));
-
-        for (int q = 0; q < Q; q++) {
-            for (int d = 0; d < D; d++) {
-                for (int s = 0; s < S; s++) {
-                    debug("I3[%s][%d][%d]=%g",
-                          itc->curriculas[q].id, d, s, values[INDEX3(q, Q, d, D, s, S)]);
-                }
-            }
-        }
-
-//
-//        GRB_CHECK(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, Y_begin, C * D, values));
-//        for (int c = 0; c < C; c++) {
-//            for (int d = 0; d < D; d++) {
-//                debug("Y[%s][%d]=%g", itc->courses[c].id, d, values[INDEX2(c, C, d, D)]);
-//            }
-//        }
-//
-//        GRB_CHECK(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, I2_begin, C, values));
-//        for (int c = 0; c < C; c++) {
-//            debug("I2[%s]=%g", itc->courses[c].id, values[c]);
-//        }
-
     } else {
-        print("Model NOT solved: %s", status_to_string(optimal_status));
+        debug("Model NOT solved: %s", status_to_string(optimal_status));
+        solver->error = status_to_string(optimal_status);
     }
 
-CLEAN:
+QUIT:
     if (error) {
         eprint("ERROR: %s", GRBgeterrormsg(env));
+        solver->error = GRBgeterrormsg(env);
     }
 
     // Free data
@@ -645,8 +664,18 @@ CLEAN:
     GRBfreemodel(model);
     GRBfreeenv(env);
 
-
 #undef GRB_CHECK
 #undef GRB_ADD_BINARY_VAR
-    return !error;
+#undef GRB_ADD_CONSTR
+#undef GRB_ADD_INDICATOR
+#undef GRB_ADD_AND
+#undef GRB_ADD_OR
+#undef GRB_SET_OBJECTIVE_TERM
+#undef GRB_GET_VARS
+
+    return !solver->error;
+}
+
+const char *exact_solver_get_error(exact_solver *solver) {
+    return solver->error;
 }
