@@ -10,4 +10,4 @@ int verbosef(const char *fmt, ...);
 
 #define verbose(format, ...) verbosef(format "\n", ##__VA_ARGS__)
 
-#endif // VERBOSE_H
+#endif // VERBOSE_H"

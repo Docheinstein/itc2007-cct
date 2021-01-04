@@ -1,6 +1,8 @@
 #ifndef ARRAY_UTILS_H
 #define ARRAY_UTILS_H
 
+#define INDEX1(i1, n1) ((i1))
+
 #define INDEX2(i2, n2, i1, n1) \
     ((i2) * (n1) + (i1))
 

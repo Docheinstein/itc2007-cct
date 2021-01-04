@@ -82,6 +82,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "parser.h"
 #include "solution.h"
 #include "array_utils.h"
+#include "config.h"
 
 const char *argp_program_version = "0.1";
 static char doc[] = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
@@ -149,17 +150,25 @@ int main (int argc, char **argv) {
     solution sol;
     solution_init(&sol);
 
-    if (solver_solve(&m, &sol)) {
+    exact_solver_config conf;
+    exact_solver_config_init(&conf,
+                             ROOM_CAPACITY_COST, MIN_WORKING_DAYS_COST,
+                             CURRICULUM_COMPACTNESS_COST, ROOM_STABILITY_COST
+    );
+
+    if (exact_solver_solve(&conf, &m, &sol)) {
         char * sol_str = solution_to_string(&sol);
         print(
-            "=== SOLUTION ===\n"
+            "====== SOLUTION ======\n"
             "%s",
             sol_str
         );
 
-        if (!filewrite(args.output, sol_str)) {
-            eprint("ERROR: failed to write output solution to '%s' (%s)",
-                   args.output, strerror(errno));
+        if (args.output) {
+            if (!filewrite(args.output, sol_str)) {
+                eprint("ERROR: failed to write output solution to '%s' (%s)",
+                       args.output, strerror(errno));
+            }
         }
 
         free(sol_str);

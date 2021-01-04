@@ -59,7 +59,6 @@ void model_destroy(const model *model) {
         unavailability_constraint_destroy(&model->unavailability_constraints[i]);
     free(model->unavailability_constraints);
 
-    free(model->course_lectures);
     free(model->course_belongs_to_curricula);
     free(model->teachers);
     free(model->course_taught_by_teacher);
@@ -198,10 +197,10 @@ void model_finalize(model *model) {
     char tmp[TMP_LEN];
 
     // l_c
-    model->course_lectures = mallocx(sizeof(int) * C);
-    for (int c = 0; c < C; c++) {
-        model->course_lectures[c] = model->courses[c].n_lectures;
-    }
+//    model->course_lectures = mallocx(sizeof(int) * C);
+//    for (int c = 0; c < C; c++) {
+//        model->course_lectures[c] = model->courses[c].n_lectures;
+//    }
 
     // b_cq
     model->course_belongs_to_curricula = mallocx(sizeof(bool) * Q * C);
@@ -291,10 +290,6 @@ curricula *model_curricula_by_id(const model *model, char *id) {
             return q;
     }
     return NULL;
-}
-
-int model_course_lectures(const model *model, int course_idx) {
-    return model->course_lectures[course_idx];
 }
 
 int model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx) {

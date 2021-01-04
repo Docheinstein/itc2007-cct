@@ -52,7 +52,6 @@ typedef struct model {
     unavailability_constraint *unavailability_constraints;
 
     // Redundant data (for faster access)
-    int * course_lectures;                  // l_c
     bool * course_belongs_to_curricula;     // b_cq
     char ** teachers;                       // T
     int n_teachers;
@@ -91,7 +90,6 @@ course *model_course_by_id(const model *model, char *id);
 room *model_room_by_id(const model *model, char *id);
 curricula *model_curricula_by_id(const model *model, char *id);
 
-int model_course_lectures(const model *model, int course_idx);
 int model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx);
 int model_course_taught_by_teacher(const model *model, int course_idx, int teacher_idx);
 int model_course_is_available_on_period(const model *model, int course_idx, int day, int slot);
