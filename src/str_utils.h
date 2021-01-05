@@ -26,6 +26,9 @@ int strtoint(const char *str, bool *ok);
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens);
 char * strjoin(char **strs, size_t size, const char *joiner);
 
+bool strstarts(const char *str, char ch);
+bool strends(const char *str, char ch);
+
 
 
 #endif // STR_UTILS_H

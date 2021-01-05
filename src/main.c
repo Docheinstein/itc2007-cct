@@ -82,6 +82,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "solution.h"
 #include "array_utils.h"
 #include "def_utils.h"
+#include "renderer.h"
 
 int main (int argc, char **argv) {
     args args;
@@ -107,7 +108,6 @@ int main (int argc, char **argv) {
     }
 
     parser_destroy(&p);
-
     model_finalize(&m);
 
     solution sol;
@@ -121,7 +121,7 @@ int main (int argc, char **argv) {
 
         exact_solver_config conf;
         exact_solver_config_init(&conf);
-        conf.grb_write_lp = args.write_lp;
+        conf.grb_write_lp = args.write_lp_file;
         conf.grb_verbose = args.verbose;
         if (args.time_limit > 0)
             conf.grb_time_limit = args.time_limit;
@@ -141,6 +141,8 @@ int main (int argc, char **argv) {
     }
 
     if (solved) {
+        solution_finalize(&sol, &m);
+
         char * sol_str = solution_to_string(&sol);
 
         int h1 = solution_hard_constraint_lectures_violations(&sol, &m);
@@ -187,6 +189,22 @@ int main (int argc, char **argv) {
         }
 
         free(sol_str);
+    }
+
+    if (args.draw_dir) {
+        renderer renderer;
+        renderer_init(&renderer);
+
+        renderer_config config;
+        renderer_config_init(&config);
+        config.output = args.draw_dir;
+
+        if (!renderer_render(&renderer, &config, &m, &sol)) {
+            eprint("WARN: failed to render solution (%s)", renderer_get_error(&renderer));
+        }
+
+        renderer_config_destroy(&config);
+        renderer_destroy(&renderer);
     }
 
     solution_destroy(&sol);

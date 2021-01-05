@@ -65,33 +65,8 @@ void solution_init(solution *sol) {
     sol->assignments = NULL;
 }
 
-void solution_destroy(solution *sol) {
-    g_list_free_full(sol->assignments, free);
-}
 
-char * solution_to_string(const solution *sol) {
-    char *buffer = NULL;
-    size_t buflen;
-
-    for (GList *p = sol->assignments; p != NULL; p = p->next) {
-        const assignment *a = p->data;
-        strappend_realloc(&buffer, &buflen, "%s %s %d %d\n",
-                          a->course->id, a->room->id, a->day, a->slot);
-    }
-
-    buffer[strlen(buffer) - 1] = '\0';
-    return buffer;
-}
-
-void solution_add_assignment(solution *sol, assignment *a) {
-    sol->assignments = g_list_append(sol->assignments, a);
-    sol->timetable_is_valid = false;
-}
-
-static void compute_timetable_if_needed(solution *sol, const model *model) {
-    if (sol->timetable_is_valid)
-        return;
-
+void solution_finalize(solution *sol, const model *model) {
     debug("Computing timetable...");
 
     sol->timetable = callocx(
@@ -110,7 +85,29 @@ static void compute_timetable_if_needed(solution *sol, const model *model) {
         )] = true;
     }
 
-    sol->timetable_is_valid = true;
+}
+
+void solution_destroy(solution *sol) {
+    g_list_free_full(sol->assignments, free);
+    free(sol->timetable);
+}
+
+char * solution_to_string(const solution *sol) {
+    char *buffer = NULL;
+    size_t buflen;
+
+    for (GList *p = sol->assignments; p != NULL; p = p->next) {
+        const assignment *a = p->data;
+        strappend_realloc(&buffer, &buflen, "%s %s %d %d\n",
+                          a->course->id, a->room->id, a->day, a->slot);
+    }
+
+    buffer[strlen(buffer) - 1] = '\0';
+    return buffer;
+}
+
+void solution_add_assignment(solution *sol, assignment *a) {
+    sol->assignments = g_list_append(sol->assignments, a);
 }
 
 bool solution_satisfy_hard_constraints(solution *sol, const model *model) {
@@ -140,8 +137,6 @@ bool solution_satisfy_hard_constraint_conflicts(solution *sol, const model *mode
 
 
 int solution_hard_constraint_lectures_violations(solution *sol, const model *model) {
-    compute_timetable_if_needed(sol, model);
-
     int violations = 0;
 
     FOR_C {
@@ -183,8 +178,6 @@ int solution_hard_constraint_lectures_violations(solution *sol, const model *mod
 }
 
 int solution_hard_constraint_room_occupancy_violations(solution *sol, const model *model) {
-    compute_timetable_if_needed(sol, model);
-
     int violations = 0;
 
     FOR_R {
@@ -208,8 +201,6 @@ int solution_hard_constraint_room_occupancy_violations(solution *sol, const mode
 }
 
 int solution_hard_constraint_conflicts_violations(solution *sol, const model *model) {
-    compute_timetable_if_needed(sol, model);
-
     int violations = 0;
 
     FOR_Q {
@@ -260,8 +251,6 @@ int solution_hard_constraint_conflicts_violations(solution *sol, const model *mo
 }
 
 int solution_hard_constraint_availabilities_violations(solution *sol, const model *model) {
-    compute_timetable_if_needed(sol, model);
-
     int violations = 0;
 
     FOR_C {
@@ -293,8 +282,6 @@ int solution_cost(solution *sol, const model *model) {
 }
 
 int solution_soft_constraint_room_capacity(solution *sol, const model *model) {
-    compute_timetable_if_needed(sol, model);
-
     int penalties = 0;
 
     FOR_C {
@@ -322,8 +309,6 @@ int solution_soft_constraint_room_capacity(solution *sol, const model *model) {
 }
 
 int solution_soft_constraint_min_working_days(solution *sol, const model *model) {
-    compute_timetable_if_needed(sol, model);
-
     int penalties = 0;
 
     FOR_C {
@@ -354,8 +339,6 @@ int solution_soft_constraint_min_working_days(solution *sol, const model *model)
 }
 
 int solution_soft_constraint_curriculum_compactness(solution *sol, const model *model) {
-    compute_timetable_if_needed(sol, model);
-
     int penalties = 0;
 
     bool * slots = mallocx(sizeof(bool) * model->n_slots);
@@ -397,8 +380,6 @@ int solution_soft_constraint_curriculum_compactness(solution *sol, const model *
 }
 
 int solution_soft_constraint_room_stability(solution *sol, const model *model) {
-    compute_timetable_if_needed(sol, model);
-
     int penalties = 0;
 
     FOR_C {

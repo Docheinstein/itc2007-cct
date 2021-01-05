@@ -58,7 +58,6 @@ typedef struct solution {
     GList *assignments;
 
     // Computed for faster access
-    bool timetable_is_valid;
     bool *timetable;
 } solution;
 
@@ -66,6 +65,7 @@ assignment * assignment_new(course *course, room *room, int day, int day_period)
 void assignment_set(assignment *a, course *course, room *room, int day, int day_period);
 
 void solution_init(solution *solution);
+void solution_finalize(solution *solution, const model *model);
 void solution_destroy(solution *solution);
 
 char * solution_to_string_debug(const solution *sol);

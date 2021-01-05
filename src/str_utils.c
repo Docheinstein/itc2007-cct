@@ -164,3 +164,11 @@ void vstrappend_realloc(char **dest, size_t *size, const char *fmt, va_list args
     va_end(args_copy);
 }
 
+bool strstarts(const char *str, char ch) {
+    return str[0] == ch;
+}
+
+bool strends(const char *str, char ch) {
+    return str[strlen(str) - 1] == ch;
+}
+
