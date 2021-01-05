@@ -50,11 +50,16 @@ typedef struct assignment {
     course *course;
     room *room;
     int day;
-    int day_period;
+    int slot;
 } assignment;
 
 typedef struct solution {
+    // Real data
     GList *assignments;
+
+    // Computed for faster access
+    bool timetable_is_valid;
+    bool *timetable;
 } solution;
 
 assignment * assignment_new(course *course, room *room, int day, int day_period);
@@ -66,14 +71,24 @@ void solution_destroy(solution *solution);
 char * solution_to_string_debug(const solution *sol);
 char * solution_to_string(const solution *sol);
 
-double solution_cost(const solution *sol);
 
 void solution_add_assignment(solution *sol, assignment *a);
 
-bool solution_satisfy_hard_constraints(const solution *sol);
-bool solution_satisfy_hard_constraint_lectures(const solution *sol);
-bool solution_satisfy_hard_constraint_room_occupancy(const solution *sol);
-bool solution_satisfy_hard_constraint_conflicts(const solution *sol);
-bool solution_satisfy_hard_constraint_availabilities(const solution *sol);
+bool solution_satisfy_hard_constraints(solution *sol, const model *model);
+bool solution_satisfy_hard_constraint_lectures(solution *sol, const model *model);
+bool solution_satisfy_hard_constraint_room_occupancy(solution *sol, const model *model);
+bool solution_satisfy_hard_constraint_conflicts(solution *sol, const model *model);
+bool solution_satisfy_hard_constraint_availabilities(solution *sol, const model *model);
+
+int solution_hard_constraint_lectures_violations(solution *sol, const model *model);
+int solution_hard_constraint_room_occupancy_violations(solution *sol, const model *model);
+int solution_hard_constraint_conflicts_violations(solution *sol, const model *model);
+int solution_hard_constraint_availabilities_violations(solution *sol, const model *model);
+
+int solution_cost(solution *sol, const model *model);
+int solution_soft_constraint_room_capacity(solution *sol, const model *model);
+int solution_soft_constraint_min_working_days(solution *sol, const model *model);
+int solution_soft_constraint_curriculum_compactness(solution *sol, const model *model);
+int solution_soft_constraint_room_stability(solution *sol, const model *model);
 
 #endif // SOLUTION_H

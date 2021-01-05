@@ -11,7 +11,7 @@ typedef struct parser {
 void parser_init(parser *parser);
 void parser_destroy(parser *parser);
 
-bool parser_parse(parser *parser, char *input, model *model);
+bool parser_parse(parser *parser, const char *input, model *model);
 
 const char *parser_get_error(parser *parser);
 

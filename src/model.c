@@ -46,6 +46,10 @@ void unavailability_constraint_destroy(const unavailability_constraint *uc) {
     free(uc->course_id);
 }
 
+void teacher_destroy(const teacher *t) {
+    free(t->id);
+}
+
 void model_destroy(const model *model) {
     free(model->name);
 
@@ -65,8 +69,11 @@ void model_destroy(const model *model) {
         unavailability_constraint_destroy(&model->unavailability_constraints[i]);
     free(model->unavailability_constraints);
 
-    free(model->course_belongs_to_curricula);
+    for (int i = 0; i < model->n_teachers; i++)
+        teacher_destroy(&model->teachers[i]);
     free(model->teachers);
+
+    free(model->course_belongs_to_curricula);
     free(model->course_taught_by_teacher);
     free(model->course_availabilities);
 }
@@ -232,9 +239,20 @@ void model_finalize(model *model) {
     for (int c = 0; c < C; c++)
         g_hash_table_add(teachers_set, model->courses[c].teacher_id);
 
-    uint T;
-    model->teachers = (char **) g_hash_table_get_keys_as_array(teachers_set, &T);
+    uint T = g_hash_table_size(teachers_set);
+    model->teachers = mallocx(sizeof(teacher) * T);
     model->n_teachers = T;
+
+    GHashTableIter iter;
+    gpointer key, value;
+
+    g_hash_table_iter_init (&iter, teachers_set);
+    int i = 0;
+    while (g_hash_table_iter_next(&iter, &key, &value)) {
+        model->teachers->index = i;
+        model->teachers[i++].id = strdup(key);
+    }
+
     g_hash_table_destroy(teachers_set);
 
     // e_ct
@@ -243,7 +261,7 @@ void model_finalize(model *model) {
         const char *course_teacher = model->courses[c].teacher_id;
         for (int t = 0; t < T; t++) {
             model->course_taught_by_teacher[INDEX2(c, C, t, T)] =
-                    streq(course_teacher, model->teachers[t]);
+                    streq(course_teacher, model->teachers[t].id);
         }
     }
 
@@ -298,17 +316,30 @@ curricula *model_curricula_by_id(const model *model, char *id) {
     return NULL;
 }
 
-int model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx) {
+int model_course_belongs_to_curricula(const model *model, const course *course, const curricula *curricula) {
+    return model_course_belongs_to_curricula_by_index(model, course->index, curricula->index);
+}
+
+int model_course_taught_by_teacher(const model *model, const course *course, const teacher *teacher) {
+    return model_course_taught_by_teacher_by_index(model, course->index, teacher->index);
+}
+
+int model_course_is_available_on_period(const model *model, const course *course, int day, int slot) {
+    return model_course_is_available_on_period_by_index(model, course->index, day, slot);
+}
+
+int model_course_belongs_to_curricula_by_index(const model *model, int course_idx, int curricula_idx) {
     return model->course_belongs_to_curricula[
             INDEX2(curricula_idx, model->n_curriculas, course_idx, model->n_courses)];
 }
 
-int model_course_taught_by_teacher(const model *model, int course_idx, int teacher_idx) {
+int model_course_taught_by_teacher_by_index(const model *model, int course_idx, int teacher_idx) {
     return model->course_taught_by_teacher[
             INDEX2(course_idx, model->n_courses, teacher_idx, model->n_teachers)];
 }
 
-int model_course_is_available_on_period(const model *model, int course_idx, int day, int slot) {
+int model_course_is_available_on_period_by_index(const model *model, int course_idx, int day, int slot) {
     return model->course_availabilities[
             INDEX3(course_idx, model->n_courses, day, model->n_days, slot, model->n_slots)];
 }
+

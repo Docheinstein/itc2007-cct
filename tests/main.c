@@ -6,6 +6,8 @@
 #include <str_utils.h>
 #include <def_utils.h>
 #include <io_utils.h>
+#include <array_utils.h>
+#include <debug.h>
 
 #define BUFLEN 128
 
@@ -204,7 +206,10 @@ MUNIT_TEST(test_strappend_realloc) {
 MUNIT_TEST(test_parser) {
     model m;
     model_init(&m);
-    parse_model("datasets/toy.ctt", &m);
+
+    parser parser;
+    parser_init(&parser);
+    munit_assert_true(parser_parse(&parser, "datasets/toy.ctt", &m));
 
     munit_assert_int(m.n_courses, ==, 4);
     munit_assert_int(m.n_rooms, ==, 2);
@@ -229,7 +234,7 @@ MUNIT_TEST(test_parser) {
     return MUNIT_OK;
 }
 
-#define ASSIGNMENT(course, room, day, day_period) \
+#define NEW_ASSIGNMENT(course, room, day, day_period) \
     assignment_new(                               \
         (model_course_by_id(&m, course)),         \
         (model_room_by_id(&m, room)),             \
@@ -237,30 +242,36 @@ MUNIT_TEST(test_parser) {
         (day_period)                              \
     )
 
-MUNIT_TEST(test_toy_solution) {
+MUNIT_TEST(test_solution_to_string) {
+
     solution sol;
     solution_init(&sol);
 
     model m;
     model_init(&m);
-    parse_model("datasets/toy.ctt", &m);
+
+    parser parser;
+    parser_init(&parser);
+    munit_assert_true(parser_parse(&parser, "datasets/toy.ctt", &m));
 
     FILE *file = fopen("tests/solutions/toy.ctt.sol", "r");
-    munit_assert_not_null("tests/solutions/toy.ctt.sol");
+    munit_assert_not_null(file);
 
     char line[256];
+    char *l;
     while (fgets(line, LENGTH(line), file)) {
-        line[strlen(line) - 1] = '\0';
-        if (strempty(line))
+        l = strtrim(line);
+        if (strempty(l))
             continue;
         char *F[4];
         bool ok;
-        munit_assert_int(strsplit(line, " ", F, 4), ==, 4);
+        munit_assert_int(strsplit(l, " ", F, 4), ==, 4);
         solution_add_assignment(&sol,
-            ASSIGNMENT(F[0], F[1], strtoint(F[2], &ok), strtoint(F[3], &ok))
+            NEW_ASSIGNMENT(F[0], F[1], strtoint(F[2], &ok), strtoint(F[3], &ok))
         );
         munit_assert_true(ok);
     }
+
     char *output = strtrim(solution_to_string(&sol));
     char *expected_solution = strtrim(fileread("tests/solutions/toy.ctt.sol"));
 
@@ -268,10 +279,73 @@ MUNIT_TEST(test_toy_solution) {
 
     free(output);
     free(expected_solution);
+
+    parser_destroy(&parser);
     model_destroy(&m);
     solution_destroy(&sol);
 
     return MUNIT_OK;
+}
+
+static MunitResult test_solution(const char *dataset_file, const char *solution_file,
+                                      bool h1, bool h2, bool h3, bool h4,
+                                      int s1, int s2, int s3, int s4) {
+    solution sol;
+    solution_init(&sol);
+
+    model m;
+    model_init(&m);
+
+    parser parser;
+    parser_init(&parser);
+    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+
+    FILE *file = fopen(solution_file, "r");
+    munit_assert_not_null(file);
+
+    char line[256];
+    char *l;
+    while (fgets(line, LENGTH(line), file)) {
+        l = strtrim(line);
+        if (strempty(l))
+            continue;
+        char *F[4];
+        bool ok;
+        munit_assert_int(strsplit(line, " ", F, 4), ==, 4);
+        solution_add_assignment(&sol,
+            NEW_ASSIGNMENT(F[0], F[1], strtoint(F[2], &ok), strtoint(F[3], &ok))
+        );
+        munit_assert_true(ok);
+    }
+
+    model_finalize(&m);
+
+    munit_assert(h1 == solution_satisfy_hard_constraint_lectures(&sol, &m));
+    munit_assert(h2 == solution_satisfy_hard_constraint_room_occupancy(&sol, &m));
+    munit_assert(h3 == solution_satisfy_hard_constraint_availabilities(&sol, &m));
+    munit_assert(h4 == solution_satisfy_hard_constraint_conflicts(&sol, &m));
+
+    munit_assert_int(s1, ==, solution_soft_constraint_room_capacity(&sol, &m));
+    munit_assert_int(s2, ==, solution_soft_constraint_min_working_days(&sol, &m));
+    munit_assert_int(s3, ==, solution_soft_constraint_curriculum_compactness(&sol, &m));
+    munit_assert_int(s4, ==, solution_soft_constraint_room_stability(&sol, &m));
+
+    parser_destroy(&parser);
+    model_destroy(&m);
+    solution_destroy(&sol);
+
+    return MUNIT_OK;
+}
+
+
+MUNIT_TEST(test_solution_cost_toy) {
+    return test_solution("datasets/toy.ctt", "tests/solutions/toy.ctt.sol",
+                         true, true, true, true, 0, 0, 0 , 0);
+}
+
+MUNIT_TEST(test_solution_cost_comp01) {
+    return test_solution("datasets/comp01.ctt", "tests/solutions/comp01.ctt.sol",
+                         true, true, true, true, 4, 0, 0, 1);
 }
 
 // ======================= END TESTS =======================
@@ -286,10 +360,11 @@ static MunitTest tests[] = {
     { "test_strappend", test_strappend, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strsplit", test_strsplit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strjoin", test_strjoin, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-//    { "test_strmake", test_strmake, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strappend_realloc", test_strappend_realloc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_parser", test_parser, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    { "test_toy_solution", test_toy_solution, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_solution_to_string", test_solution_to_string, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_solution_cost_toy", test_solution_cost_toy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_solution_cost_comp01", test_solution_cost_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     MUNIT_TESTS_END
 };
 

@@ -8,6 +8,7 @@
 #include "array_utils.h"
 #include "config.h"
 #include "def_utils.h"
+#include "str_utils.h"
 
 static const char * status_to_string(int status) {
     switch (status) {
@@ -311,7 +312,7 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
 
                 int i = 0;
                 for (int c = 0; c < C; c++) {
-                    if (!model_course_belongs_to_curricula(itc, c, q))
+                    if (!model_course_belongs_to_curricula_by_index(itc, c, q))
                         continue;
 
                     for (int r = 0; r < R; r++) {
@@ -527,7 +528,7 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
 
                     for (int c = 0; c < C; c++) {
                         for (int r = 0; r < R; r++) {
-                            if (model_course_belongs_to_curricula(itc, c, q)) {
+                            if (model_course_belongs_to_curricula_by_index(itc, c, q)) {
                                 indexes[i] = X_begin + INDEX4(c, C, r, R, d, D, s, S);
                                 values[i++] = 1.0;
                             }
@@ -551,7 +552,7 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
 
                     for (int c = 0; c < C; c++) {
                         for (int r = 0; r < R; r++) {
-                            if (model_course_taught_by_teacher(itc, c, t)) {
+                            if (model_course_taught_by_teacher_by_index(itc, c, t)) {
                                 indexes[i] = X_begin + INDEX4(c, C, r, R, d, D, s, S);
                                 values[i++] = 1.0;
                             }
@@ -585,7 +586,7 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
                     }
 
                     GRB_ADD_CONSTR(i,
-                                   GRB_LESS_EQUAL, (double) model_course_is_available_on_period(itc, c, d, s),
+                                   GRB_LESS_EQUAL, (double) model_course_is_available_on_period_by_index(itc, c, d, s),
                                    "A_%s_%d_%d", itc->courses[c].id, d, s);
                 }
             }
@@ -665,6 +666,7 @@ QUIT:
     GRBfreeenv(env);
 
 #undef GRB_CHECK
+#undef GRB_ADD_VAR
 #undef GRB_ADD_BINARY_VAR
 #undef GRB_ADD_CONSTR
 #undef GRB_ADD_INDICATOR
@@ -673,7 +675,7 @@ QUIT:
 #undef GRB_SET_OBJECTIVE_TERM
 #undef GRB_GET_VARS
 
-    return !solver->error;
+    return strempty(solver->error);
 }
 
 const char *exact_solver_get_error(exact_solver *solver) {

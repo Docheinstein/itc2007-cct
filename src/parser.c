@@ -8,6 +8,7 @@
 #include "model.h"
 #include "mem_utils.h"
 #include "array_utils.h"
+#include "debug.h"
 
 /*
     INPUT FILE SYNTAX
@@ -73,7 +74,7 @@ const char *parser_get_error(parser *parser) {
     return parser->error;
 }
 
-bool parser_parse(parser *parser, char *input, model *model) {
+bool parser_parse(parser *parser, const char *input, model *model) {
 
 #define ABORT_PARSE(errfmt, ...) do { \
     snprintf(error_reason, MAX_ERROR_LENGTH, errfmt, ##__VA_ARGS__); \
@@ -86,8 +87,8 @@ bool parser_parse(parser *parser, char *input, model *model) {
     error_reason[0] = '\0';
     int line_num = 0;
 
-    char line[MAX_LINE_LENGTH];
-    char line_copy[MAX_LINE_LENGTH];
+    char line0[MAX_LINE_LENGTH];
+    char *line;
 
     char key_[MAX_LINE_LENGTH];
     char value_[MAX_LINE_LENGTH];
@@ -98,6 +99,9 @@ bool parser_parse(parser *parser, char *input, model *model) {
 
     int section = SECTION_NONE;
     int section_entry = 0;
+    int course_index = 0;
+    int room_index = 0;
+    int curricula_index = 0;
 
     bool ok = true;
 
@@ -108,16 +112,13 @@ bool parser_parse(parser *parser, char *input, model *model) {
     if (!file)
         ABORT_PARSE("failed to open '%s' (%s)\n", input, strerror(errno));
 
-    while (ok && fgets(line, LENGTH(line), file)) {
+    while (ok && fgets(line0, LENGTH(line0), file)) {
         ++line_num;
-        line[strlen(line) - 1] = '\0';
+        line = strtrim(line0);
         verbose("<< %s", line);
 
         if (strempty(line))
             continue;
-
-        // Make a copy since strsplit() modifies the original line
-        snprintf(line_copy, MAX_LINE_LENGTH, "%s", line);
 
         // Inside section?
         if (section == SECTION_COURSES) {
@@ -128,6 +129,7 @@ bool parser_parse(parser *parser, char *input, model *model) {
 
                 course *c = &model->courses[section_entry++];
                 int f = 0;
+                c->index = course_index++;
                 c->id = strdup(tokens[f++]);
                 c->teacher_id = strdup(tokens[f++]);
                 c->n_lectures = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
@@ -143,6 +145,7 @@ bool parser_parse(parser *parser, char *input, model *model) {
 
                 room *r = &model->rooms[section_entry++];
                 int f = 0;
+                r->index = room_index++;
                 r->id = strdup(tokens[f++]);
                 r->capacity = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
             }
@@ -158,6 +161,7 @@ bool parser_parse(parser *parser, char *input, model *model) {
 
                 curricula *q = &model->curriculas[section_entry++];
                 int f = 0;
+                q->index = curricula_index++;
                 q->id = strdup(tokens[f++]);
                 q->n_courses = strtoint(tokens[f++], &ok); if (!ok) ABORT_PARSE_INT_FAIL();
 
@@ -197,7 +201,6 @@ bool parser_parse(parser *parser, char *input, model *model) {
 
             char *key = strtrim(key_);
             char *value = strtrim(value_);
-//            char *value = value_;
 
             // Preliminary fields
             if (streq("Name", key))
@@ -245,8 +248,10 @@ bool parser_parse(parser *parser, char *input, model *model) {
         verbose("WARN: failed to close '%s' (%s)", input, strerror(errno));
 
 QUIT:
-    if (!strempty(error_reason))
+    if (!strempty(error_reason)) {
+        debug("Parser error: %s", error_reason);
         parser->error = strmake("parse error at line %d (%s)", line_num, error_reason);
+    }
 
-    return !parser->error;
+    return strempty(parser->error);
 }

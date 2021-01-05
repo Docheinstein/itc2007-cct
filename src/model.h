@@ -8,6 +8,7 @@
 // <course> := <CourseID> <Teacher> <# Lectures> <MinWorkingDays> <# Students>
 // e.g.     :=   c0001       t000         6            4               130
 typedef struct course {
+    int index;
     char *id;
     char *teacher_id;
     int n_lectures;
@@ -18,6 +19,7 @@ typedef struct course {
 // <room> := <RoomID> <Capacity>
 // e.g.   :=    B         200
 typedef struct room {
+    int index;
     char *id;
     int capacity;
 } room;
@@ -25,6 +27,7 @@ typedef struct room {
 // <curricula> := <CurriculumID> <# Courses> <CourseID> ... <CourseID>
 // e.g.        :=      q000         4         c0001 c0002 c0004 c0005 
 typedef struct curricula {
+    int index;
     char *id;
     int n_courses;
     char **courses_ids;
@@ -37,6 +40,12 @@ typedef struct unavailability_constraint {
     int day;
     int slot;
 } unavailability_constraint;
+
+
+typedef struct teacher {
+    char *id;
+    int index;
+} teacher;
 
 typedef struct model {
     char *name;
@@ -52,9 +61,10 @@ typedef struct model {
     unavailability_constraint *unavailability_constraints;
 
     // Redundant data (for faster access)
-    bool * course_belongs_to_curricula;     // b_cq
-    char ** teachers;                       // T
     int n_teachers;
+    teacher * teachers;                       // T
+
+    bool * course_belongs_to_curricula;     // b_cq
     bool * course_taught_by_teacher;        // e_ct
     bool * course_availabilities;           // e_cds
 
@@ -62,18 +72,11 @@ typedef struct model {
 
 void model_init(model *model);
 
-void course_set(course *c,
-                char *id, char *teacher_id, int n_lectures,
-                int min_working_days, int n_students);
-void room_set(room *r, char *id, int capacity);
-void curricula_set(curricula* q, char *id, int n_courses, char **courses_ids);
-void unavailability_constraint_set(unavailability_constraint *uc,
-                                   char *course_id, int day, int day_period);
-
 void course_destroy(const course *c);
 void room_destroy(const room *r);
 void curricula_destroy(const curricula *q);
 void unavailability_constraint_destroy(const unavailability_constraint *uc);
+void teacher_destroy(const teacher *t);
 void model_destroy(const model *model);
 
 void course_to_string(const course *c, char *buffer, size_t buflen);
@@ -90,8 +93,12 @@ course *model_course_by_id(const model *model, char *id);
 room *model_room_by_id(const model *model, char *id);
 curricula *model_curricula_by_id(const model *model, char *id);
 
-int model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx);
-int model_course_taught_by_teacher(const model *model, int course_idx, int teacher_idx);
-int model_course_is_available_on_period(const model *model, int course_idx, int day, int slot);
+int model_course_belongs_to_curricula(const model *model, const course *course, const curricula *curricula);
+int model_course_taught_by_teacher(const model *model, const course *course, const teacher *teacher);
+int model_course_is_available_on_period(const model *model, const course *course, int day, int slot);
+
+int model_course_belongs_to_curricula_by_index(const model *model, int course_idx, int curricula_idx);
+int model_course_taught_by_teacher_by_index(const model *model, int course_idx, int teacher_idx);
+int model_course_is_available_on_period_by_index(const model *model, int course_idx, int day, int slot);
 
 #endif // MODEL_H

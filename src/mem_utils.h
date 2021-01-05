@@ -10,5 +10,6 @@
 } while(0)
 
 void * mallocx(size_t size);
+void *callocx(size_t nmemb, size_t size);
 
 #endif // MEM_UTILS_H

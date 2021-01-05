@@ -81,6 +81,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "parser.h"
 #include "solution.h"
 #include "array_utils.h"
+#include "def_utils.h"
 
 int main (int argc, char **argv) {
     args args;
@@ -113,7 +114,6 @@ int main (int argc, char **argv) {
     solution_init(&sol);
 
     bool solved = false;
-    double cost = 0;
 
     if (args.method == ITC2007_METHOD_EXACT) {
         exact_solver solver;
@@ -123,12 +123,12 @@ int main (int argc, char **argv) {
         exact_solver_config_init(&conf);
         conf.grb_write_lp = args.write_lp;
         conf.grb_verbose = args.verbose;
-        conf.grb_time_limit = args.time_limit;
+        if (args.time_limit > 0)
+            conf.grb_time_limit = args.time_limit;
 
         solved = exact_solver_solve(&solver, &conf, &m, &sol);
         if (solved) {
             verbose("Model solved: cost = %g", solver.objective);
-            cost = solver.objective;
         }
         else
             eprint("ERROR: failed to solve model (%s)", exact_solver_get_error(&solver));
@@ -142,14 +142,40 @@ int main (int argc, char **argv) {
 
     if (solved) {
         char * sol_str = solution_to_string(&sol);
-        // TODO
-        // cost = solution_cost(&sol);
+
+        int h1 = solution_hard_constraint_lectures_violations(&sol, &m);
+        int h2 = solution_hard_constraint_room_occupancy_violations(&sol, &m);
+        int h3 = solution_hard_constraint_conflicts_violations(&sol, &m);
+        int h4 = solution_hard_constraint_availabilities_violations(&sol, &m);
+        int s1 = solution_soft_constraint_room_capacity(&sol, &m);
+        int s2 = solution_soft_constraint_min_working_days(&sol, &m);
+        int s3 = solution_soft_constraint_curriculum_compactness(&sol, &m);
+        int s4 = solution_soft_constraint_room_stability(&sol, &m);
+
         print(
             "====== SOLUTION ======\n"
-            "Cost: %g\n"
+            "HARD constraints satisfied: %s\n"
+            "\tLectures violations: %d\n"
+            "\tRoomOccupancy violations: %d\n"
+            "\tConflicts violations: %d\n"
+            "\tAvailabilities violations: %d\n"
+            "SOFT constraints cost: %d\n"
+            "\tRoomCapacity cost: %d\n"
+            "\tMinWorkingDays cost: %d\n"
+            "\tCurriculumCompactness cost: %d\n"
+            "\tRoomStability cost: %d\n"
             "----------------------\n"
             "%s",
-            cost,
+            BOOL_TO_STR(!h1 && !h2 && !h3 && !h4),
+            h1,
+            h2,
+            h3,
+            h4,
+            s1 + s2 + s3 + s4,
+            s1,
+            s2,
+            s3,
+            s4,
             sol_str
         );
 

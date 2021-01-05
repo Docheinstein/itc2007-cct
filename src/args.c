@@ -21,14 +21,16 @@ void args_to_string(const args *args, char *buffer, size_t buflen) {
     snprintf(buffer, buflen,
         "input = %s\n"
         "output = %s\n"
-        "verbose = %s"
-        "method = %s"
-        "write_lp = %s",
+        "verbose = %s\n"
+        "method = %s\n"
+        "write_lp = %s\n"
+        "time_limit = %d",
         args->input,
         args->output,
         BOOL_TO_STR(args->verbose),
         itc2007_method_to_string(args->method),
-        args->write_lp
+        args->write_lp,
+        args->time_limit
     );
 }
 
