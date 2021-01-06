@@ -23,12 +23,16 @@ void args_to_string(const args *args, char *buffer, size_t buflen) {
         "output = %s\n"
         "verbose = %s\n"
         "method = %s\n"
+        "draw_directory = %s\n"
+        "draw_overview_file = %s\n"
         "write_lp = %s\n"
         "time_limit = %d",
         args->input,
         args->output,
         BOOL_TO_STR(args->verbose),
         itc2007_method_to_string(args->method),
+        args->draw_directory,
+        args->draw_overview_file,
         args->write_lp_file,
         args->time_limit
     );
@@ -39,8 +43,10 @@ void args_init(args *args) {
     args->output = NULL;
     args->verbose = false;
     args->method = ITC2007_METHOD_DEFAULT;
-    args->draw_dir = NULL;
+    args->draw_directory = NULL;
+    args->draw_overview_file = NULL;
     args->write_lp_file = NULL;
+    args->solution_input_file = NULL;
     args->time_limit = 0;
 }
 
@@ -56,7 +62,9 @@ typedef enum itc2007_option {
     ITC2007_OPT_VERBOSE = 'v',
     ITC2007_OPT_METHOD = 'm',
     ITC2007_OPT_TIME_LIMIT = 't',
-    ITC2007_OPT_DRAW = 'd',
+    ITC2007_OPT_DRAW_DIRECTORY = 'D',
+    ITC2007_OPT_DRAW_OVERVIEW_FILE = 'd',
+    ITC2007_OPT_SOLUTION = 's',
     ITC2007_OPT_WRITE_LP = 0x100,
 } itc2007_option;
 
@@ -64,9 +72,13 @@ typedef enum itc2007_option {
 static struct argp_option options[] = {
   { "verbose", ITC2007_OPT_VERBOSE, NULL, 0, "Print debugging information" },
   { "write-lp", ITC2007_OPT_WRITE_LP, "FILE", 0, "Write .lp to file (only for exact solver)" },
-  { "draw", ITC2007_OPT_DRAW, "DIR", 0, "Draw graphical representations of the solution "
-                                        "and place them in DIR" },
+  { "draw-all", ITC2007_OPT_DRAW_DIRECTORY, "DIR", 0,
+        "Draw all the timetables of the solution and place them in DIR" },
+  { "draw-overview", ITC2007_OPT_DRAW_OVERVIEW_FILE, "FILE", 0,
+        "Draw the overview timetable of the solution and save it as FILE" },
   { "time", ITC2007_OPT_TIME_LIMIT, "SECONDS", 0, "Time limit in seconds for solve the model" },
+  { "solution", ITC2007_OPT_SOLUTION, "SOL_FILE", 0, "Load the solution file SOL_FILE instead of computing it "
+                                                     "(useful for see the cost/violations or with -d or -D for render the solution)" },
   { "method", ITC2007_OPT_METHOD, "exact|tabu", 0, "Method to use for solve the model.\n"
                                                     "Possible values are: 'exact'" },
   { NULL }
@@ -89,8 +101,14 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
     case ITC2007_OPT_VERBOSE:
         args->verbose = true;
         break;
-    case ITC2007_OPT_DRAW:
-        args->draw_dir = arg;
+    case ITC2007_OPT_DRAW_DIRECTORY:
+        args->draw_directory = arg;
+        break;
+    case ITC2007_OPT_DRAW_OVERVIEW_FILE:
+        args->draw_overview_file = arg;
+        break;
+    case ITC2007_OPT_SOLUTION:
+        args->solution_input_file = arg;
         break;
     case ITC2007_OPT_WRITE_LP:
         args->write_lp_file = arg;

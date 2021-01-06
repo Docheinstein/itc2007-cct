@@ -91,11 +91,13 @@ int main (int argc, char **argv) {
 
     set_verbose(args.verbose);
 
-    char buffer[256];
+    char buffer[1024];
     args_to_string(&args, buffer, LENGTH(buffer));
     verbose("====== ARGUMENTS ======\n"
             "%s",
             buffer);
+
+    srand(time(NULL));
 
     model m;
     model_init(&m);
@@ -103,47 +105,60 @@ int main (int argc, char **argv) {
     parser p;
     parser_init(&p);
     if (!parser_parse(&p, args.input, &m)) {
-        eprint("ERROR: failed to parse input file '%s' (%s)", args.input, parser_get_error(&p));
+        eprint("ERROR: failed to parse model file '%s' (%s)", args.input, parser_get_error(&p));
         exit(EXIT_FAILURE);
     }
 
     parser_destroy(&p);
-    model_finalize(&m);
 
     solution sol;
     solution_init(&sol);
 
-    bool solved = false;
+    bool solution_loaded = false;
 
-    if (args.method == ITC2007_METHOD_EXACT) {
-        exact_solver solver;
-        exact_solver_init(&solver);
-
-        exact_solver_config conf;
-        exact_solver_config_init(&conf);
-        conf.grb_write_lp = args.write_lp_file;
-        conf.grb_verbose = args.verbose;
-        if (args.time_limit > 0)
-            conf.grb_time_limit = args.time_limit;
-
-        solved = exact_solver_solve(&solver, &conf, &m, &sol);
-        if (solved) {
-            verbose("Model solved: cost = %g", solver.objective);
+    if (args.solution_input_file) {
+        // Load the solution instead of computing it
+        solution_parser sp;
+        solution_parser_init(&sp);
+        if (!solution_parser_parse(&sp, &m, args.solution_input_file, &sol)) {
+            eprint("ERROR: failed to parse solution file '%s' (%s)",
+                   args.input, solution_parser_get_error(&sp));
+            exit(EXIT_FAILURE);
         }
-        else
-            eprint("ERROR: failed to solve model (%s)", exact_solver_get_error(&solver));
 
-        exact_solver_config_destroy(&conf);
-        exact_solver_destroy(&solver);
-    } else if (args.method == ITC2007_METHOD_TABU) {
-        eprint("ERROR: not implemented yet");
-        exit(EXIT_FAILURE);
+        solution_parser_destroy(&sp);
+        solution_loaded = true;
+    } else {
+        // Standard case, compute the solution
+        if (args.method == ITC2007_METHOD_EXACT) {
+            exact_solver solver;
+            exact_solver_init(&solver);
+
+            exact_solver_config conf;
+            exact_solver_config_init(&conf);
+            conf.grb_write_lp = args.write_lp_file;
+            conf.grb_verbose = args.verbose;
+            if (args.time_limit > 0)
+                conf.grb_time_limit = args.time_limit;
+
+            solution_loaded = exact_solver_solve(&solver, &conf, &m, &sol);
+            if (solution_loaded) {
+                verbose("Model solved: cost = %g", solver.objective);
+            }
+            else
+                eprint("ERROR: failed to solve model (%s)", exact_solver_get_error(&solver));
+
+            exact_solver_config_destroy(&conf);
+            exact_solver_destroy(&solver);
+        } else if (args.method == ITC2007_METHOD_TABU) {
+            eprint("ERROR: not implemented yet");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    if (solved) {
-        solution_finalize(&sol, &m);
 
-        char * sol_str = solution_to_string(&sol);
+    if (solution_loaded) {
+        char *sol_str = solution_to_string(&sol);
 
         int h1 = solution_hard_constraint_lectures_violations(&sol, &m);
         int h2 = solution_hard_constraint_room_occupancy_violations(&sol, &m);
@@ -155,30 +170,30 @@ int main (int argc, char **argv) {
         int s4 = solution_soft_constraint_room_stability(&sol, &m);
 
         print(
-            "====== SOLUTION ======\n"
-            "HARD constraints satisfied: %s\n"
-            "\tLectures violations: %d\n"
-            "\tRoomOccupancy violations: %d\n"
-            "\tConflicts violations: %d\n"
-            "\tAvailabilities violations: %d\n"
-            "SOFT constraints cost: %d\n"
-            "\tRoomCapacity cost: %d\n"
-            "\tMinWorkingDays cost: %d\n"
-            "\tCurriculumCompactness cost: %d\n"
-            "\tRoomStability cost: %d\n"
-            "----------------------\n"
-            "%s",
-            BOOL_TO_STR(!h1 && !h2 && !h3 && !h4),
-            h1,
-            h2,
-            h3,
-            h4,
-            s1 + s2 + s3 + s4,
-            s1,
-            s2,
-            s3,
-            s4,
-            sol_str
+                "====== SOLUTION ======\n"
+                "HARD constraints satisfied: %s\n"
+                "\tLectures violations: %d\n"
+                "\tRoomOccupancy violations: %d\n"
+                "\tConflicts violations: %d\n"
+                "\tAvailabilities violations: %d\n"
+                "SOFT constraints cost: %d\n"
+                "\tRoomCapacity cost: %d\n"
+                "\tMinWorkingDays cost: %d\n"
+                "\tCurriculumCompactness cost: %d\n"
+                "\tRoomStability cost: %d\n"
+                "----------------------\n"
+                "%s",
+                BOOL_TO_STR(!h1 && !h2 && !h3 && !h4),
+                h1,
+                h2,
+                h3,
+                h4,
+                s1 + s2 + s3 + s4,
+                s1,
+                s2,
+                s3,
+                s4,
+                sol_str
         );
 
         if (args.output) {
@@ -191,13 +206,14 @@ int main (int argc, char **argv) {
         free(sol_str);
     }
 
-    if (args.draw_dir) {
+    if (args.draw_overview_file || args.draw_directory) {
         renderer renderer;
         renderer_init(&renderer);
 
         renderer_config config;
         renderer_config_init(&config);
-        config.output = args.draw_dir;
+        config.output_dir = args.draw_directory;
+        config.output_file = args.draw_overview_file;
 
         if (!renderer_render(&renderer, &config, &m, &sol)) {
             eprint("WARN: failed to render solution (%s)", renderer_get_error(&renderer));

@@ -27,7 +27,7 @@ int strpos(const char *str, char character) {
 char *strrtrim(char *str) {
     char *end = &str[strlen(str) - 1];
 
-    while (isspace(*end) && end > str)
+    while (isspace(*end) && end >= str)
         --end;
 
     end[1] = '\0';
@@ -47,6 +47,56 @@ char *strltrim(char *str) {
 char *strtrim(char *str) {
     char *start = strltrim(str);
     return strrtrim(start);
+}
+
+
+char *strrtrim_chars(char *str, const char *chars) {
+    char *end = &str[strlen(str) - 1];
+
+    do {
+        bool go_ahead = false;
+
+        for (int i = 0; i < strlen(chars); i++) {
+            if (*end == chars[i] && end >= str) {
+                --end;
+                go_ahead = true;
+                break;
+            }
+        }
+
+        if (!go_ahead)
+            break;
+    } while (true);
+
+    end[1] = '\0';
+
+    return str;
+}
+
+char *strltrim_chars(char *str, const char *chars) {
+    char *start = str;
+
+    do {
+        bool go_ahead = false;
+
+        for (int i = 0; i < strlen(chars); i++) {
+            if (*start == chars[i]) {
+                ++start;
+                go_ahead = true;
+                break;
+            }
+        }
+
+        if (!go_ahead)
+            break;
+    } while (true);
+
+    return start;
+}
+
+char *strtrim_chars(char *str, const char *chars) {
+    char *start = strltrim_chars(str, chars);
+    return strrtrim_chars(start, chars);
 }
 
 int strtoint(const char *str, bool *ok) {
@@ -165,10 +215,17 @@ void vstrappend_realloc(char **dest, size_t *size, const char *fmt, va_list args
 }
 
 bool strstarts(const char *str, char ch) {
-    return str[0] == ch;
+    return strfirst(str) == ch;
 }
 
 bool strends(const char *str, char ch) {
-    return str[strlen(str) - 1] == ch;
+    return strlast(str) == ch;
 }
 
+char strfirst(const char *str) {
+    return str[0];
+}
+
+char strlast(const char *str) {
+    return str[strlen(str) - 1];
+}

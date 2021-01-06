@@ -15,7 +15,9 @@ typedef struct args {
     bool verbose;
     itc2007_method method;
     char *write_lp_file;
-    char *draw_dir;
+    char *solution_input_file;
+    char *draw_directory;
+    char *draw_overview_file;
     int time_limit;
 } args;
 

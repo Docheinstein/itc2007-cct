@@ -46,9 +46,6 @@
     <unavailability_constraint> := <CourseID> <Day> <Day_Period>
 */
 
-#define MAX_ERROR_LENGTH        256
-#define MAX_LINE_LENGTH         256
-
 #define SECTION_NONE            0
 #define SECTION_COURSES         1
 #define SECTION_ROOMS           2
@@ -83,6 +80,9 @@ bool parser_parse(parser *parser, const char *input, model *model) {
 
 #define ABORT_PARSE_INT_FAIL() ABORT_PARSE("integer conversion failed")
 
+    static const int MAX_ERROR_LENGTH = 256;
+    static const int MAX_LINE_LENGTH = 256;
+
     char error_reason[MAX_ERROR_LENGTH];
     error_reason[0] = '\0';
     int line_num = 0;
@@ -108,7 +108,6 @@ bool parser_parse(parser *parser, const char *input, model *model) {
     verbose("Opening input file: '%s'", input);
 
     FILE *file = fopen(input, "r");
-
     if (!file)
         ABORT_PARSE("failed to open '%s' (%s)\n", input, strerror(errno));
 
@@ -253,5 +252,12 @@ QUIT:
         parser->error = strmake("parse error at line %d (%s)", line_num, error_reason);
     }
 
-    return strempty(parser->error);
+    bool success = strempty(parser->error);
+    if (success)
+        model_finalize(model);
+
+#undef ABORT_PARSE
+#undef ABORT_PARSE_INT_FAIL
+
+    return success;
 }

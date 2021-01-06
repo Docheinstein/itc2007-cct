@@ -249,7 +249,7 @@ void model_finalize(model *model) {
     g_hash_table_iter_init (&iter, teachers_set);
     int i = 0;
     while (g_hash_table_iter_next(&iter, &key, &value)) {
-        model->teachers->index = i;
+        model->teachers[i].index = i;
         model->teachers[i++].id = strdup(key);
     }
 
@@ -268,7 +268,6 @@ void model_finalize(model *model) {
     // a_cds
 
     GHashTable *unavailabilities_set = g_hash_table_new_full(g_str_hash, g_str_equal, free, NULL);
-//    GHashTable *unavailabilities_set = g_hash_table_new(g_str_hash, g_str_equal);
 
     for (int u = 0; u < U; u++) {
         const struct unavailability_constraint *uc = &model->unavailability_constraints[u];

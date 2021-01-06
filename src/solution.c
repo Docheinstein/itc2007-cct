@@ -5,6 +5,7 @@
 #include "debug.h"
 #include "io_utils.h"
 #include "config.h"
+#include "verbose.h"
 
 #define FOR_C \
     const int C = model->n_courses; \
@@ -405,4 +406,90 @@ int solution_soft_constraint_room_stability(solution *sol, const model *model) {
     };
 
     return penalties * ROOM_STABILITY_COST;
+}
+
+void solution_parser_init(solution_parser *solution_parser) {
+    solution_parser->error = NULL;
+}
+
+void solution_parser_destroy(solution_parser *solution_parser) {
+    free(solution_parser->error);
+}
+
+bool solution_parser_parse(solution_parser *solution_parser, const model *model,
+                           const char *input, solution *solution) {
+
+#define ABORT_PARSE(errfmt, ...) do { \
+    snprintf(error_reason, MAX_ERROR_LENGTH, errfmt, ##__VA_ARGS__); \
+    goto QUIT; \
+} while(0)
+
+#define ABORT_PARSE_INT_FAIL() ABORT_PARSE("integer conversion failed")
+
+    static const int MAX_ERROR_LENGTH = 256;
+    static const int MAX_LINE_LENGTH = 256;
+
+    char error_reason[MAX_ERROR_LENGTH];
+    error_reason[0] = '\0';
+    int line_num = 0;
+
+    char line0[MAX_LINE_LENGTH];
+    char *line;
+
+    verbose("Opening input file: '%s'", input);
+
+    FILE *file = fopen(input, "r");
+    if (!file)
+        ABORT_PARSE("failed to open '%s' (%s)\n", input, strerror(errno));
+
+    while (fgets(line0, LENGTH(line0), file)) {
+        ++line_num;
+        line = strtrim(line0);
+        verbose("<< %s", line);
+
+        if (strempty(line))
+            continue;
+
+
+        char *F[4];
+        bool ok;
+        int n_tokens = strsplit(line, " ", F, 4);
+        if (n_tokens != 4)
+            ABORT_PARSE("unexpected tokens count: found %d instead of 4", n_tokens);
+
+        solution_add_assignment(solution,
+            assignment_new(
+                    model_course_by_id(model, F[0]),
+                    model_room_by_id(model, F[1]),
+                    strtoint(F[2], &ok),
+                    strtoint(F[3], &ok
+            )
+        ));
+
+        if (!ok)
+            ABORT_PARSE_INT_FAIL();
+    }
+
+    verbose("Closing file: '%s'", input);
+    if (fclose(file) != 0)
+        verbose("WARN: failed to close '%s' (%s)", input, strerror(errno));
+
+QUIT:
+    if (!strempty(error_reason)) {
+        debug("Parser error: %s", error_reason);
+        solution_parser->error = strmake("parse error at line %d (%s)", line_num, error_reason);
+    }
+
+    bool success = strempty(solution_parser->error);
+    if (success)
+        solution_finalize(solution, model);
+
+#undef ABORT_PARSE
+#undef ABORT_PARSE_INT_FAIL
+
+    return success;
+}
+
+const char *solution_parser_get_error(solution_parser *solution_parser) {
+    return solution_parser->error;
 }

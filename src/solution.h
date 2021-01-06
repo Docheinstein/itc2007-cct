@@ -61,6 +61,17 @@ typedef struct solution {
     bool *timetable;
 } solution;
 
+
+typedef struct solution_parser {
+    char *error;
+} solution_parser;
+
+void solution_parser_init(solution_parser *solution_parser);
+bool solution_parser_parse(solution_parser *solution_parser, const model *model,
+                           const char * input, solution *solution);
+void solution_parser_destroy(solution_parser *solution_parser);
+const char * solution_parser_get_error(solution_parser *solution_parser);
+
 assignment * assignment_new(course *course, room *room, int day, int day_period);
 void assignment_set(assignment *a, course *course, room *room, int day, int day_period);
 
@@ -70,7 +81,6 @@ void solution_destroy(solution *solution);
 
 char * solution_to_string_debug(const solution *sol);
 char * solution_to_string(const solution *sol);
-
 
 void solution_add_assignment(solution *sol, assignment *a);
 

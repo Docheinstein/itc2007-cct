@@ -675,7 +675,10 @@ QUIT:
 #undef GRB_SET_OBJECTIVE_TERM
 #undef GRB_GET_VARS
 
-    return strempty(solver->error);
+    bool success = strempty(solver->error);
+    if (success)
+        solution_finalize(solution, itc);
+    return success;
 }
 
 const char *exact_solver_get_error(exact_solver *solver) {

@@ -8,6 +8,7 @@
 #include <io_utils.h>
 #include <array_utils.h>
 #include <debug.h>
+#include "os_utils.h"
 
 #define BUFLEN 128
 
@@ -70,6 +71,55 @@ MUNIT_TEST(test_strtrim) {
     munit_assert_string_equal(strtrim(s5), "");
     munit_assert_string_equal(strtrim(s6), "");
     munit_assert_string_equal(strtrim(s7), "some thing");
+
+    return MUNIT_OK;
+}
+
+MUNIT_TEST(test_strltrim_chars) {
+    munit_assert_string_equal(strltrim_chars("XXsomething", "X"), "something");
+    munit_assert_string_equal(strltrim_chars("\n\tsomething", "\n\t"), "something");
+    munit_assert_string_equal(strltrim_chars("something", "X"), "something");
+    munit_assert_string_equal(strltrim_chars("something  ", " "), "something  ");
+    munit_assert_string_equal(strltrim_chars("", "X"), "");
+    munit_assert_string_equal(strltrim_chars(" ", " "), "");
+
+    return MUNIT_OK;
+}
+
+MUNIT_TEST(test_strrtrim_chars) {
+    char s1[] = "something  X";
+    char s2[] = "something\n\t";
+    char s3[] = "something";
+    char s4[] = "  something";
+    char s5[] = "";
+    char s6[] = " ";
+
+    munit_assert_string_equal(strrtrim_chars(s1, "X"), "something  ");
+    munit_assert_string_equal(strrtrim_chars(s2, "\n\t"), "something");
+    munit_assert_string_equal(strrtrim_chars(s3, "X"), "something");
+    munit_assert_string_equal(strrtrim_chars(s4, "X"), "  something");
+    munit_assert_string_equal(strrtrim_chars(s5, " "), "");
+    munit_assert_string_equal(strrtrim_chars(s6, " "), "");
+
+    return MUNIT_OK;
+}
+
+MUNIT_TEST(test_strtrim_chars) {
+    char s1[] = " something  ";
+    char s2[] = "\tsomething\n\t ";
+    char s3[] = "\nsomething";
+    char s4[] = "  something";
+    char s5[] = "";
+    char s6[] = " ";
+    char s7[] = " some thing  ";
+
+    munit_assert_string_equal(strtrim_chars(s1, " "), "something");
+    munit_assert_string_equal(strtrim_chars(s2, " \t\n"), "something");
+    munit_assert_string_equal(strtrim_chars(s3, " "), "\nsomething");
+    munit_assert_string_equal(strtrim_chars(s4, " "), "something");
+    munit_assert_string_equal(strtrim_chars(s5, " "), "");
+    munit_assert_string_equal(strtrim_chars(s6, " "), "");
+    munit_assert_string_equal(strtrim_chars(s7, " "), "some thing");
 
     return MUNIT_OK;
 }
@@ -203,6 +253,35 @@ MUNIT_TEST(test_strappend_realloc) {
     return MUNIT_OK;
 }
 
+MUNIT_TEST(test_pathjoin) {
+    char *s;
+
+    s = pathjoin("/tmp", "file");
+    munit_assert_string_equal(s, "/tmp" PATH_SEP_STR "file");
+    free(s);
+
+
+    s = pathjoin("/tmp/", "file");
+    munit_assert_string_equal(s, "/tmp" PATH_SEP_STR "file");
+    free(s);
+
+    s = pathjoin("/tmp/", "/file");
+    munit_assert_string_equal(s, "/tmp" PATH_SEP_STR "file");
+    free(s);
+
+    return MUNIT_OK;
+}
+
+
+MUNIT_TEST(test_mkdirs) {
+    if (!isdir("/tmp/dir")) {
+        munit_assert_true(mkdirs("/tmp/dir"));
+    }
+    munit_assert_true(isdir("/tmp/dir"));
+    return MUNIT_OK;
+}
+
+
 MUNIT_TEST(test_parser) {
     model m;
     model_init(&m);
@@ -234,43 +313,45 @@ MUNIT_TEST(test_parser) {
     return MUNIT_OK;
 }
 
-#define NEW_ASSIGNMENT(course, room, day, day_period) \
-    assignment_new(                               \
-        (model_course_by_id(&m, course)),         \
-        (model_room_by_id(&m, room)),             \
-        (day),                                    \
-        (day_period)                              \
-    )
-
-MUNIT_TEST(test_solution_to_string) {
-
+MUNIT_TEST(test_solution_parser) {
     solution sol;
     solution_init(&sol);
 
     model m;
     model_init(&m);
 
+    solution_parser sol_parser;
+    solution_parser_init(&sol_parser);
+
     parser parser;
     parser_init(&parser);
+
     munit_assert_true(parser_parse(&parser, "datasets/toy.ctt", &m));
+    munit_assert_true(solution_parser_parse(&sol_parser, &m, "tests/solutions/toy.ctt.sol", &sol));
 
-    FILE *file = fopen("tests/solutions/toy.ctt.sol", "r");
-    munit_assert_not_null(file);
+    parser_destroy(&parser);
+    solution_parser_destroy(&sol_parser);
+    model_destroy(&m);
+    solution_destroy(&sol);
 
-    char line[256];
-    char *l;
-    while (fgets(line, LENGTH(line), file)) {
-        l = strtrim(line);
-        if (strempty(l))
-            continue;
-        char *F[4];
-        bool ok;
-        munit_assert_int(strsplit(l, " ", F, 4), ==, 4);
-        solution_add_assignment(&sol,
-            NEW_ASSIGNMENT(F[0], F[1], strtoint(F[2], &ok), strtoint(F[3], &ok))
-        );
-        munit_assert_true(ok);
-    }
+    return MUNIT_OK;
+}
+
+MUNIT_TEST(test_solution_to_string) {
+    solution sol;
+    solution_init(&sol);
+
+    model m;
+    model_init(&m);
+
+    solution_parser sol_parser;
+    solution_parser_init(&sol_parser);
+
+    parser parser;
+    parser_init(&parser);
+
+    munit_assert_true(parser_parse(&parser, "datasets/toy.ctt", &m));
+    munit_assert_true(solution_parser_parse(&sol_parser, &m, "tests/solutions/toy.ctt.sol", &sol));
 
     char *output = strtrim(solution_to_string(&sol));
     char *expected_solution = strtrim(fileread("tests/solutions/toy.ctt.sol"));
@@ -281,8 +362,10 @@ MUNIT_TEST(test_solution_to_string) {
     free(expected_solution);
 
     parser_destroy(&parser);
+    solution_parser_destroy(&sol_parser);
     model_destroy(&m);
     solution_destroy(&sol);
+
 
     return MUNIT_OK;
 }
@@ -296,29 +379,14 @@ static MunitResult test_solution(const char *dataset_file, const char *solution_
     model m;
     model_init(&m);
 
+    solution_parser sol_parser;
+    solution_parser_init(&sol_parser);
+
     parser parser;
     parser_init(&parser);
+
     munit_assert_true(parser_parse(&parser, dataset_file, &m));
-
-    FILE *file = fopen(solution_file, "r");
-    munit_assert_not_null(file);
-
-    char line[256];
-    char *l;
-    while (fgets(line, LENGTH(line), file)) {
-        l = strtrim(line);
-        if (strempty(l))
-            continue;
-        char *F[4];
-        bool ok;
-        munit_assert_int(strsplit(line, " ", F, 4), ==, 4);
-        solution_add_assignment(&sol,
-            NEW_ASSIGNMENT(F[0], F[1], strtoint(F[2], &ok), strtoint(F[3], &ok))
-        );
-        munit_assert_true(ok);
-    }
-
-    model_finalize(&m);
+    munit_assert_true(solution_parser_parse(&sol_parser, &m, solution_file, &sol));
 
     munit_assert(h1 == solution_satisfy_hard_constraint_lectures(&sol, &m));
     munit_assert(h2 == solution_satisfy_hard_constraint_room_occupancy(&sol, &m));
@@ -331,6 +399,7 @@ static MunitResult test_solution(const char *dataset_file, const char *solution_
     munit_assert_int(s4, ==, solution_soft_constraint_room_stability(&sol, &m));
 
     parser_destroy(&parser);
+    solution_parser_destroy(&sol_parser);
     model_destroy(&m);
     solution_destroy(&sol);
 
@@ -355,13 +424,19 @@ static MunitTest tests[] = {
     { "test_strltrim", test_strltrim, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strrtrim", test_strrtrim, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strtrim", test_strtrim, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_strltrim_chars", test_strltrim_chars, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_strrtrim_chars", test_strrtrim_chars, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_strtrim_chars", test_strtrim_chars, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strtoint", test_strtoint, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strappend", test_strappend, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strappend", test_strappend, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strsplit", test_strsplit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strjoin", test_strjoin, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_strappend_realloc", test_strappend_realloc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_pathjoin", test_pathjoin, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_mkdirs", test_mkdirs, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_parser", test_parser, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_solution_parser", test_solution_parser, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_to_string", test_solution_to_string, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_toy", test_solution_cost_toy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_comp01", test_solution_cost_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
