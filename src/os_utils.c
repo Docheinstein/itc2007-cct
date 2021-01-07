@@ -4,7 +4,7 @@
 #include "str_utils.h"
 #include "debug.h"
 
-char *pathjoin_internal(const char *first, ...) {
+char *pathjoin0(const char *first, ...) {
     va_list args;
     va_start(args, first);
 

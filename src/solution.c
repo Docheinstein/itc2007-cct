@@ -6,6 +6,7 @@
 #include "io_utils.h"
 #include "config.h"
 #include "verbose.h"
+#include "def_utils.h"
 
 #define FOR_C \
     const int C = model->n_courses; \
@@ -64,6 +65,7 @@ void assignment_set(assignment *a, course *course, room *room, int day, int day_
 
 void solution_init(solution *sol) {
     sol->assignments = NULL;
+    sol->timetable = NULL;
 }
 
 
@@ -105,6 +107,40 @@ char * solution_to_string(const solution *sol) {
 
     buffer[strlen(buffer) - 1] = '\0';
     return buffer;
+}
+
+char *solution_quality_to_string(solution *sol, const model *model) {
+    int h1 = solution_hard_constraint_lectures_violations(sol, model);
+    int h2 = solution_hard_constraint_room_occupancy_violations(sol, model);
+    int h3 = solution_hard_constraint_conflicts_violations(sol, model);
+    int h4 = solution_hard_constraint_availabilities_violations(sol, model);
+    int s1 = solution_soft_constraint_room_capacity(sol, model);
+    int s2 = solution_soft_constraint_min_working_days(sol, model);
+    int s3 = solution_soft_constraint_curriculum_compactness(sol, model);
+    int s4 = solution_soft_constraint_room_stability(sol, model);
+
+    return strmake(
+            "HARD constraints satisfied: %s\n"
+            "\tLectures violations: %d\n"
+            "\tRoomOccupancy violations: %d\n"
+            "\tConflicts violations: %d\n"
+            "\tAvailabilities violations: %d\n"
+            "SOFT constraints cost: %d\n"
+            "\tRoomCapacity cost: %d\n"
+            "\tMinWorkingDays cost: %d\n"
+            "\tCurriculumCompactness cost: %d\n"
+            "\tRoomStability cost: %d",
+            BOOL_TO_STR(!h1 && !h2 && !h3 && !h4),
+            h1,
+            h2,
+            h3,
+            h4,
+            s1 + s2 + s3 + s4,
+            s1,
+            s2,
+            s3,
+            s4
+    );
 }
 
 void solution_add_assignment(solution *sol, assignment *a) {

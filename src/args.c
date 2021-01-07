@@ -7,16 +7,7 @@
 #include "def_utils.h"
 #include <stdbool.h>
 
-static const char * itc2007_method_to_string(itc2007_method method) {
-    switch (method) {
-    case ITC2007_METHOD_EXACT:
-        return "exact";
-    case ITC2007_METHOD_TABU:
-        return "tabu";
-    default:
-        return "unknown";
-    }
-}
+
 void args_to_string(const args *args, char *buffer, size_t buflen) {
     snprintf(buffer, buflen,
         "input = %s\n"
@@ -26,15 +17,17 @@ void args_to_string(const args *args, char *buffer, size_t buflen) {
         "draw_directory = %s\n"
         "draw_overview_file = %s\n"
         "write_lp = %s\n"
-        "time_limit = %d",
-        args->input,
-        args->output,
-        BOOL_TO_STR(args->verbose),
-        itc2007_method_to_string(args->method),
-        args->draw_directory,
-        args->draw_overview_file,
-        args->write_lp_file,
-        args->time_limit
+        "time_limit = %d\n"
+        "seed = %u",
+             args->input,
+             args->output,
+             BOOL_TO_STR(args->verbose),
+             resolution_method_to_string(args->method),
+             args->draw_directory,
+             args->draw_overview_file,
+             args->write_lp_file,
+             args->time_limit,
+             args->seed
     );
 }
 
@@ -42,12 +35,13 @@ void args_init(args *args) {
     args->input = NULL;
     args->output = NULL;
     args->verbose = false;
-    args->method = ITC2007_METHOD_DEFAULT;
+    args->method = RESOLUTION_METHOD_DEFAULT;
     args->draw_directory = NULL;
     args->draw_overview_file = NULL;
     args->write_lp_file = NULL;
     args->solution_input_file = NULL;
     args->time_limit = 0;
+    args->seed = 0;
 }
 
 void args_destroy(args *args) {
@@ -65,6 +59,7 @@ typedef enum itc2007_option {
     ITC2007_OPT_DRAW_DIRECTORY = 'D',
     ITC2007_OPT_DRAW_OVERVIEW_FILE = 'd',
     ITC2007_OPT_SOLUTION = 's',
+    ITC2007_OPT_SEED = 'S',
     ITC2007_OPT_WRITE_LP = 0x100,
 } itc2007_option;
 
@@ -81,12 +76,23 @@ static struct argp_option options[] = {
                                                      "(useful for see the cost/violations or with -d or -D for render the solution)" },
   { "method", ITC2007_OPT_METHOD, "exact|tabu", 0, "Method to use for solve the model.\n"
                                                     "Possible values are: 'exact'" },
+  { "seed", ITC2007_OPT_SEED, "N", 0, "Seed to use for randomization, if not provided a random one is used" },
   { NULL }
 };
 
 static int parse_int(const char *str) {
     bool ok;
     int val = strtoint(str, &ok);
+    if (!ok) {
+        eprint("ERROR: integer conversion failed for parameter '%s'", str);
+        exit(EXIT_FAILURE);
+    }
+    return val;
+}
+
+static uint parse_uint(const char *str) {
+    bool ok;
+    uint val = strtouint(str, &ok);
     if (!ok) {
         eprint("ERROR: integer conversion failed for parameter '%s'", str);
         exit(EXIT_FAILURE);
@@ -118,14 +124,17 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         break;
     case ITC2007_OPT_METHOD:
         if (streq(arg, "exact"))
-            args->method = ITC2007_METHOD_EXACT;
+            args->method = RESOLUTION_METHOD_EXACT;
         else if (streq(arg, "tabu"))
-            args->method = ITC2007_METHOD_TABU;
+            args->method = RESOLUTION_METHOD_TABU;
         else {
             eprint("ERROR: unknown method '%s'.\n"
                    "Possible values are 'exact', 'tabu'", arg);
             exit(EXIT_FAILURE);
         }
+        break;
+    case ITC2007_OPT_SEED:
+        args->seed = parse_uint(arg);
         break;
     case ARGP_KEY_ARG:
         switch (state->arg_num) {

@@ -5,6 +5,7 @@
 #include "os_utils.h"
 #include "def_utils.h"
 #include "array_utils.h"
+#include "verbose.h"
 
 #define WHITE 1, 1, 1
 #define BLACK 0, 0, 0
@@ -734,27 +735,32 @@ bool renderer_render(renderer *renderer, const renderer_config *config,
 
     if (!strempty(config->output_dir)) {
         for (int q = 0; q < model->n_curriculas; q++) {
+            verbose("Rendering timetable of curriculum '%s'", model->curriculas[q].id);
             if (!renderer_render_curriculum_timetable(renderer, config, model,
                                                       solution, &model->curriculas[q]))
                 return false;
         }
         for (int c = 0; c < model->n_courses; c++) {
+            verbose("Rendering timetable of course '%s'", model->courses[c].id);
             if (!renderer_render_course_timetable(renderer, config, model,
                                                   solution, &model->courses[c]))
                 return false;
         }
         for (int r = 0; r < model->n_rooms; r++) {
+            verbose("Rendering timetable of room '%s'", model->rooms[r].id);
             if (!renderer_render_room_timetable(renderer, config, model,
                                                 solution, &model->rooms[r]))
                 return false;
         }
         for (int t = 0; t < model->n_teachers; t++) {
+            verbose("Rendering timetable of teacher '%s'", model->teachers[t].id);
             if (!renderer_render_teacher_timetable(renderer, config, model,
                                                    solution, &model->teachers[t]))
                 return false;
         }
     }
 
+    verbose("Rendering overview timetable");
     renderer_render_overview_timetable(renderer, config, model, solution);
 
     return strempty(renderer->error);

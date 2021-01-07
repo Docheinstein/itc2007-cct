@@ -79,8 +79,8 @@ void solution_init(solution *solution);
 void solution_finalize(solution *solution, const model *model);
 void solution_destroy(solution *solution);
 
-char * solution_to_string_debug(const solution *sol);
 char * solution_to_string(const solution *sol);
+char * solution_quality_to_string(solution *sol, const model *model);
 
 void solution_add_assignment(solution *sol, assignment *a);
 

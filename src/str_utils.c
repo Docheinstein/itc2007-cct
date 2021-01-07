@@ -99,17 +99,39 @@ char *strtrim_chars(char *str, const char *chars) {
     return strrtrim_chars(start, chars);
 }
 
+
 int strtoint(const char *str, bool *ok) {
+    return (uint) strtolong(str, ok);
+}
+
+uint strtouint(const char *str, bool *ok) {
+    return (uint) strtoulong(str, ok);
+}
+
+long strtolong(const char *str, bool *ok) {
     char *endptr = NULL;
 
     errno = 0;
-    int ret = (int) strtol(str, &endptr, 10);
+    long ret = strtol(str, &endptr, 10);
 
     if (ok != NULL)
         *ok = (errno == 0 && str && endptr && *endptr == '\0');
 
     return ret;
 }
+
+ulong strtoulong(const char *str, bool *ok) {
+    char *endptr = NULL;
+
+    errno = 0;
+    unsigned long ret = strtoul(str, &endptr, 10);
+
+    if (ok != NULL)
+        *ok = (errno == 0 && str && endptr && *endptr == '\0');
+
+    return ret;
+}
+
 
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens) {
     if (max_tokens <= 1)

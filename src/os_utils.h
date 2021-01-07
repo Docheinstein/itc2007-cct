@@ -11,8 +11,8 @@
 #define PATH_SEP_STR "/"
 #endif
 
-char * pathjoin_internal(const char *first, ...);
-#define pathjoin(...) pathjoin_internal(__VA_ARGS__, NULL)
+char * pathjoin0(const char *first, ...);
+#define pathjoin(...) pathjoin0(__VA_ARGS__, NULL)
 
 bool exists(const char *path);
 bool isfile(const char *path);
