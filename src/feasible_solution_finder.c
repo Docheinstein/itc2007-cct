@@ -13,6 +13,17 @@ void feasible_solution_finder_destroy(feasible_solution_finder *finder) {
     free(finder->error);
 }
 
+typedef struct course_assignment {
+    course *course;
+    int difficulty;
+} course_assignment;
+
+int course_assignment_compare(const void *ca1, const void *ca2) {
+    return
+        ((const course_assignment *) ca1)->difficulty <
+        ((const course_assignment *) ca2)->difficulty;
+}
+
 bool feasible_solution_finder_find(feasible_solution_finder *finder,
                                    solution *sol) {
     const int C = sol->model->n_courses;
@@ -37,8 +48,76 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
     int n_assignments = 0;
     int n_attempts = 0;
 
+    // Sort the courses by the difficulty, in order to assign the most
+    // difficult courses before the easy ones (i.e. a course is difficult
+    // it place if it has many associated constraints).
+    // Specifically:
+    // 1. H3a: How many curriculum does the course belong to?
+    // 2. H3b: How many courses the teacher of the course teaches?
+    // 3. H4: How many unavailability constraint the course has?
+
+    // 1. H3a: How many curriculum does the course belong to?
+    int *courses_n_curriculas = callocx(C, sizeof(int));
     for (int c = 0; c < C; c++) {
-        const course *course = &m->courses[c];
+        model_curriculas_of_course(m, c, &courses_n_curriculas[c]);
+        debug("Course %s belongs to %d curriculas",
+              m->courses[c].id, courses_n_curriculas[c]);
+    }
+
+    // 2. H3b: How many courses the teacher of the course teaches?
+    int *courses_teacher_n_courses = callocx(C, sizeof(int));
+    for (int c = 0; c < C; c++) {
+        model_courses_of_teacher(m, model_teacher_by_id(m, m->courses[c].teacher_id)->index,
+                                 &courses_teacher_n_courses[c]);
+        debug("Course %s has teacher %s which teaches %d courses",
+              m->courses[c].id, m->courses[c].teacher_id, courses_teacher_n_courses[c]);
+    }
+
+    // 3. H4: How many unavailability constraint the course has?
+    int *courses_n_unavailabilities = callocx(C, sizeof(int));
+    for (int c = 0; c < C; c++) {
+        for (int d = 0; d < D; d++) {
+            for (int s = 0; s < S; s++) {
+                courses_n_unavailabilities[c] += !model_course_is_available_on_period(m, c, d, s);
+            }
+        }
+        debug("Course %s has %d unavailabilities constraints",
+              m->courses[c].id, courses_n_unavailabilities[c]);
+    }
+
+    // Compute the difficulty score of courses assignments
+    static const int CURRICULAS_CONFLICTS_DIFFICULTY_FACTOR = 1;
+    static const int TEACHER_CONFLICTS_DIFFICULTY_FACTOR = 1;
+    static const int UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR = 1;
+    static const int COURSE_LECTURES_DIFFICULTY_FACTOR = 1;
+
+    course_assignment *courses_assignment_difficulty = mallocx(sizeof(course_assignment) * C);
+
+    for (int c = 0; c < C; c++) {
+        courses_assignment_difficulty[c].course = &m->courses[c];
+        courses_assignment_difficulty[c].difficulty =
+            (courses_n_curriculas[c] * CURRICULAS_CONFLICTS_DIFFICULTY_FACTOR +
+            courses_teacher_n_courses[c] * UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR +
+            courses_n_unavailabilities[c] * UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR)
+            * MAX(1, courses_assignment_difficulty[c].course->n_lectures * COURSE_LECTURES_DIFFICULTY_FACTOR);
+        debug("Course %s has assignment difficulty %d",
+              courses_assignment_difficulty[c].course->id,
+              courses_assignment_difficulty[c].difficulty);
+    }
+
+    qsort(courses_assignment_difficulty, C, sizeof(course_assignment),
+          course_assignment_compare);
+
+    for (int c = 0; c < C; c++) {
+        debug("POST sort: course %s has assignment difficulty %d",
+              courses_assignment_difficulty[c].course->id,
+              courses_assignment_difficulty[c].difficulty);
+    }
+
+    for (int i = 0; i < C; i++) {
+        const course *course = courses_assignment_difficulty[i].course;
+        const int c = course->index;
+
         int course_n_curriculas;
         int *course_curriculas = model_curriculas_of_course(m, c, &course_n_curriculas);
 

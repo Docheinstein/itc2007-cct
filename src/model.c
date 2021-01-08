@@ -20,11 +20,11 @@ void model_init(model *model) {
     model->rooms = NULL;
     model->curriculas = NULL;
     model->unavailability_constraints = NULL;
-
+    model->n_teachers = 0;
+    model->teachers = NULL;
     model->course_belongs_to_curricula = NULL;
     model->curriculas_of_course = NULL;
-    model->teachers = NULL;
-    model->n_teachers = 0;
+    model->courses_of_teacher = NULL;
     model->course_taught_by_teacher = NULL;
     model->course_availabilities = NULL;
 }
@@ -78,6 +78,10 @@ void model_destroy(const model *model) {
         g_array_free(model->curriculas_of_course[c], true);
     free(model->curriculas_of_course);
 
+    for (int t = 0; t < model->n_teachers; t++)
+        g_array_free(model->courses_of_teacher[t], true);
+    free(model->courses_of_teacher);
+
     free(model->course_belongs_to_curricula);
     free(model->course_taught_by_teacher);
     free(model->course_availabilities);
@@ -118,6 +122,8 @@ void unavailability_constraint_to_string(const unavailability_constraint *uc,
     );
 }
 
+char * model_to_string(const model *model) {
+
 #define MODEL_APPEND_SECTION(header, n_entries, entries, to_string_func) do { \
     if (entries) { \
         strappend_realloc(&buffer, &buflen, header); \
@@ -128,7 +134,6 @@ void unavailability_constraint_to_string(const unavailability_constraint *uc,
     } \
 } while(0)
 
-char * model_to_string(const model *model) {
     char *buffer = NULL;
     size_t buflen;
 
@@ -168,38 +173,9 @@ char * model_to_string(const model *model) {
 
     buffer[strlen(buffer) - 1] = '\0';
 
+#undef MODEL_APPEND_SECTION
 
     return buffer; // must be freed outside
-}
-
-void course_set(course *c,
-                char *id, char *teacher_id, int n_lectures,
-                int min_working_days, int n_students) {
-    c->id = id;
-    c->teacher_id = teacher_id;
-    c->n_lectures = n_lectures;
-    c->min_working_days = min_working_days;
-    c->n_students = n_students;
-}
-
-void room_set(room *r,
-              char *id, int capacity) {
-    r->id = id;
-    r->capacity = capacity;
-}
-
-void curricula_set(curricula *q,
-                   char *id, int n_courses, char **courses_ids) {
-    q->id = id;
-    q->n_courses = n_courses;
-    q->courses_ids = courses_ids;
-}
-
-void unavailability_constraint_set(unavailability_constraint *uc,
-                                   char *course_id, int day, int day_period) {
-    uc->course_id = course_id;
-    uc->day = day;
-    uc->slot = day_period;
 }
 
 void model_finalize(model *model) {
@@ -214,12 +190,12 @@ void model_finalize(model *model) {
     static const int TMP_LEN = 256;
     char tmp[TMP_LEN];
 
-    // b_cq
     model->curriculas_of_course = mallocx(sizeof(GArray *) * C);
     for (int c = 0; c < C; c++) {
         model->curriculas_of_course[c] = g_array_new(false, false, sizeof(int));
     }
 
+    // b_cq
     model->course_belongs_to_curricula = mallocx(sizeof(bool) * Q * C);
     for (int q = 0; q < Q; q++) {
         const curricula *curricula = &model->curriculas[q];
@@ -244,7 +220,7 @@ void model_finalize(model *model) {
     for (int c = 0; c < C; c++)
         g_hash_table_add(teachers_set, model->courses[c].teacher_id);
 
-    uint T = g_hash_table_size(teachers_set);
+    const uint T = g_hash_table_size(teachers_set);
     model->teachers = mallocx(sizeof(teacher) * T);
     model->n_teachers = T;
 
@@ -291,6 +267,21 @@ void model_finalize(model *model) {
     }
 
     g_hash_table_destroy(unavailabilities_set);
+
+    model->courses_of_teacher = mallocx(sizeof(GArray *) * T);
+    for (int t = 0; t < T; t++) {
+        model->courses_of_teacher[t] = g_array_new(false, false, sizeof(int));
+    }
+
+    for (int t = 0; t < T; t++) {
+        const teacher *teacher = &model->teachers[t];
+        for (int c = 0; c < C; c++) {
+            const course *course = &model->courses[c];
+            if (streq(teacher->id, course->teacher_id)) {
+                g_array_append_val(model->courses_of_teacher[t], course->id);
+            }
+        }
+    }
 }
 
 course *model_course_by_id(const model *model, char *id) {
@@ -351,4 +342,10 @@ int *model_curriculas_of_course(const model *model, int course_idx, int *n_curri
     if (n_curriculas)
         *n_curriculas = model->curriculas_of_course[course_idx]->len;
     return (int *) model->curriculas_of_course[course_idx]->data;
+}
+
+int *model_courses_of_teacher(const model *model, int teacher_idx, int *n_courses) {
+    if (n_courses)
+        *n_courses = model->courses_of_teacher[teacher_idx]->len;
+    return (int *) model->courses_of_teacher[teacher_idx]->data;
 }
