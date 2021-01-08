@@ -13,6 +13,7 @@ typedef struct args {
     char *solution_input_file;
     char *draw_directory;
     char *draw_overview_file;
+    bool force_draw;
     int time_limit;
     uint seed;
 } args;

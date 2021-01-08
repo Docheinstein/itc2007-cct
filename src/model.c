@@ -22,6 +22,7 @@ void model_init(model *model) {
     model->unavailability_constraints = NULL;
 
     model->course_belongs_to_curricula = NULL;
+    model->curriculas_of_course = NULL;
     model->teachers = NULL;
     model->n_teachers = 0;
     model->course_taught_by_teacher = NULL;
@@ -72,6 +73,10 @@ void model_destroy(const model *model) {
     for (int i = 0; i < model->n_teachers; i++)
         teacher_destroy(&model->teachers[i]);
     free(model->teachers);
+
+    for (int c = 0; c < model->n_courses; c++)
+        g_array_free(model->curriculas_of_course[c], true);
+    free(model->curriculas_of_course);
 
     free(model->course_belongs_to_curricula);
     free(model->course_taught_by_teacher);
@@ -209,13 +214,12 @@ void model_finalize(model *model) {
     static const int TMP_LEN = 256;
     char tmp[TMP_LEN];
 
-    // l_c
-//    model->course_lectures = mallocx(sizeof(int) * C);
-//    for (int c = 0; c < C; c++) {
-//        model->course_lectures[c] = model->courses[c].n_lectures;
-//    }
-
     // b_cq
+    model->curriculas_of_course = mallocx(sizeof(GArray *) * C);
+    for (int c = 0; c < C; c++) {
+        model->curriculas_of_course[c] = g_array_new(false, false, sizeof(int));
+    }
+
     model->course_belongs_to_curricula = mallocx(sizeof(bool) * Q * C);
     for (int q = 0; q < Q; q++) {
         const curricula *curricula = &model->curriculas[q];
@@ -227,6 +231,7 @@ void model_finalize(model *model) {
             for (int qc = 0; qc < curricula->n_courses; qc++) {
                 if (streq(course->id, curricula->courses_ids[qc])) {
                     model->course_belongs_to_curricula[INDEX2(q, Q, c, C)] = 1;
+                    g_array_append_val(model->curriculas_of_course[c], q);
                     break;
                 }
             }
@@ -315,30 +320,35 @@ curricula *model_curricula_by_id(const model *model, char *id) {
     return NULL;
 }
 
-int model_course_belongs_to_curricula(const model *model, const course *course, const curricula *curricula) {
-    return model_course_belongs_to_curricula_by_index(model, course->index, curricula->index);
+
+teacher *model_teacher_by_id(const model *model, char *id) {
+    for (int i = 0; i < model->n_teachers; i++) {
+        teacher *t = &model->teachers[i];
+        if (streq(id, t->id))
+            return t;
+    }
+    return NULL;
 }
 
-int model_course_taught_by_teacher(const model *model, const course *course, const teacher *teacher) {
-    return model_course_taught_by_teacher_by_index(model, course->index, teacher->index);
-}
 
-int model_course_is_available_on_period(const model *model, const course *course, int day, int slot) {
-    return model_course_is_available_on_period_by_index(model, course->index, day, slot);
-}
 
-int model_course_belongs_to_curricula_by_index(const model *model, int course_idx, int curricula_idx) {
+bool model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx) {
     return model->course_belongs_to_curricula[
             INDEX2(curricula_idx, model->n_curriculas, course_idx, model->n_courses)];
 }
 
-int model_course_taught_by_teacher_by_index(const model *model, int course_idx, int teacher_idx) {
+bool model_course_is_taught_by_teacher(const model *model, int course_idx, int teacher_idx) {
     return model->course_taught_by_teacher[
             INDEX2(course_idx, model->n_courses, teacher_idx, model->n_teachers)];
 }
 
-int model_course_is_available_on_period_by_index(const model *model, int course_idx, int day, int slot) {
+bool model_course_is_available_on_period(const model *model, int course_idx, int day, int slot) {
     return model->course_availabilities[
             INDEX3(course_idx, model->n_courses, day, model->n_days, slot, model->n_slots)];
 }
 
+int *model_curriculas_of_course(const model *model, int course_idx, int *n_curriculas) {
+    if (n_curriculas)
+        *n_curriculas = model->curriculas_of_course[course_idx]->len;
+    return (int *) model->curriculas_of_course[course_idx]->data;
+}

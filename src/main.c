@@ -81,7 +81,6 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "parser.h"
 #include "solution.h"
 #include "array_utils.h"
-#include "def_utils.h"
 #include "renderer.h"
 #include "feasible_solution_finder.h"
 
@@ -117,7 +116,7 @@ int main (int argc, char **argv) {
     parser_destroy(&parser);
 
     solution sol;
-    solution_init(&sol);
+    solution_init(&sol, &model);
 
     bool solution_loaded = false;
 
@@ -125,7 +124,7 @@ int main (int argc, char **argv) {
         // Load the solution instead of computing it
         solution_parser sp;
         solution_parser_init(&sp);
-        if (!solution_parser_parse(&sp, &model, args.solution_input_file, &sol)) {
+        if (!solution_parser_parse(&sp, args.solution_input_file, &sol)) {
             eprint("ERROR: failed to parse solution file '%s' (%s)",
                    args.input, solution_parser_get_error(&sp));
             exit(EXIT_FAILURE);
@@ -159,8 +158,9 @@ int main (int argc, char **argv) {
             feasible_solution_finder finder;
             feasible_solution_finder_init(&finder);
 
-            if (feasible_solution_finder_find(&finder, &model, &sol)) {
+            if (feasible_solution_finder_find(&finder, &sol)) {
                 // TS...
+                solution_loaded = true;
             } else {
                 eprint("ERROR: can't provide a feasible solution using method '%s' (%s)",
                        resolution_method_to_string(args.method),
@@ -172,9 +172,9 @@ int main (int argc, char **argv) {
     }
 
 
-    if (solution_loaded) {
+    if (solution_loaded || args.force_draw) {
         char *sol_str = solution_to_string(&sol);
-        char *sol_quality_str = solution_quality_to_string(&sol, &model);
+        char *sol_quality_str = solution_quality_to_string(&sol);
 
         print("====== SOLUTION ======\n"
               "%s\n"

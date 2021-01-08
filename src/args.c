@@ -16,6 +16,7 @@ void args_to_string(const args *args, char *buffer, size_t buflen) {
         "method = %s\n"
         "draw_directory = %s\n"
         "draw_overview_file = %s\n"
+        "force_draw = %s\n"
         "write_lp = %s\n"
         "time_limit = %d\n"
         "seed = %u",
@@ -25,6 +26,7 @@ void args_to_string(const args *args, char *buffer, size_t buflen) {
              resolution_method_to_string(args->method),
              args->draw_directory,
              args->draw_overview_file,
+             BOOL_TO_STR(args->force_draw),
              args->write_lp_file,
              args->time_limit,
              args->seed
@@ -38,6 +40,7 @@ void args_init(args *args) {
     args->method = RESOLUTION_METHOD_DEFAULT;
     args->draw_directory = NULL;
     args->draw_overview_file = NULL;
+    args->force_draw = false;
     args->write_lp_file = NULL;
     args->solution_input_file = NULL;
     args->time_limit = 0;
@@ -58,6 +61,7 @@ typedef enum itc2007_option {
     ITC2007_OPT_TIME_LIMIT = 't',
     ITC2007_OPT_DRAW_DIRECTORY = 'D',
     ITC2007_OPT_DRAW_OVERVIEW_FILE = 'd',
+    ITC2007_OPT_FORCE_DRAW = 'f',
     ITC2007_OPT_SOLUTION = 's',
     ITC2007_OPT_SEED = 'S',
     ITC2007_OPT_WRITE_LP = 0x100,
@@ -71,6 +75,8 @@ static struct argp_option options[] = {
         "Draw all the timetables of the solution and place them in DIR" },
   { "draw-overview", ITC2007_OPT_DRAW_OVERVIEW_FILE, "FILE", 0,
         "Draw the overview timetable of the solution and save it as FILE" },
+  { "force-draw", ITC2007_OPT_FORCE_DRAW, NULL, 0,
+        "Draw even if a feasible solution can't be provided" },
   { "time", ITC2007_OPT_TIME_LIMIT, "SECONDS", 0, "Time limit in seconds for solve the model" },
   { "solution", ITC2007_OPT_SOLUTION, "SOL_FILE", 0, "Load the solution file SOL_FILE instead of computing it "
                                                      "(useful for see the cost/violations or with -d or -D for render the solution)" },
@@ -112,6 +118,9 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         break;
     case ITC2007_OPT_DRAW_OVERVIEW_FILE:
         args->draw_overview_file = arg;
+        break;
+    case ITC2007_OPT_FORCE_DRAW:
+        args->force_draw = true;
         break;
     case ITC2007_OPT_SOLUTION:
         args->solution_input_file = arg;

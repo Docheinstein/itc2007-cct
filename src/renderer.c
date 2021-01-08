@@ -6,6 +6,7 @@
 #include "def_utils.h"
 #include "array_utils.h"
 #include "verbose.h"
+#include "mem_utils.h"
 
 #define WHITE 1, 1, 1
 #define BLACK 0, 0, 0
@@ -49,9 +50,9 @@ static void random_colors(int n_colors, double **r, double **g, double **b) {
     if (!n_colors)
         return;
 
-    *r = malloc(sizeof(double) * n_colors);
-    *g = malloc(sizeof(double) * n_colors);
-    *b = malloc(sizeof(double) * n_colors);
+    *r = mallocx(sizeof(double) * n_colors);
+    *g = mallocx(sizeof(double) * n_colors);
+    *b = mallocx(sizeof(double) * n_colors);
 
     for (int i = 0; i < n_colors; i++)
         random_color(&((*r)[i]), &((*g)[i]), &((*b)[i]));
@@ -330,7 +331,7 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
         for (int s = 0; s < model->n_slots; s++) {
             int slot_assignments = 0;
             for (int c = 0; c < model->n_courses; c++) {
-                if (!model_course_belongs_to_curricula_by_index(model, c, q->index))
+                if (!model_course_belongs_to_curricula(model, c, q->index))
                     continue;
 
                 for (int r = 0; r < model->n_rooms; r++) {
@@ -355,7 +356,7 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
         for (int s = 0; s < model->n_slots; s++) {
             int slot_index = 0;
             for (int c = 0; c < model->n_courses; c++) {
-                if (!model_course_belongs_to_curricula_by_index(model, c, q->index))
+                if (!model_course_belongs_to_curricula(model, c, q->index))
                     continue;
 
                 for (int r = 0; r < model->n_rooms; r++) {
@@ -582,7 +583,7 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
         for (int s = 0; s < model->n_slots; s++) {
             int slot_assignments = 0;
             for (int c = 0; c < model->n_courses; c++) {
-                if (!model_course_taught_by_teacher_by_index(model, c, teacher->index))
+                if (!model_course_is_taught_by_teacher(model, c, teacher->index))
                     continue;
 
                 for (int r = 0; r < model->n_rooms; r++) {
@@ -607,7 +608,7 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
         for (int s = 0; s < model->n_slots; s++) {
             int slot_index = 0;
             for (int c = 0; c < model->n_courses; c++) {
-                if (!model_course_taught_by_teacher_by_index(model, c, teacher->index))
+                if (!model_course_is_taught_by_teacher(model, c, teacher->index))
                     continue;
 
                 for (int r = 0; r < model->n_rooms; r++) {
@@ -672,10 +673,7 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
             int slot_assignments = 0;
             for (int c = 0; c < model->n_courses; c++) {
                 for (int r = 0; r < model->n_rooms; r++) {
-                    slot_assignments += solution->timetable[
-                            INDEX4(c, model->n_courses,
-                                   r, model->n_rooms,
-                                   d, model->n_days, s, model->n_slots)];
+                    slot_assignments += solution_get_at(solution, c, r, d, s);
                 }
             }
             max_slot_assignments = MAX(max_slot_assignments, slot_assignments);

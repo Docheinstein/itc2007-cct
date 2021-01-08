@@ -25,7 +25,7 @@ typedef struct room {
 } room;
 
 // <curricula> := <CurriculumID> <# Courses> <CourseID> ... <CourseID>
-// e.g.        :=      q000         4         c0001 c0002 c0004 c0005 
+// e.g.        :=      q000         4         c0001 c0002 c0004 c0005
 typedef struct curricula {
     int index;
     char *id;
@@ -62,12 +62,13 @@ typedef struct model {
 
     // Redundant data (for faster access)
     int n_teachers;
-    teacher * teachers;                       // T
+    teacher *teachers;                       // T
 
-    bool * course_belongs_to_curricula;     // b_cq
-    bool * course_taught_by_teacher;        // e_ct
-    bool * course_availabilities;           // e_cds
+    GArray **curriculas_of_course;
 
+    bool *course_belongs_to_curricula;     // b_cq
+    bool *course_taught_by_teacher;        // e_ct
+    bool *course_availabilities;           // e_cds
 } model;
 
 void model_init(model *model);
@@ -85,20 +86,18 @@ void curricula_to_string(const curricula *q, char *buffer, size_t buflen);
 void unavailability_constraint_to_string(const unavailability_constraint *uc,
                                          char *buffer, size_t buflen);
 
-char * model_to_string(const model *model);
+char *model_to_string(const model *model);
 
 void model_finalize(model *model);
 
 course *model_course_by_id(const model *model, char *id);
 room *model_room_by_id(const model *model, char *id);
 curricula *model_curricula_by_id(const model *model, char *id);
+teacher *model_teacher_by_id(const model *model, char *id);
 
-int model_course_belongs_to_curricula(const model *model, const course *course, const curricula *curricula);
-int model_course_taught_by_teacher(const model *model, const course *course, const teacher *teacher);
-int model_course_is_available_on_period(const model *model, const course *course, int day, int slot);
-
-int model_course_belongs_to_curricula_by_index(const model *model, int course_idx, int curricula_idx);
-int model_course_taught_by_teacher_by_index(const model *model, int course_idx, int teacher_idx);
-int model_course_is_available_on_period_by_index(const model *model, int course_idx, int day, int slot);
+bool model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx);
+bool model_course_is_taught_by_teacher(const model *model, int course_idx, int teacher_idx);
+bool model_course_is_available_on_period(const model *model, int course_idx, int day, int slot);
+int *model_curriculas_of_course(const model *model, int course_idx, int *n_curriculas);
 
 #endif // MODEL_H

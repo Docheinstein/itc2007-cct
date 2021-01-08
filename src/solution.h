@@ -46,19 +46,9 @@ room used for the lectures of a course_id, but the first, counts as 1 point of p
 
 #include <stdbool.h>
 
-typedef struct assignment {
-    course *course;
-    room *room;
-    int day;
-    int slot;
-} assignment;
-
 typedef struct solution {
-    // Real data
-    GList *assignments;
-
-    // Computed for faster access
     bool *timetable;
+    const model *model;
 } solution;
 
 
@@ -67,38 +57,36 @@ typedef struct solution_parser {
 } solution_parser;
 
 void solution_parser_init(solution_parser *solution_parser);
-bool solution_parser_parse(solution_parser *solution_parser, const model *model,
-                           const char * input, solution *solution);
+bool solution_parser_parse(solution_parser *solution_parser, const char * input,
+                           solution *solution);
 void solution_parser_destroy(solution_parser *solution_parser);
 const char * solution_parser_get_error(solution_parser *solution_parser);
 
-assignment * assignment_new(course *course, room *room, int day, int day_period);
-void assignment_set(assignment *a, course *course, room *room, int day, int day_period);
 
-void solution_init(solution *solution);
-void solution_finalize(solution *solution, const model *model);
+void solution_init(solution *solution, const model *model);
 void solution_destroy(solution *solution);
 
+void solution_set_at(solution *sol, int c, int r, int d, int s, bool value);
+bool solution_get_at(const solution *sol, int c, int r, int d, int s);
+
 char * solution_to_string(const solution *sol);
-char * solution_quality_to_string(solution *sol, const model *model);
+char * solution_quality_to_string(solution *sol);
 
-void solution_add_assignment(solution *sol, assignment *a);
+bool solution_satisfy_hard_constraints(solution *sol);
+bool solution_satisfy_hard_constraint_lectures(solution *sol);
+bool solution_satisfy_hard_constraint_room_occupancy(solution *sol);
+bool solution_satisfy_hard_constraint_conflicts(solution *sol);
+bool solution_satisfy_hard_constraint_availabilities(solution *sol);
 
-bool solution_satisfy_hard_constraints(solution *sol, const model *model);
-bool solution_satisfy_hard_constraint_lectures(solution *sol, const model *model);
-bool solution_satisfy_hard_constraint_room_occupancy(solution *sol, const model *model);
-bool solution_satisfy_hard_constraint_conflicts(solution *sol, const model *model);
-bool solution_satisfy_hard_constraint_availabilities(solution *sol, const model *model);
+int solution_hard_constraint_lectures_violations(solution *sol);
+int solution_hard_constraint_room_occupancy_violations(solution *sol);
+int solution_hard_constraint_conflicts_violations(solution *sol);
+int solution_hard_constraint_availabilities_violations(solution *sol);
 
-int solution_hard_constraint_lectures_violations(solution *sol, const model *model);
-int solution_hard_constraint_room_occupancy_violations(solution *sol, const model *model);
-int solution_hard_constraint_conflicts_violations(solution *sol, const model *model);
-int solution_hard_constraint_availabilities_violations(solution *sol, const model *model);
-
-int solution_cost(solution *sol, const model *model);
-int solution_soft_constraint_room_capacity(solution *sol, const model *model);
-int solution_soft_constraint_min_working_days(solution *sol, const model *model);
-int solution_soft_constraint_curriculum_compactness(solution *sol, const model *model);
-int solution_soft_constraint_room_stability(solution *sol, const model *model);
+int solution_cost(solution *sol);
+int solution_soft_constraint_room_capacity(solution *sol);
+int solution_soft_constraint_min_working_days(solution *sol);
+int solution_soft_constraint_curriculum_compactness(solution *sol);
+int solution_soft_constraint_room_stability(solution *sol);
 
 #endif // SOLUTION_H
