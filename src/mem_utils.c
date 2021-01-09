@@ -2,8 +2,8 @@
 #include "io_utils.h"
 #include <stdlib.h>
 
-void *mallocx(size_t size) {
-    void *ptr = malloc(size);
+void *mallocx(size_t nmemb, size_t size) {
+    void *ptr = malloc(nmemb * size);
     if (!ptr) {
         eprint("ERROR: malloc failed (out of memory)");
         exit(-1);

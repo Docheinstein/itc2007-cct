@@ -313,7 +313,7 @@ int solution_soft_constraint_min_working_days(solution *sol) {
 int solution_soft_constraint_curriculum_compactness(solution *sol) {
     int penalties = 0;
 
-    bool * slots = mallocx(sizeof(bool) * sol->model->n_slots);
+    bool * slots = mallocx(sol->model->n_slots, sizeof(bool));
 
     FOR_Q {
         FOR_D {

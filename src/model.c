@@ -190,13 +190,13 @@ void model_finalize(model *model) {
     static const int TMP_LEN = 256;
     char tmp[TMP_LEN];
 
-    model->curriculas_of_course = mallocx(sizeof(GArray *) * C);
+    model->curriculas_of_course = mallocx(C, sizeof(GArray *));
     for (int c = 0; c < C; c++) {
         model->curriculas_of_course[c] = g_array_new(false, false, sizeof(int));
     }
 
     // b_cq
-    model->course_belongs_to_curricula = mallocx(sizeof(bool) * Q * C);
+    model->course_belongs_to_curricula = mallocx(C, sizeof(bool) * Q);
     for (int q = 0; q < Q; q++) {
         const curricula *curricula = &model->curriculas[q];
 
@@ -221,7 +221,7 @@ void model_finalize(model *model) {
         g_hash_table_add(teachers_set, model->courses[c].teacher_id);
 
     const uint T = g_hash_table_size(teachers_set);
-    model->teachers = mallocx(sizeof(teacher) * T);
+    model->teachers = mallocx(T, sizeof(teacher));
     model->n_teachers = T;
 
     GHashTableIter iter;
@@ -237,7 +237,7 @@ void model_finalize(model *model) {
     g_hash_table_destroy(teachers_set);
 
     // e_ct
-    model->course_taught_by_teacher = mallocx(sizeof(bool) * C * T);
+    model->course_taught_by_teacher = mallocx(T, sizeof(bool) * C);
     for (int c = 0; c < C; c++) {
         const char *course_teacher = model->courses[c].teacher_id;
         for (int t = 0; t < T; t++) {
@@ -255,7 +255,7 @@ void model_finalize(model *model) {
         g_hash_table_add(unavailabilities_set, strmake("%s_%d_%d", uc->course_id, uc->day, uc->slot));
     }
 
-    model->course_availabilities = mallocx(sizeof(bool) * C * D * S);
+    model->course_availabilities = mallocx(S, sizeof(bool) * C * D);
     for (int c = 0; c < C; c++) {
         for (int d = 0; d < D; d++) {
             for (int s = 0; s < S; s++) {
@@ -268,7 +268,7 @@ void model_finalize(model *model) {
 
     g_hash_table_destroy(unavailabilities_set);
 
-    model->courses_of_teacher = mallocx(sizeof(GArray *) * T);
+    model->courses_of_teacher = mallocx(T, sizeof(GArray *));
     for (int t = 0; t < T; t++) {
         model->courses_of_teacher[t] = g_array_new(false, false, sizeof(int));
     }

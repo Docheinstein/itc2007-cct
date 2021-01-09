@@ -10,7 +10,7 @@ char *fileread(const char *filename) {
     long filesize = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *content = mallocx(filesize + 1);
+    char *content = mallocx(filesize + 1, sizeof(char));
     fread(content, sizeof(char), filesize, f);
     fclose(f);
 

@@ -50,9 +50,9 @@ static void random_colors(int n_colors, double **r, double **g, double **b) {
     if (!n_colors)
         return;
 
-    *r = mallocx(sizeof(double) * n_colors);
-    *g = mallocx(sizeof(double) * n_colors);
-    *b = mallocx(sizeof(double) * n_colors);
+    *r = mallocx(n_colors, sizeof(double));
+    *g = mallocx(n_colors, sizeof(double));
+    *b = mallocx(n_colors, sizeof(double));
 
     for (int i = 0; i < n_colors; i++)
         random_color(&((*r)[i]), &((*g)[i]), &((*b)[i]));

@@ -160,7 +160,7 @@ char *strjoin(char **strs, size_t size, const char *joiner) {
     buflen += (int) strlen(strs[size - 1]);            // last, without joiner
     buflen += 1;                                       // '\0'
 
-    char *s = mallocx(sizeof(char) * buflen);
+    char *s = mallocx(buflen, sizeof(char));
     s[0] = '\0';
 
     for (int i = 0; i < size - 1; i++)
@@ -178,7 +178,7 @@ char *strmake(const char *fmt, ...) {
 
     int buflen = vsnprintf(NULL, 0, fmt, args) + 1;
 
-    char *s = mallocx(sizeof(char) * buflen);
+    char *s = mallocx(buflen, sizeof(char));
     vsnprintf(s, buflen, fmt, args2);
 
     va_end(args);
@@ -214,7 +214,7 @@ void vstrappend_realloc(char **dest, size_t *size, const char *fmt, va_list args
 
     if (!*dest) {
         *size = DEFAULT_BUFFER_SIZE;
-        *dest = mallocx(DEFAULT_BUFFER_SIZE);
+        *dest = mallocx(DEFAULT_BUFFER_SIZE, sizeof(char));
         *dest[0] = '\0';
     }
 

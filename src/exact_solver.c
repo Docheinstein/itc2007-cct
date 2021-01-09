@@ -196,8 +196,8 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
 
     debug("|X|=%d", X_count);
 
-    indexes = mallocx(sizeof(int) * X_count);
-    values = mallocx(sizeof(double) * X_count);
+    indexes = mallocx(X_count, sizeof(int));
+    values = mallocx(X_count, sizeof(double));
 
     // Y_cd
     const int Y_begin = var_index;

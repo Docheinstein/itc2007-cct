@@ -167,7 +167,7 @@ bool parser_parse(parser *parser, const char *input, model *model) {
                 if (q->n_courses != n_tokens - CURRICULA_FIXED_FIELDS)
                     ABORT_PARSE("unexpected curricula fields count");
 
-                q->courses_ids = mallocx(sizeof(char *) * q->n_courses);
+                q->courses_ids = mallocx(q->n_courses, sizeof(char *));
                 for (int i = 0; i < q->n_courses; i++) {
                     q->courses_ids[i] = strdup(tokens[f++]);
                 }
@@ -221,23 +221,23 @@ bool parser_parse(parser *parser, const char *input, model *model) {
             else if (streq("COURSES", key) && strempty(value)) {
                 section = SECTION_COURSES;
                 section_entry = 0;
-                model->courses = mallocx(sizeof(course) * model->n_courses);
+                model->courses = mallocx(model->n_courses, sizeof(course));
             }
             else if (streq("ROOMS", key) && strempty(value)) {
                 section = SECTION_ROOMS;
                 section_entry = 0;
-                model->rooms = mallocx(sizeof(course) * model->n_rooms);
+                model->rooms = mallocx(model->n_rooms, sizeof(course));
             }
             else if (streq("CURRICULA", key) && strempty(value)) {
                 section = SECTION_CURRICULAS;
                 section_entry = 0;
-                model->curriculas = mallocx(sizeof(course) * model->n_curriculas);
+                model->curriculas = mallocx(model->n_curriculas, sizeof(course));
             }
             else if (streq("UNAVAILABILITY_CONSTRAINTS", key) && strempty(value)) {
                 section = SECTION_CONSTRAINTS;
                 section_entry = 0;
                 model->unavailability_constraints =
-                        mallocx(sizeof(course) * model->n_unavailability_constraints);
+                        mallocx(model->n_unavailability_constraints, sizeof(course));
             }
         }
     }

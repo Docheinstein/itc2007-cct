@@ -91,7 +91,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
     static const int UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR = 1;
     static const int COURSE_LECTURES_DIFFICULTY_FACTOR = 1;
 
-    course_assignment *courses_assignment_difficulty = mallocx(sizeof(course_assignment) * C);
+    course_assignment *courses_assignment_difficulty = mallocx(C, sizeof(course_assignment));
 
     for (int c = 0; c < C; c++) {
         courses_assignment_difficulty[c].course = &m->courses[c];
