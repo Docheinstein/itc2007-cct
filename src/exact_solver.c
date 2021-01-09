@@ -1,14 +1,14 @@
 #include <stdio.h>
-#include <io_utils.h>
+#include <utils/io_utils.h>
 #include "verbose.h"
 #include "debug.h"
 #include "exact_solver.h"
 #include "gurobi/gurobi_c.h"
-#include "mem_utils.h"
-#include "array_utils.h"
+#include "utils/mem_utils.h"
+#include "utils/array_utils.h"
 #include "config.h"
-#include "def_utils.h"
-#include "str_utils.h"
+#include "utils/def_utils.h"
+#include "utils/str_utils.h"
 
 static const char * status_to_string(int status) {
     switch (status) {
@@ -47,11 +47,6 @@ static const char * status_to_string(int status) {
     }
 }
 
-void exact_solver_init(exact_solver *solver) {
-    solver->objective = 0;
-    solver->error = NULL;
-}
-
 void exact_solver_config_init(exact_solver_config *config) {
     config->grb_verbose = true;
     config->grb_time_limit = GRB_INFINITY;
@@ -72,8 +67,18 @@ void exact_solver_config_destroy(exact_solver_config *config) {
 
 }
 
-void exact_solver_destroy(exact_solver *solver) {
+void exact_solver_init(exact_solver *solver) {
+    solver->objective = 0;
+    solver->error = NULL;
+}
 
+void exact_solver_destroy(exact_solver *solver) {
+    // DO NOT free solver->error since is a const char * from status_to_string()
+}
+
+static void exact_solver_reinit(exact_solver *solver) {
+    exact_solver_init(solver);
+    exact_solver_destroy(solver);
 }
 
 bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
@@ -127,6 +132,8 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
 
 #define GRB_GET_VARS(begin, count, dest) \
     GRB_CHECK(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, begin, count, dest));
+
+    exact_solver_reinit(solver);
 
     verbose(
         "====== EXACT SOLVER ======\n"

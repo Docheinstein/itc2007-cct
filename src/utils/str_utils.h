@@ -31,6 +31,8 @@ uint strtouint(const char *str, bool *ok);
 long strtolong(const char *str, bool *ok);
 ulong strtoulong(const char *str, bool *ok);
 
+double strtodouble(const char *str, bool *ok);
+
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens);
 char * strjoin(char **strs, size_t size, const char *joiner);
 

@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include "resolution_method.h"
 
+#define ARG_INT_NONE (-1)
+
 typedef struct args {
     char *input;
     char *output;
@@ -16,6 +18,8 @@ typedef struct args {
     bool force_draw;
     int time_limit;
     uint seed;
+    double assignments_difficulty_ranking_randomness;
+    int multistart;
 } args;
 
 void args_parse(args *args, int argc, char **argv);

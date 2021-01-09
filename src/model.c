@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <str_utils.h>
-#include "mem_utils.h"
-#include "array_utils.h"
+#include <utils/str_utils.h>
+#include "utils/mem_utils.h"
+#include "utils/array_utils.h"
 #include "debug.h"
 
 void model_init(model *model) {

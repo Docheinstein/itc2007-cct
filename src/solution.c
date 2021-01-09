@@ -1,11 +1,12 @@
-#include <str_utils.h>
+#include <utils/str_utils.h>
+#include <utils/io_utils.h>
 #include "solution.h"
-#include "mem_utils.h"
-#include "array_utils.h"
+#include "utils/mem_utils.h"
+#include "utils/array_utils.h"
 #include "debug.h"
 #include "config.h"
 #include "verbose.h"
-#include "def_utils.h"
+#include "utils/def_utils.h"
 
 #define FOR_C for (int c = 0; c < sol->model->n_courses; c++)
 #define FOR_R for (int r = 0; r < sol->model->n_rooms; r++)
@@ -23,6 +24,14 @@ void solution_init(solution *sol, const model *model) {
 
 void solution_destroy(solution *sol) {
     free(sol->timetable);
+}
+
+
+void solution_copy(solution *solution_dest, solution *solution_src) {
+    memcpy(solution_dest->timetable, solution_src->timetable,
+           solution_dest->model->n_courses * solution_dest->model->n_rooms *
+           solution_dest->model->n_days * solution_dest->model->n_slots * sizeof(bool));
+    solution_dest->model = solution_src->model; // should already be the same
 }
 
 char * solution_to_string(const solution *sol) {
@@ -252,6 +261,8 @@ int solution_cost(solution *sol) {
         solution_soft_constraint_room_stability(sol);
 }
 
+
+
 int solution_soft_constraint_room_capacity(solution *sol) {
     int penalties = 0;
 
@@ -464,11 +475,22 @@ const char *solution_parser_get_error(solution_parser *solution_parser) {
 }
 
 void solution_set_at(solution *sol, int c, int r, int d, int s, bool value) {
-    sol->timetable[INDEX4(c, sol->C, r, sol->model->n_rooms,
+    sol->timetable[INDEX4(c, sol->model->n_courses, r, sol->model->n_rooms,
                           d, sol->model->n_days, s, sol->model->n_slots)] = value;
 }
 
 bool solution_get_at(const solution *sol, int c, int r, int d, int s) {
-    return sol->timetable[INDEX4(c, sol->C, r, sol->model->n_rooms,
+    return sol->timetable[INDEX4(c, sol->model->n_courses, r, sol->model->n_rooms,
                                  d, sol->model->n_days, s, sol->model->n_slots)];
 }
+
+unsigned long long solution_fingerprint(const solution *sol) {
+    unsigned long long fingerprint = 0;
+    for (int i = 0; i < sol->model->n_courses * sol->model->n_rooms * sol->model->n_days * sol->model->n_slots; i++) {
+        if (sol->timetable[i])
+            fingerprint++;
+        fingerprint *= 23;
+    }
+    return fingerprint;
+}
+

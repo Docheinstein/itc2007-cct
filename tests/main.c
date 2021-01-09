@@ -3,12 +3,12 @@
 #include <parser.h>
 #include "munit/munit.h"
 #include <verbose.h>
-#include <str_utils.h>
-#include <def_utils.h>
-#include <io_utils.h>
-#include <array_utils.h>
+#include <utils/str_utils.h>
+#include <utils/def_utils.h>
+#include <utils/io_utils.h>
+#include <utils/array_utils.h>
 #include <debug.h>
-#include "os_utils.h"
+#include "utils/os_utils.h"
 
 #define BUFLEN 128
 

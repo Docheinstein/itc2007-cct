@@ -66,11 +66,15 @@ const char * solution_parser_get_error(solution_parser *solution_parser);
 void solution_init(solution *solution, const model *model);
 void solution_destroy(solution *solution);
 
+void solution_copy(solution *solution_dest, solution *solution_src);
+
 void solution_set_at(solution *sol, int c, int r, int d, int s, bool value);
 bool solution_get_at(const solution *sol, int c, int r, int d, int s);
 
 char * solution_to_string(const solution *sol);
 char * solution_quality_to_string(solution *sol);
+
+unsigned long long solution_fingerprint(const solution *sol);
 
 bool solution_satisfy_hard_constraints(solution *sol);
 bool solution_satisfy_hard_constraint_lectures(solution *sol);

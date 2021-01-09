@@ -25,7 +25,7 @@ typedef struct exact_solver_config {
 
 typedef struct exact_solver {
     double objective;
-    const char *error;
+    char *error;
 } exact_solver;
 
 

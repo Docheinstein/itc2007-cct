@@ -132,6 +132,18 @@ ulong strtoulong(const char *str, bool *ok) {
     return ret;
 }
 
+double strtodouble(const char *str, bool *ok) {
+    char *endptr = NULL;
+
+    errno = 0;
+    double ret = strtod(str, &endptr);
+
+    if (ok != NULL)
+        *ok = (errno == 0 && str && endptr && *endptr == '\0');
+
+    return ret;
+}
+
 
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens) {
     if (max_tokens <= 1)

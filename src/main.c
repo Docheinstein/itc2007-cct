@@ -75,14 +75,36 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <stdlib.h>
 #include <stdbool.h>
 #include <exact_solver.h>
-#include <io_utils.h>
+#include <utils/io_utils.h>
+#include <utils/random_utils.h>
+#include <time.h>
+#include <utils/str_utils.h>
 #include "args.h"
 #include "verbose.h"
 #include "parser.h"
 #include "solution.h"
-#include "array_utils.h"
+#include "utils/array_utils.h"
 #include "renderer.h"
 #include "feasible_solution_finder.h"
+#include "debug.h"
+
+static void render_solution(const model *model, const solution *sol,
+                            const args *args) {
+    renderer renderer;
+    renderer_init(&renderer);
+
+    renderer_config config;
+    renderer_config_init(&config);
+    config.output_dir = args->draw_directory;
+    config.output_file = args->draw_overview_file;
+
+    if (!renderer_render(&renderer, &config, model, sol)) {
+        eprint("WARN: failed to render solution (%s)", renderer_get_error(&renderer));
+    }
+
+    renderer_config_destroy(&config);
+    renderer_destroy(&renderer);
+}
 
 int main (int argc, char **argv) {
     args args;
@@ -91,6 +113,17 @@ int main (int argc, char **argv) {
 
     set_verbose(args.verbose);
 
+    if (args.seed == ARG_INT_NONE) {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+        args.seed = ts.tv_nsec ^ ts.tv_sec;
+    }
+
+    if (args.assignments_difficulty_ranking_randomness == ARG_INT_NONE)
+        args.assignments_difficulty_ranking_randomness = 0.66;
+
+
+
     char buffer[1024];
     args_to_string(&args, buffer, LENGTH(buffer));
     verbose("====== ARGUMENTS ======\n"
@@ -98,10 +131,8 @@ int main (int argc, char **argv) {
             "-----------------------",
             buffer);
 
-    uint seed = args.seed ? args.seed : time(NULL);
-    verbose("Using RNG seed: %u", seed);
-
-    srand(seed);
+    verbose("Using RNG seed: %u", args.seed);
+    rand_init(args.seed);
 
     model model;
     model_init(&model);
@@ -145,6 +176,7 @@ int main (int argc, char **argv) {
             if (args.time_limit > 0)
                 conf.grb_time_limit = args.time_limit;
 
+            verbose("Solving model exactly, it may take a long time...");
             solution_loaded = exact_solver_solve(&solver, &conf, &model, &sol);
             if (solution_loaded) {
                 verbose("Model solved: cost = %g", solver.objective);
@@ -155,18 +187,76 @@ int main (int argc, char **argv) {
             exact_solver_config_destroy(&conf);
             exact_solver_destroy(&solver);
         } else if (args.method == RESOLUTION_METHOD_TABU) {
+            if (args.time_limit == ARG_INT_NONE && args.multistart == ARG_INT_NONE) {
+                print("WARN: you should probably use either "
+                      "time limit (-t) or multistart (-n) for heuristics methods.\n"
+                      "Will do a single run...");
+            }
+
+            feasible_solution_finder_config config;
+            feasible_solution_finder_config_init(&config);
+
+            config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+
             feasible_solution_finder finder;
             feasible_solution_finder_init(&finder);
 
-            if (feasible_solution_finder_find(&finder, &sol)) {
-                // TS...
-                solution_loaded = true;
-            } else {
-                eprint("ERROR: can't provide a feasible solution using method '%s' (%s)",
-                       resolution_method_to_string(args.method),
-                       feasible_solution_finder_find_get_error(&finder));
+            int iters = args.multistart > 1 ? args.multistart : 1;
+
+            int best_solution_cost = INT_MAX;
+            int n_feasibles = 0;
+            int n_duplicates = 0;
+
+            // DEBUG
+            GHashTable *hash = g_hash_table_new(g_int_hash, g_int_equal);
+
+            for (int i = 0; i < iters; i++) {
+                solution s;
+                solution_init(&s, &model);
+
+                debug("[%d] Finding initial feasible solution...", i);
+
+
+                if (feasible_solution_finder_find(&finder, &config, &s)) {
+                    n_feasibles++;
+                    solution_loaded = true;
+                    // TS...
+
+                    int cost = solution_cost(&s);
+//                    verbose("[%d] Initial solution {%#llx} is feasible, cost = %d", i, solution_fingerprint(&s), cost);
+                    int fingerprint = solution_fingerprint(&s);
+                    debug("[%d] Initial solution {%#llx} is feasible, cost = %d", i, fingerprint, cost);
+
+                    // DEBUG
+                    if (g_hash_table_contains(hash, GINT_TO_POINTER(&fingerprint))) {
+//                        print("WARN: duplicate solution");
+                        n_duplicates++;
+                    } else {
+                        g_hash_table_add(hash, GINT_TO_POINTER(&fingerprint));
+                    }
+
+                    if (cost < best_solution_cost) {
+                        best_solution_cost = cost;
+                        solution_copy(&sol, &s);
+
+                        verbose("[%d] New best solution found, cost = %d", i, best_solution_cost);
+                    }
+                } else {
+//                    verbose("[%d] Failed to compute initial solution {%#llx} (%s)",
+                    debug("[%d] Initial solution {%#llx} is unfeasible (%s)",
+                           i,
+                           solution_fingerprint(&s),
+                           feasible_solution_finder_find_get_error(&finder));
+
+                }
+
+                solution_destroy(&s);
             }
 
+            verbose("Number of duplicate solutions: %d", n_duplicates);
+            verbose("Initial feasible solutions: %d/%d", n_feasibles, iters);
+
+            feasible_solution_finder_config_destroy(&config);
             feasible_solution_finder_destroy(&finder);
         }
     }
@@ -175,14 +265,14 @@ int main (int argc, char **argv) {
     if (solution_loaded || args.force_draw) {
         char *sol_str = solution_to_string(&sol);
         char *sol_quality_str = solution_quality_to_string(&sol);
-
+#if 0
         print("====== SOLUTION ======\n"
               "%s\n"
               "----------------------\n"
               "%s",
               sol_quality_str,
               sol_str);
-
+#endif
         if (args.output) {
             if (!filewrite(args.output, sol_str)) {
                 eprint("ERROR: failed to write output solution to '%s' (%s)",
@@ -192,22 +282,8 @@ int main (int argc, char **argv) {
 
         free(sol_str);
 
-        if (args.draw_overview_file || args.draw_directory) {
-            renderer renderer;
-            renderer_init(&renderer);
-
-            renderer_config config;
-            renderer_config_init(&config);
-            config.output_dir = args.draw_directory;
-            config.output_file = args.draw_overview_file;
-
-            if (!renderer_render(&renderer, &config, &model, &sol)) {
-                eprint("WARN: failed to render solution (%s)", renderer_get_error(&renderer));
-            }
-
-            renderer_config_destroy(&config);
-            renderer_destroy(&renderer);
-        }
+        if (args.draw_overview_file || args.draw_directory)
+            render_solution(&model, &sol, &args);
     }
 
     solution_destroy(&sol);

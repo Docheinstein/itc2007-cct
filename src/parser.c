@@ -2,12 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <io_utils.h>
-#include <str_utils.h>
+#include <utils/io_utils.h>
+#include <utils/str_utils.h>
 #include "verbose.h"
 #include "model.h"
-#include "mem_utils.h"
-#include "array_utils.h"
+#include "utils/mem_utils.h"
+#include "utils/array_utils.h"
 #include "debug.h"
 
 /*
@@ -67,6 +67,11 @@ void parser_destroy(parser *parser) {
     free(parser->error);
 }
 
+void parser_reinit(parser *parser) {
+    parser_init(parser);
+    parser_destroy(parser);
+}
+
 const char *parser_get_error(parser *parser) {
     return parser->error;
 }
@@ -79,6 +84,8 @@ bool parser_parse(parser *parser, const char *input, model *model) {
 } while(0)
 
 #define ABORT_PARSE_INT_FAIL() ABORT_PARSE("integer conversion failed")
+
+    parser_reinit(parser);
 
     static const int MAX_ERROR_LENGTH = 256;
     static const int MAX_LINE_LENGTH = 256;
@@ -105,7 +112,7 @@ bool parser_parse(parser *parser, const char *input, model *model) {
 
     bool ok = true;
 
-    verbose("Opening input file: '%s'", input);
+    verbose("Opening input model file: '%s'", input);
 
     FILE *file = fopen(input, "r");
     if (!file)
@@ -114,7 +121,7 @@ bool parser_parse(parser *parser, const char *input, model *model) {
     while (ok && fgets(line0, LENGTH(line0), file)) {
         ++line_num;
         line = strtrim(line0);
-        verbose("<< %s", line);
+        debug("<< %s", line);
 
         if (strempty(line))
             continue;
@@ -241,8 +248,9 @@ bool parser_parse(parser *parser, const char *input, model *model) {
             }
         }
     }
+    verbose("Model '%s' parsed successfully", input);
 
-    verbose("Closing file: '%s'", input);
+    verbose("Closing model file: '%s'", input);
     if (fclose(file) != 0)
         verbose("WARN: failed to close '%s' (%s)", input, strerror(errno));
 

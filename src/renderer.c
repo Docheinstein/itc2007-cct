@@ -1,20 +1,21 @@
+#include <utils/random_utils.h>
 #include "renderer.h"
 #include "cairo.h"
-#include "str_utils.h"
+#include "utils/str_utils.h"
 #include "debug.h"
-#include "os_utils.h"
-#include "def_utils.h"
-#include "array_utils.h"
+#include "utils/os_utils.h"
+#include "utils/def_utils.h"
+#include "utils/array_utils.h"
 #include "verbose.h"
-#include "mem_utils.h"
+#include "utils/mem_utils.h"
 
 #define WHITE 1, 1, 1
 #define BLACK 0, 0, 0
 #define LIGHT_GRAY 0.9, 0.9, 0.9
 #define DARK_GRAY 0.6, 0.6, 0.6
 
-#define DARK_THRESHOLD 0.2
-#define LIGHT_THRESHOLD 0.8
+#define DARK_THRESHOLD 0.3
+#define LIGHT_THRESHOLD 0.95
 
 void renderer_config_init(renderer_config *config) {
     config->output_dir = NULL;
@@ -37,13 +38,15 @@ void renderer_destroy(renderer *renderer) {
     free(renderer->error);
 }
 
+static void renderer_reinit(renderer *renderer) {
+    renderer_init(renderer);
+    renderer_destroy(renderer);
+}
+
 static void random_color(double *r, double *g, double *b) {
-    double r0 = (double) rand() / RAND_MAX;
-    double g0 = (double) rand() / RAND_MAX;
-    double b0 = (double) rand() / RAND_MAX;
-    *r = RANGIFY(DARK_THRESHOLD, r0, LIGHT_THRESHOLD);
-    *g = RANGIFY(DARK_THRESHOLD, g0, LIGHT_THRESHOLD);
-    *b = RANGIFY(DARK_THRESHOLD, b0, LIGHT_THRESHOLD);
+    *r = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
+    *g = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
+    *b = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
 }
 
 static void random_colors(int n_colors, double **r, double **g, double **b) {
@@ -259,6 +262,10 @@ static bool prologue(
         }
     }
 
+    if (exists(*path) && !isfile(*path)) {
+        renderer->error = strmake("output file can't be a directory");
+        return false;
+    }
 
     *cols = model->n_days + 1;
     *rows = model->n_slots + 1;
@@ -721,6 +728,8 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
 
 bool renderer_render(renderer *renderer, const renderer_config *config,
                      const model *model, const solution *solution) {
+    renderer_reinit(renderer);
+
     if (strempty(config->output_dir) && strempty(config->output_file)) {
         renderer->error = strmake("output directory or output file must be specified");
         return false;
