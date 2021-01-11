@@ -25,7 +25,7 @@ typedef struct exact_solver_config {
 
 typedef struct exact_solver {
     double objective;
-    char *error;
+    const char *error;
 } exact_solver;
 
 
@@ -35,7 +35,7 @@ void exact_solver_config_destroy(exact_solver_config *config);
 void exact_solver_init(exact_solver *solver);
 void exact_solver_destroy(exact_solver *solver);
 
-bool exact_solver_solve(exact_solver *solver, exact_solver_config *config, model *model, solution *solution);
+bool exact_solver_solve(exact_solver *solver, exact_solver_config *config, solution *solution);
 
 const char *exact_solver_get_error(exact_solver *solver);
 

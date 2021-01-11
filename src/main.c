@@ -80,13 +80,15 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <time.h>
 #include <utils/str_utils.h>
 #include "args.h"
-#include "verbose.h"
+#include "log/verbose.h"
 #include "parser.h"
 #include "solution.h"
 #include "utils/array_utils.h"
 #include "renderer.h"
 #include "feasible_solution_finder.h"
-#include "debug.h"
+#include "log/debug.h"
+#include "neighbourhood.h"
+#include "local_search_solver.h"
 
 static void render_solution(const model *model, const solution *sol,
                             const args *args) {
@@ -166,56 +168,59 @@ int main (int argc, char **argv) {
     } else {
         // Standard case, compute the solution
         if (args.method == RESOLUTION_METHOD_EXACT) {
+            exact_solver_config conf;
+            exact_solver_config_init(&conf);
+
             exact_solver solver;
             exact_solver_init(&solver);
 
-            exact_solver_config conf;
-            exact_solver_config_init(&conf);
             conf.grb_write_lp = args.write_lp_file;
             conf.grb_verbose = args.verbose;
-            if (args.time_limit > 0)
-                conf.grb_time_limit = args.time_limit;
+            conf.grb_time_limit = args.time_limit;
 
-            verbose("Solving model exactly, it may take a long time...");
-            solution_loaded = exact_solver_solve(&solver, &conf, &model, &sol);
-            if (solution_loaded) {
-                verbose("Model solved: cost = %g", solver.objective);
-            }
-            else
+            verbose("Solving model exactly, it might take a long time...");
+            solution_loaded = exact_solver_solve(&solver, &conf, &sol);
+            if (!solution_loaded)
                 eprint("ERROR: failed to solve model (%s)", exact_solver_get_error(&solver));
 
             exact_solver_config_destroy(&conf);
             exact_solver_destroy(&solver);
-        } else if (args.method == RESOLUTION_METHOD_TABU) {
+        } else if (args.method == RESOLUTION_METHOD_LOCAL_SEARCH) {
             if (args.time_limit == ARG_INT_NONE && args.multistart == ARG_INT_NONE) {
                 print("WARN: you should probably use either "
                       "time limit (-t) or multistart (-n) for heuristics methods.\n"
                       "Will do a single run...");
             }
 
-            feasible_solution_finder_config config;
-            feasible_solution_finder_config_init(&config);
-
+            local_search_solver_config config;
+            local_search_solver_config_init(&config);
+            config.multistart = args.multistart;
+            config.time_limit = args.time_limit;
             config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
 
-            feasible_solution_finder finder;
-            feasible_solution_finder_init(&finder);
+            local_search_solver solver;
+            local_search_solver_init(&solver);
 
-            int iters = args.multistart > 1 ? args.multistart : 1;
+            solution_loaded = local_search_solver_solve(&solver, &config, &sol);
+            if (!solution_loaded)
+                eprint("ERROR: failed to solve model (%s)", local_search_solver_get_error(&solver));
 
-            int best_solution_cost = INT_MAX;
+            local_search_solver_config_destroy(&config);
+            local_search_solver_destroy(&solver);
+        }
+
+//        } else if (args.method == RESOLUTION_METHOD_TABU_SEARCH) {
+/*
             int n_feasibles = 0;
             int n_duplicates = 0;
 
-            // DEBUG
+            // DEBUG, or not?
             GHashTable *hash = g_hash_table_new(g_int_hash, g_int_equal);
 
             for (int i = 0; i < iters; i++) {
-                solution s;
-                solution_init(&s, &model);
+
 
                 debug("[%d] Finding initial feasible solution...", i);
-
 
                 if (feasible_solution_finder_find(&finder, &config, &s)) {
                     n_feasibles++;
@@ -224,16 +229,51 @@ int main (int argc, char **argv) {
 
                     int cost = solution_cost(&s);
 //                    verbose("[%d] Initial solution {%#llx} is feasible, cost = %d", i, solution_fingerprint(&s), cost);
-                    int fingerprint = solution_fingerprint(&s);
+                    unsigned long long fingerprint = solution_fingerprint(&s);
                     debug("[%d] Initial solution {%#llx} is feasible, cost = %d", i, fingerprint, cost);
 
                     // DEBUG
-                    if (g_hash_table_contains(hash, GINT_TO_POINTER(&fingerprint))) {
+                    if (g_hash_table_contains(hash, GUINT_TO_POINTER(&fingerprint))) {
 //                        print("WARN: duplicate solution");
                         n_duplicates++;
                     } else {
-                        g_hash_table_add(hash, GINT_TO_POINTER(&fingerprint));
+                        g_hash_table_add(hash, GUINT_TO_POINTER(&fingerprint));
                     }
+
+                    // LS
+                    bool improved;
+
+                    do {
+                        improved = false;
+
+                        neighbourhood_iter iter;
+                        neighbourhood_iter_init(&iter, &s);
+                        int c1, r1, d1, s1, r2, d2, s2;
+                        while (neighbourhood_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
+                            bool restart = false;
+
+                            solution s_ls;
+                            solution_init(&s_ls, &model);
+                            debug("neighbourhood_iter_next %d %d %d %d %d %d %d", c1, r1, d1, s1, r2, d2, s2);
+                            neighbourhood_swap_assignment(&s, &s_ls, c1, r1, d1, s1, r2, d2, s2);
+                            int ls_cost = solution_cost(&s_ls);
+
+                            if (solution_satisfy_hard_constraints(&s_ls) &&
+                                ls_cost < cost) {
+                                cost = ls_cost;
+                                solution_copy(&s, &s_ls);
+                                verbose("[%d] LS is doing better, cost = %d", i, cost);
+                                improved = true;
+                                restart = true;
+                            }
+
+                            solution_destroy(&s_ls);
+
+                            if (restart)
+                                break;
+                        }
+                        neighbourhood_iter_destroy(&iter);
+                    } while (improved);
 
                     if (cost < best_solution_cost) {
                         best_solution_cost = cost;
@@ -258,21 +298,21 @@ int main (int argc, char **argv) {
 
             feasible_solution_finder_config_destroy(&config);
             feasible_solution_finder_destroy(&finder);
-        }
+            */
+//        }
     }
-
 
     if (solution_loaded || args.force_draw) {
         char *sol_str = solution_to_string(&sol);
         char *sol_quality_str = solution_quality_to_string(&sol);
-#if 0
+
         print("====== SOLUTION ======\n"
               "%s\n"
               "----------------------\n"
               "%s",
               sol_quality_str,
               sol_str);
-#endif
+
         if (args.output) {
             if (!filewrite(args.output, sol_str)) {
                 eprint("ERROR: failed to write output solution to '%s' (%s)",

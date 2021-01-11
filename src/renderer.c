@@ -2,11 +2,10 @@
 #include "renderer.h"
 #include "cairo.h"
 #include "utils/str_utils.h"
-#include "debug.h"
+#include "log/debug.h"
 #include "utils/os_utils.h"
-#include "utils/def_utils.h"
 #include "utils/array_utils.h"
-#include "verbose.h"
+#include "log/verbose.h"
 #include "utils/mem_utils.h"
 
 #define WHITE 1, 1, 1
@@ -680,7 +679,7 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
             int slot_assignments = 0;
             for (int c = 0; c < model->n_courses; c++) {
                 for (int r = 0; r < model->n_rooms; r++) {
-                    slot_assignments += solution_get_at(solution, c, r, d, s);
+                    slot_assignments += solution_get(solution, c, r, d, s);
                 }
             }
             max_slot_assignments = MAX(max_slot_assignments, slot_assignments);

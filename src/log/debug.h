@@ -4,11 +4,15 @@
 #include <stdio.h>
 
 #ifdef DEBUG
-#define debugf(fmt, ...) printf(fmt, ##__VA_ARGS__)
 #define debug(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #else
-#define debug(format, ...)
+#define debug(fmt, ...)
 #endif
 
+#if DEBUG >= 2
+#define debug2(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#else
+#define debug2(fmt, ...)
+#endif
 
 #endif // DEBUG_H

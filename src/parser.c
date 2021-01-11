@@ -4,11 +4,11 @@
 #include <errno.h>
 #include <utils/io_utils.h>
 #include <utils/str_utils.h>
-#include "verbose.h"
+#include "log/verbose.h"
 #include "model.h"
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
-#include "debug.h"
+#include "log/debug.h"
 
 /*
     INPUT FILE SYNTAX

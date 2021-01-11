@@ -92,9 +92,9 @@ static struct argp_option options[] = {
   { "solution", OPTION_SOLUTION, "SOL_FILE", 0,
         "Load the solution file SOL_FILE instead of computing it"
         "(useful for see the cost/violations or with -d or -D for render the solution)" },
-  { "method", OPTION_METHOD, "exact|tabu", 0,
+  { "method", OPTION_METHOD, "exact|local|tabu", 0,
         "Method to use for solve the model.\n"
-        "Possible values are: 'exact'" },
+        "Possible values are: 'exact', 'local' and 'tabu'" },
   { "seed", OPTION_SEED, "N", 0,
         "Seed to use for randomization, if not provided a random one is used" },
   { "ranking-randomness", OPTION_ASSIGNMENTS_DIFFICULTY_RANKING_RANDOMNESS, "N", 0,
@@ -166,11 +166,13 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
     case OPTION_METHOD:
         if (streq(arg, "exact"))
             args->method = RESOLUTION_METHOD_EXACT;
+        else if (streq(arg, "local"))
+            args->method = RESOLUTION_METHOD_LOCAL_SEARCH;
         else if (streq(arg, "tabu"))
-            args->method = RESOLUTION_METHOD_TABU;
+            args->method = RESOLUTION_METHOD_TABU_SEARCH;
         else {
             eprint("ERROR: unknown method '%s'.\n"
-                   "Possible values are 'exact', 'tabu'", arg);
+                   "Possible values are 'exact', 'local' 'tabu'", arg);
             exit(EXIT_FAILURE);
         }
         break;

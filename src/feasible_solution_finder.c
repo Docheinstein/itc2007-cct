@@ -1,17 +1,11 @@
 #include "feasible_solution_finder.h"
 #include "utils/str_utils.h"
-#include "debug.h"
+#include "log/debug.h"
 #include "utils/array_utils.h"
 #include "utils/mem_utils.h"
-#include "verbose.h"
+#include "log/verbose.h"
 #include <stdlib.h>
-#include <utils/io_utils.h>
 #include <utils/random_utils.h>
-
-//#ifdef debug
-//#undef debug
-//#define debug(format, ...)
-//#endif
 
 void feasible_solution_finder_config_init(feasible_solution_finder_config *config) {
     config->difficulty_ranking_randomness = 0; // deterministic
@@ -98,14 +92,14 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
         // 1. H3a: How many curriculum does the course belong to?
         int n_curriculas;
         model_curriculas_of_course(m, c, &n_curriculas);
-        debug("Course %s belongs to %d curriculas",  course->id, n_curriculas);
+        debug2("Course %s belongs to %d curriculas",  course->id, n_curriculas);
 
 
         // 2. H3b: How many courses the teacher of the course teaches?
         int n_teacher_courses;
         model_courses_of_teacher(m, model_teacher_by_id(m, course->teacher_id)->index,
                                  &n_teacher_courses);
-        debug("Course %s has teacher %s which teaches %d courses",
+        debug2("Course %s has teacher %s which teaches %d courses",
               course->id, m->courses[c].teacher_id, n_teacher_courses);
 
         // 3. H4: How many unavailability constraint the course has?
@@ -115,7 +109,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
                 n_unavailabilities += !model_course_is_available_on_period(m, c, d, s);
             }
         }
-        debug("Course %s has %d unavailabilities constraints",
+        debug2("Course %s has %d unavailabilities constraints",
               m->courses[c].id, n_unavailabilities);
 
         course_assignment *ca = &courses_assignment_difficulty[c];
@@ -128,7 +122,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
         ca->difficulty_ranking_factor =
                 rand_normal(1, config->difficulty_ranking_randomness);
 
-        debug("Course %s has assignment difficulty %d (random ranking factor = %g)",
+        debug2("Course %s has assignment difficulty %d (random ranking factor = %g)",
               ca->course->id, ca->difficulty, ca->difficulty_ranking_factor);
     }
 
@@ -136,7 +130,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
           course_assignment_compare);
 
     for (int c = 0; c < C; c++)
-        debug("Course %s : %d * %g -> %g",
+        debug2("Course %s : %d * %g -> %g",
               courses_assignment_difficulty[c].course->id,
               courses_assignment_difficulty[c].difficulty,
               courses_assignment_difficulty[c].difficulty_ranking_factor,
@@ -152,20 +146,20 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
         int lectures_to_assign = course->n_lectures;
 
         while (lectures_to_assign) {
-            debug("%s: %d lectures not assigned yet", course->id, lectures_to_assign);
+            debug2("%s: %d lectures not assigned yet", course->id, lectures_to_assign);
             int iter_assignments = 0;
 
             for (int r = 0; r < R && lectures_to_assign; r++) {
                 const room *room = &m->rooms[r];
                 for (int d = 0; d < D && lectures_to_assign;  d++) {
                     for (int s = 0; s < S /* && lectures_to_assign */; s++) {
-                        debug("\t%s in room %s on (day=%d, slot=%d)?", course->id, room->id, d, s);
+                        debug2("\t%s in room %s on (day=%d, slot=%d)?", course->id, room->id, d, s);
                         n_attempts++;
                         // Check hard constraints
 
                         // H2: RoomOccupancy
                         if (room_is_used[INDEX3(r, sol->R, d, D, s, S)]) {
-                            debug("\t\tfailed (RoomOccupancy: %s)", room->id);
+                            debug2("\t\tfailed (RoomOccupancy: %s)", room->id);
                             continue;
                         }
 
@@ -178,7 +172,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
                             }
                         }
                         if (curriculum_conflict >= 0) {
-                            debug("\t\tfailed (CurriculumConflict: %s)",
+                            debug2("\t\tfailed (CurriculumConflict: %s)",
                                   m->curriculas[course_curriculas[curriculum_conflict]].id);
                             continue;
                         }
@@ -187,17 +181,17 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
                         int t = model_teacher_by_id(m, course->teacher_id)->index;
 
                         if (teacher_is_busy[INDEX3(t, T, d, D, s, S)]) {
-                            debug("\t\tfailed (TeacherConflict %s)", m->teachers[t].id);
+                            debug2("\t\tfailed (TeacherConflict %s)", m->teachers[t].id);
                             continue;
                         }
 
                         // H4: availabilities
                         if (!model_course_is_available_on_period(m, c, d, s)) {
-                            debug("\t\tfailed (Availabilities (%s, %d, %d))", course->id, d, s);
+                            debug2("\t\tfailed (Availabilities (%s, %d, %d))", course->id, d, s);
                             continue;
                         }
 
-                        debug(" -> OK!");
+                        debug2(" -> OK!");
                         room_is_used[INDEX3(r, R, d, D, s, S)] = true;
                         teacher_is_busy[INDEX3(t, T, d, D, s, S)] = true;
                         for (int cq = 0 ; cq < course_n_curriculas; cq++) {
@@ -205,7 +199,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
                                     course_curriculas[cq], Q, d, D, s, S)] =  true;
                         }
 
-                        solution_set_at(sol, c, r, d, s, true);
+                        solution_set(sol, c, r, d, s, true);
                         lectures_to_assign--;
                         iter_assignments++;
                         n_assignments++;

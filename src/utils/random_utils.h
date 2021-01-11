@@ -6,6 +6,7 @@
 void rand_init(uint seed);
 
 int rand_int();
+int rand_int_range(int start, int end);
 
 double rand_uniform(double lb, double ub);
 double rand_normal(double mean, double std);

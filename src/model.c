@@ -6,7 +6,7 @@
 #include <utils/str_utils.h>
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
-#include "debug.h"
+#include "log/debug.h"
 
 void model_init(model *model) {
     model->name = NULL;

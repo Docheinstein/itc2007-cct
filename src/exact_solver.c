@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <utils/io_utils.h>
-#include "verbose.h"
-#include "debug.h"
+#include "log/verbose.h"
+#include "log/debug.h"
 #include "exact_solver.h"
 #include "gurobi/gurobi_c.h"
 #include "utils/mem_utils.h"
@@ -49,7 +49,7 @@ static const char * status_to_string(int status) {
 
 void exact_solver_config_init(exact_solver_config *config) {
     config->grb_verbose = true;
-    config->grb_time_limit = GRB_INFINITY;
+    config->grb_time_limit = 0;
     config->grb_write_lp = NULL;
 
     config->h_lectures = true;
@@ -82,7 +82,7 @@ static void exact_solver_reinit(exact_solver *solver) {
 }
 
 bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
-                        model *itc, solution *solution) {
+                        solution *solution) {
 
 #define GRB_CHECK(op) do { \
     error = op; \
@@ -155,6 +155,8 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
         config->s_room_stability
     );
 
+    const model *itc = solution->model;
+
     GRBenv *env = NULL;
     GRBmodel *model = NULL;
 
@@ -171,10 +173,11 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
     int * indexes = NULL;
     double * values = NULL;
 
+    double time_limit = config->grb_time_limit > 1 ? config->grb_time_limit : GRB_INFINITY;
     GRB_CHECK(GRBemptyenv(&env));
     GRB_CHECK(GRBstartenv(env));
     GRB_CHECK(GRBsetintparam(env, GRB_INT_PAR_OUTPUTFLAG, config->grb_verbose));
-    GRB_CHECK(GRBsetdblparam(env, GRB_DBL_PAR_TIMELIMIT, config->grb_time_limit));
+    GRB_CHECK(GRBsetdblparam(env, GRB_DBL_PAR_TIMELIMIT, time_limit));
     GRB_CHECK(GRBnewmodel(env, &model, "itc2007_cct", 0, NULL, NULL, NULL, NULL, NULL));
 
     verbose("Creating model...");
@@ -631,7 +634,7 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
                             debug("X[%s,%s,%d,%d]=%g",
                                   itc->courses[c].id, itc->rooms[r].id, d, s,
                                   Xval);
-                            solution_set_at(solution, c, r, d, s, true);
+                            solution_set(solution, c, r, d, s, true);
                         }
                     }
                 }

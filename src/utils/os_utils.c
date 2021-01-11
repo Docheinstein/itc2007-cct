@@ -2,7 +2,7 @@
 #include <stdarg.h>
 #include <sys/stat.h>
 #include "str_utils.h"
-#include "debug.h"
+#include "log/debug.h"
 
 char *pathjoin0(const char *first, ...) {
     va_list args;

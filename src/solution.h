@@ -66,31 +66,34 @@ const char * solution_parser_get_error(solution_parser *solution_parser);
 void solution_init(solution *solution, const model *model);
 void solution_destroy(solution *solution);
 
-void solution_copy(solution *solution_dest, solution *solution_src);
+void solution_copy(solution *solution_dest, const solution *solution_src);
 
-void solution_set_at(solution *sol, int c, int r, int d, int s, bool value);
-bool solution_get_at(const solution *sol, int c, int r, int d, int s);
+void solution_set(solution *sol, int c, int r, int d, int s, bool value);
+bool solution_get(const solution *sol, int c, int r, int d, int s);
+
+void solution_set_at(solution *sol, int index, bool value);
+bool solution_get_at(const solution *sol, int index);
 
 char * solution_to_string(const solution *sol);
 char * solution_quality_to_string(solution *sol);
 
 unsigned long long solution_fingerprint(const solution *sol);
 
-bool solution_satisfy_hard_constraints(solution *sol);
-bool solution_satisfy_hard_constraint_lectures(solution *sol);
-bool solution_satisfy_hard_constraint_room_occupancy(solution *sol);
-bool solution_satisfy_hard_constraint_conflicts(solution *sol);
-bool solution_satisfy_hard_constraint_availabilities(solution *sol);
+bool solution_satisfy_hard_constraints(const solution *sol);
+bool solution_satisfy_hard_constraint_lectures(const solution *sol);
+bool solution_satisfy_hard_constraint_room_occupancy(const solution *sol);
+bool solution_satisfy_hard_constraint_conflicts(const solution *sol);
+bool solution_satisfy_hard_constraint_availabilities(const solution *sol);
 
-int solution_hard_constraint_lectures_violations(solution *sol);
-int solution_hard_constraint_room_occupancy_violations(solution *sol);
-int solution_hard_constraint_conflicts_violations(solution *sol);
-int solution_hard_constraint_availabilities_violations(solution *sol);
+int solution_hard_constraint_lectures_violations(const solution *sol);
+int solution_hard_constraint_room_occupancy_violations(const solution *sol);
+int solution_hard_constraint_conflicts_violations(const solution *sol);
+int solution_hard_constraint_availabilities_violations(const solution *sol);
 
-int solution_cost(solution *sol);
-int solution_soft_constraint_room_capacity(solution *sol);
-int solution_soft_constraint_min_working_days(solution *sol);
-int solution_soft_constraint_curriculum_compactness(solution *sol);
-int solution_soft_constraint_room_stability(solution *sol);
+int solution_cost(const solution *sol);
+int solution_soft_constraint_room_capacity(const solution *sol);
+int solution_soft_constraint_min_working_days(const solution *sol);
+int solution_soft_constraint_curriculum_compactness(const solution *sol);
+int solution_soft_constraint_room_stability(const solution *sol);
 
 #endif // SOLUTION_H

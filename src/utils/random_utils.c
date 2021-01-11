@@ -12,6 +12,10 @@ int rand_int() {
     return (int) random();
 }
 
+int rand_int_range(int start, int end) {
+    return start + ((int) random() % (end - start));
+}
+
 double rand_uniform(double lb, double ub) {
     int r = rand_int();
     return lb + ((double) r / RAND_MAX) * (ub - lb);
