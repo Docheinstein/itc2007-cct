@@ -1,5 +1,6 @@
 #include <log/debug.h>
 #include <utils/io_utils.h>
+#include <utils/str_utils.h>
 #include "neighbourhood.h"
 #include "utils/mem_utils.h"
 #include "utils/random_utils.h"
@@ -120,8 +121,10 @@ void neighbourhood_iter_init(neighbourhood_iter *iter, const solution *sol) {
     // Find the assignments in the timetable
     int cursor = 0;
     for (int i = 0; i < ttsize; i++) {
-        if (solution_get_at(sol, i))
+        if (solution_get_at(sol, i)) {
+            debug("[%d] Found assignment at index %d", cursor, i);
             iter->assignments[cursor++] = i;
+        }
     }
 
     iter->n_assignments = cursor;
@@ -147,6 +150,10 @@ bool neighbourhood_iter_next(neighbourhood_iter *iter, int *c1,
     const model *model = iter->solution->model;
     CRDSQT
 
+    debug2("neighbourhood_iter_next for iter->assignment_index = %d | iter->assignments[iter->assignment_index] = %d",
+           iter->assignment_index, iter->assignments[iter->assignment_index]);
+    debug2(" = %d", iter->solution->timetable[iter->assignments[iter->assignment_index]]);
+
     *c1 = RINDEX4_0(iter->assignments[iter->assignment_index], C, R, D, S);
     *r1 = RINDEX4_1(iter->assignments[iter->assignment_index], C, R, D, S);
     *d1 = RINDEX4_2(iter->assignments[iter->assignment_index], C, R, D, S);
@@ -169,49 +176,128 @@ bool neighbourhood_iter_next(neighbourhood_iter *iter, int *c1,
 static bool fastcheck_hard_constraints(const solution *sol,
                                        int c1, int r1, int d1, int s1,
                                        int c2, int r2, int d2, int s2) {
+
+
 //    return
 //        fastcheck_hard_constraints_partial(sol, c1, r2, d2, s2) &&
 //        fastcheck_hard_constraints_partial(sol, c2, r1, d2, s1);
-    const bool same_period = d1 == d2 && s1 == s2;
-
-    if (c2 >= 0) {
-        debug2("Non empty slot (c=%d, r=%d, d=%d, s=%d) NOT IMPL", c2, r2, d2, s2);
-        return false; // non empty second slot, not implemented yet
-    }
-
     const model *model = sol->model;
     CRDSQT
 
+    const bool same_period = d1 == d2 && s1 == s2;
+    const bool same_room = r1 == r2;
+    const bool same_course = c2 >= 0 && c1 == c2;
+    const bool same_teacher = c2 >= 0 && model_same_teacher(model, c1, c2);
+//    const bool same_curricula = c2 >= 0 && model_share_curricula(model, c1, c2);
+
+    debug2("c1 = %d -> %s | r1 = %d -> %s | d1 = %d | s1 = %d | c2 = %d -> %s | r2 = %d -> %s | d2 = %d | s2 = %d ",
+           c1, model->courses[c1].id, r1, model->rooms[r1].id, d1, s1,
+           c2, c2 >= 0 ? model->courses[c2].id : "(none)", r2, model->rooms[r2].id, d2, s2);
+    debug2("same_period = %d", same_period);
+    debug2("same_course = %d", same_course);
+    debug2("same_room = %d", same_room);
+    debug2("same_teacher = %d", same_teacher);
+//    debug2("same_curricula = %d", same_curricula);
+
+    if (same_period && same_course && same_room)
+        return true; // nothing to do
+
     // H1b
     debug2("Check H1b (c=%d, d=%d, s=%d)", c1, d2, s2);
-    if (sol->helper.sum_cds[INDEX3(c1, C, d2, D, s2, S)] && !same_period)
+    if (sol->helper.sum_cds[INDEX3(c1, C, d2, D, s2, S)] - same_period - same_course > 0)
         return false;
 
-    // H2
-    debug2("Check H2 (r=%d, d=%d, s=%d)", r2, d2, s2);
-    if (sol->helper.sum_rds[INDEX3(r2, R, d2, D, s2, S)] && !same_period)
-        return false;
-
-    // H3a
-    int c_n_curriculas;
-    int * c_curriculas = model_curriculas_of_course(model, c1, &c_n_curriculas);
-    for (int cq = 0; cq < c_n_curriculas; cq++) {
-        const int q = c_curriculas[cq];
-        debug2("Check H3a (q=%d, d=%d, s=%d)", q, d2, s2);
-        if (sol->helper.sum_qds[INDEX3(q, Q, d2, D, s2, S)] && !same_period)
+    if (c2 >= 0) {
+        debug2("Check H1b (c=%d, d=%d, s=%d)", c2, d1, s1);
+        if (sol->helper.sum_cds[INDEX3(c2, C, d1, D, s1, S)] - same_period - same_course > 0)
             return false;
     }
 
-    // H3b
-    const int t = model_teacher_by_id(model, model->courses[c1].teacher_id)->index;
-    debug2("Check H3b (t=%d, d=%d, s=%d)", t, d2, s2);
-    if (sol->helper.sum_tds[INDEX3(t, T, d2, D, s2, S)] && !same_period)
+    // H2
+/*  NOT NEEDED?
+    debug2("Check H2 (r=%d, d=%d, s=%d)", r2, d2, s2);
+    if (sol->helper.sum_rds[INDEX3(r2, R, d2, D, s2, S)] - same_period - same_room > 0)
         return false;
+
+    if (c2 >= 0) {
+        debug2("Check H2 (r=%d, d=%d, s=%d)", r1, d1, s1);
+        if (sol->helper.sum_rds[INDEX3(r1, R, d1, D, s1, S)] - same_period - same_room > 0)
+            return false;
+    }
+*/
+    // H3a
+/*
+    int c1_n_curriculas;
+    int * c1_curriculas = model_curriculas_of_course(model, c1, &c1_n_curriculas);
+    for (int c1q = 0; c1q < c1_n_curriculas; c1q++) {
+        const int q = c1_curriculas[c1q];
+        debug2("Check H3a (q=%d, d=%d, s=%d)", q, d2, s2);
+        debug2("sol->helper.sum_qds[INDEX3(q, Q, d2, D, s2, S)] = %d", sol->helper.sum_qds[INDEX3(q, Q, d2, D, s2, S)]);
+        for (int r = 0; r < R; r++) {
+            int c_rds = sol->helper.c_rds[INDEX3(r, R, d2, D, s2, S)];
+            if (c_rds) {
+                int cx_n_curriculas;
+                int * cx_curriculas = model_curriculas_of_course(model, c_rds, &cx_n_curriculas);
+                for (int cxq = 0; cxq < cx_n_curriculas; cxq++) {
+                    const int qx = c1_curriculas[cxq];
+
+                    if (q1 == qx)
+                        return false;
+                }
+            }
+
+        }
+    }
+*/
+    int c1_n_curriculas;
+    int * c1_curriculas = model_curriculas_of_course(model, c1, &c1_n_curriculas);
+    for (int cq = 0; cq < c1_n_curriculas; cq++) {
+        const int q = c1_curriculas[cq];
+        bool share_curricula = c2 >= 0 && model_share_curricula(model, c1, c2, q);
+        debug2("Check H3a (q=%d, d=%d, s=%d) -> %d", q, d2, s2, sol->helper.sum_qds[INDEX3(q, Q, d2, D, s2, S)]);
+//        debug2("  %s %s share %s => %d", model->courses[c1].id, model->courses[c2].id, model->curriculas[q].id, model_share_curricula(model, c1, c2, q));
+        if (sol->helper.sum_qds[INDEX3(q, Q, d2, D, s2, S)] - same_period - share_curricula > 0)
+            return false;
+    }
+
+    if (c2 >= 0) {
+        int c2_n_curriculas;
+        int * c2_curriculas = model_curriculas_of_course(model, c2, &c2_n_curriculas);
+        for (int cq = 0; cq < c2_n_curriculas; cq++) {
+            const int q = c2_curriculas[cq];
+            bool share_curricula = model_share_curricula(model, c1, c2, q);
+
+            debug2("Check H3a (q=%d, d=%d, s=%d)", q, d1, s1);
+//            debug2("  %s %s share %s => %d", model->courses[c1].id, model->courses[c2].id, model->curriculas[q].id, model_share_curricula(model, c1, c2, q));
+            if (sol->helper.sum_qds[INDEX3(q, Q, d1, D, s1, S)] - same_period - share_curricula > 0)
+                return false;
+        }
+    }
+
+    // H3b
+    const int t1 = model_teacher_by_id(model, model->courses[c1].teacher_id)->index;
+    debug2("Check H3b (t=%d, d=%d, s=%d)", t1, d2, s2);
+    if (sol->helper.sum_tds[INDEX3(t1, T, d2, D, s2, S)] - same_period - same_teacher > 0)
+        return false;
+
+    if (c2 >= 0) {
+        const int t2 = model_teacher_by_id(model, model->courses[c2].teacher_id)->index;
+        debug2("Check H3b (t=%d, d=%d, s=%d)", t2, d1, s1);
+        if (sol->helper.sum_tds[INDEX3(t2, T, d1, D, s1, S)] - same_period - same_teacher > 0)
+            return false;
+    }
 
     // H4
     debug2("Check H4 (c=%d, d=%d, s=%d)", c1, d2, s2);
     if (!model_course_is_available_on_period(model, c1, d2, s2))
         return false;
+
+    if (c2 >= 0) {
+        debug2("Check H4 (c=%d, d=%d, s=%d)", c2, d1, s1);
+        if (!model_course_is_available_on_period(model, c2, d1, s1))
+            return false;
+    }
+
 
     return true;
 }
@@ -230,36 +316,35 @@ bool neighbourhood_swap_assignment(const solution *sol_in, solution *sol_out, in
 #endif
 
     // Check if there is already a course in the picked (room,day,slot)
-    int c_star = -1;
-    for (int c = 0; c < C; c++) {
-        if (solution_get(sol_in, c, r2, d2, s2)) {
-            c_star = c;
-            break;
-        }
+    int c_star = sol_in->helper.c_rds[INDEX3(r2, R, d2, D, s2, S)];
+
+
+    if (c_star >= 0) {
+        debug2("Found course %s scheduled in slot (%s, %d, %d)",
+                sol_in->model->courses[c_star].id,
+                sol_in->model->rooms[r2].id, d2, s2);
+    } else {
+        debug2("No course found in slot (%s, %d, %d)",
+              sol_in->model->rooms[r2].id, d2, s2);
     }
 
-    if (!fastcheck_hard_constraints(sol_in, c1, r1, d1, s1, c_star, r2, d2, s2))
-        return false;
+    bool satisfy_hard = fastcheck_hard_constraints(sol_in, c1, r1, d1, s1, c_star, r2, d2, s2);
 
     // Satisfy hard constraints, do swaps
     solution_copy(sol_out, sol_in);
 
     // Swap assignments
     solution_set(sol_out, c1, r1, d1, s1, false);
+
+    if (c_star >= 0)
+        solution_set(sol_out, c_star, r2, d2, s2, false);
+
     solution_set(sol_out, c1, r2, d2, s2, true);
 
-    if (c_star >= 0) {
-        debug2("Found course %s scheduled in slot (%s, %d, %d)",
-                sol_in->model->courses[c_star].id,
-                sol_in->model->rooms[r2].id, d2, s2);
-        solution_set(sol_out, c_star, r2, d2, s2, false);
+    if (c_star >= 0)
         solution_set(sol_out, c_star, r1, d1, s1, true);
-    } else {
-        debug2("No course found in slot (%s, %d, %d)",
-              sol_in->model->rooms[r2].id, d2, s2);
-    }
 
-    return true;
+    return satisfy_hard;
 }
 /*
 void neighbourhood_swap_assignment(const solution *sol_in, solution *sol_out, int c1,

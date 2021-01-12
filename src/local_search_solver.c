@@ -11,12 +11,30 @@ static void do_local_search(const solution *sol_in, solution *sol_out) {
     solution_copy(sol_out, sol_in);
     solution_finalize(sol_out);
 
+#if DEBUG
+    if (solution_fingerprint(sol_out) != solution_fingerprint(sol_in)) {
+        eprint("Different fingerprint after solution copy");
+        exit(4);
+    }
+#endif
+
+    debug2("BEF");
+    for (int i = 0; i < sol_out->model->n_courses * sol_out->model->n_rooms * sol_out->model->n_slots; i++)
+        debug2("%d ", sol_out->timetable[i]);
+
     int cost = solution_cost(sol_out);
 
     int i = 0;
     bool improved;
     do {
         improved = false;
+
+        debug2("AFT");
+        for (int j = 0; j < sol_out->model->n_courses * sol_out->model->n_rooms * sol_out->model->n_slots; j++)
+            debug2("%d ", sol_out->timetable[j]);
+
+//        write_solution(sol_out, "/tmp/sol_out_before_init2.sol");
+//        render_solution_overview(sol_out, "/tmp/sol_out_before_init2.png");
 
         neighbourhood_iter iter;
         neighbourhood_iter_init(&iter, sol_out);
@@ -40,22 +58,35 @@ static void do_local_search(const solution *sol_in, solution *sol_out) {
 #if DEBUG
                 if (!solution_satisfy_hard_constraints(&sol_ls)) {
                     eprint("After valid swap, solution must satisfy hard constraints");
-                    render_solution_overview(sol_in, "/tmp/sol_in.png");
-                    render_solution_overview(&sol_ls, "/tmp/sol_ls.png");
+                    render_solution_overview(sol_out, "/tmp/sol_before_neigh.png");
+                    render_solution_overview(&sol_ls, "/tmp/sol_after_neigh.png");
                     exit(3);
                 }
 #endif
                 int ls_cost = solution_cost(&sol_ls);
                 if (ls_cost < cost) {
-                    solution_copy(sol_out, &sol_ls);
-                    solution_finalize(sol_out);
                     cost = ls_cost;
                     debug("  [%d.%d] LS: solution improved, cost = %d", i, j, cost);
+
+                    solution_copy(sol_out, &sol_ls);
+                    solution_finalize(sol_out);
                     improved = true;
                     restart = true;
                 } else {
                     debug("  [%d.%d] LS: solution NOT improved, cost %d >= %d", i, j, ls_cost, cost);
                 }
+            } else {
+#if DEBUG
+                debug(" [%d.%d] Infeasible LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)",
+                      i, j, c1, r1, d1, s1, r2, d2, s2);
+
+                if (solution_satisfy_hard_constraints(&sol_ls)) {
+                    eprint("After invalid swap, solution must NOT satisfy hard constraints");
+                    render_solution_overview(sol_out, "/tmp/sol_before_neigh.png");
+                    render_solution_overview(&sol_ls, "/tmp/sol_after_neigh.png");
+                    exit(3);
+                }
+#endif
             }
 
             solution_destroy(&sol_ls);
@@ -121,9 +152,8 @@ bool local_search_solver_solve(local_search_solver *solver,
         if (feasible_solution_finder_find(&finder, &finder_config, &s)) {
             solution_finalize(&s);
 
-            int cost = solution_cost(&s);
-
-            debug("[%d] Initial solution is feasible, cost = %d", i, cost);
+            debug("[%d] Initial solution is feasible, cost = %d",
+                  i, solution_cost(&s));
 
             // Local search starting from this feasible solution
             solution s_ls;

@@ -295,14 +295,11 @@ int main (int argc, char **argv) {
               sol_quality_str,
               sol_str);
 
-        if (args.output) {
-            if (!filewrite(args.output, sol_str)) {
-                eprint("ERROR: failed to write output solution to '%s' (%s)",
-                       args.output, strerror(errno));
-            }
-        }
-
         free(sol_str);
+        free(sol_quality_str);
+
+        if (args.output)
+            write_solution(&sol, args.output);
 
         if (args.draw_overview_file || args.draw_directory)
             render_solution(&sol, args.draw_overview_file, args.draw_directory);

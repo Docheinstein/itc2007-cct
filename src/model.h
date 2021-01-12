@@ -71,6 +71,9 @@ typedef struct model {
     bool *course_belongs_to_curricula;     // b_cq
     bool *course_taught_by_teacher;        // e_ct
     bool *course_availabilities;           // e_cds
+
+    bool *share_curricula;
+    bool *same_teacher;
 } model;
 
 void model_init(model *model);
@@ -102,6 +105,8 @@ bool model_course_is_taught_by_teacher(const model *model, int course_idx, int t
 bool model_course_is_available_on_period(const model *model, int course_idx, int day, int slot);
 int *model_curriculas_of_course(const model *model, int course_idx, int *n_curriculas);
 int *model_courses_of_curricula(const model *model, int curricula_dx, int *n_courses);
-int *model_courses_of_teacher(const model *model, int teacher_id, int *n_courses);
+int *model_courses_of_teacher(const model *model, int teacher_idx, int *n_courses);
+bool model_share_curricula(const model *model, int course1_idx, int course2_idx, int curricula_idx);
+bool model_same_teacher(const model *model, int course1_idx, int course2_idx);
 
 #endif // MODEL_H

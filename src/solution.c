@@ -27,6 +27,8 @@
 static void solution_helper_init(solution_helper *helper, const solution *sol) {
     CRDSQT
 
+    helper->c_rds = mallocx(R * D * S, sizeof(int));
+
     helper->timetable_cdsr = mallocx(C * D * S * R, sizeof(bool));
     helper->sum_cds = mallocx(C * D * S, sizeof(int));
     
@@ -41,6 +43,8 @@ static void solution_helper_init(solution_helper *helper, const solution *sol) {
 }
 
 static void solution_helper_destroy(solution_helper *helper) {
+    free(helper->c_rds);
+
     free(helper->timetable_cdsr);
     free(helper->sum_cds);
 
@@ -58,6 +62,8 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
     CRDSQT
     const model *model = sol->model;
 
+    memset(helper->c_rds, -1, R * D * S * sizeof(int));
+
     memset(helper->timetable_cdsr, 0, C * D * S * R * sizeof(bool));
     memset(helper->sum_cds, 0, C * D * S * sizeof(int));
 
@@ -69,6 +75,20 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
 
     memset(helper->timetable_tdscr, 0, T * D * S * C * R * sizeof(bool));
     memset(helper->sum_tds, 0, T * D * S * sizeof(int));
+
+    // c_rds
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    if (sol->timetable[INDEX4(c, C, r, R, d, D, s, S)])
+                        helper->c_rds[INDEX3(r, R, d, D, s, S)] = c;
+                    debug2("helper->c_rds[INDEX3(%d, %d, %d)] = %d",
+                           r, d, s, helper->c_rds[INDEX3(r, R, d, D, s, S)]);
+                }
+            }
+        }
+    }
 
     // timetable_cdsr
     FOR_C {
@@ -551,7 +571,7 @@ int solution_hard_constraint_availabilities_violations(const solution *sol) {
                     n += solution_get(sol, c, r, d, s);
                 }
                 if (!(n <= model_course_is_available_on_period(sol->model, c, d, s))) {
-                    debug2("H4 (Availabilities) violation: course '%s' scheduled %d times on "
+                    debug2("H4 (Availabilities) violation: course '%s' scheduled %d time(s) on "
                           "(day=%d, slot=%d) but breaks unavailability constraint",
                           sol->model->courses[c].id, n, d, s);
                     violations++;
@@ -818,4 +838,20 @@ void solution_set_at(solution *sol, int index, bool value) {
 
 bool solution_get_at(const solution *sol, int index) {
     return sol->timetable[index];
+}
+
+bool write_solution(const solution *sol, const char *output_file) {
+    char *sol_str = solution_to_string(sol);
+
+    if (!output_file)
+        return false;
+
+    bool success = filewrite(output_file, sol_str);
+    if (!success)
+        eprint("ERROR: failed to write output solution to '%s' (%s)",
+               output_file, strerror(errno));
+
+    free(sol_str);
+
+    return success;
 }

@@ -28,6 +28,8 @@ void model_init(model *model) {
     model->courses_of_teacher = NULL;
     model->course_taught_by_teacher = NULL;
     model->course_availabilities = NULL;
+    model->share_curricula = NULL;
+    model->same_teacher = NULL;
 }
 
 void course_destroy(const course *c) {
@@ -90,6 +92,8 @@ void model_destroy(const model *model) {
     free(model->course_belongs_to_curricula);
     free(model->course_taught_by_teacher);
     free(model->course_availabilities);
+    free(model->share_curricula);
+    free(model->same_teacher);
 }
 
 void course_to_string(const course *course, char *buffer, size_t buflen) {
@@ -288,12 +292,42 @@ void model_finalize(model *model) {
         }
     }
 
-    model->courses_of_curricula = mallocx(model->n_curriculas, sizeof(int *));
+    model->courses_of_curricula = mallocx(Q, sizeof(int *));
     for (int q = 0; q < Q; q++) {
         const curricula *curricula = &model->curriculas[q];
         model->courses_of_curricula[q] = mallocx(curricula->n_courses, sizeof(int));
         for (int qc = 0; qc < curricula->n_courses; qc++) {
             model->courses_of_curricula[q][qc] = model_course_by_id(model, curricula->courses_ids[qc])->index;
+        }
+    }
+
+    model->share_curricula = mallocx(C * C * Q, sizeof(bool));
+    for (int c1 = 0; c1 < C; c1++) {
+        for (int c2 = 0; c2 < C; c2++) {
+            int c1_n_curriculas, c2_n_curriculas;
+            int *c1_curriculas = model_curriculas_of_course(model, c1, &c1_n_curriculas);
+            int *c2_curriculas = model_curriculas_of_course(model, c2, &c2_n_curriculas);
+            for (int q = 0; q < Q; q++) {
+                bool in_c1 = false;
+                bool in_c2 = false;
+
+                for (int c1_qi = 0; c1_qi < c1_n_curriculas && !in_c1; c1_qi++)
+                    in_c1 = q == c1_curriculas[c1_qi];
+
+                for (int c2_qi = 0; c2_qi < c2_n_curriculas && !in_c2; c2_qi++)
+                    in_c2 = q == c2_curriculas[c2_qi];
+
+                model->share_curricula[INDEX3(c1, C, c2, C, q, Q)] = in_c1 && in_c2;
+            }
+        }
+    }
+
+    model->same_teacher = mallocx(C * C, sizeof(bool));
+    for (int c1 = 0; c1 < C; c1++) {
+        for (int c2 = 0; c2 < C; c2++) {
+            model->same_teacher[INDEX2(c1, C, c2, C)] =
+                    streq(model->courses[c1].teacher_id,
+                          model->courses[c2].teacher_id);
         }
     }
 }
@@ -368,4 +402,15 @@ int *model_courses_of_teacher(const model *model, int teacher_idx, int *n_course
     if (n_courses)
         *n_courses = model->courses_of_teacher[teacher_idx]->len;
     return (int *) model->courses_of_teacher[teacher_idx]->data;
+}
+
+bool model_share_curricula(const model *model, int course1_idx, int course2_idx, int curricula_idx) {
+    return model->share_curricula[INDEX3(course1_idx, model->n_courses,
+                                        course2_idx, model->n_courses,
+                                        curricula_idx, model->n_curriculas)];
+}
+
+bool model_same_teacher(const model *model, int course1_idx, int course2_idx) {
+    return model->same_teacher[INDEX2(course1_idx, model->n_courses,
+                                      course2_idx, model->n_courses)];
 }
