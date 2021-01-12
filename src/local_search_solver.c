@@ -7,96 +7,105 @@
 #include "feasible_solution_finder.h"
 #include "renderer.h"
 
-static void do_local_search(const solution *sol_in, solution *sol_out) {
-    solution_copy(sol_out, sol_in);
-    solution_finalize(sol_out);
-
+static void do_local_search(solution *sol) {
 #if DEBUG
-    if (solution_fingerprint(sol_out) != solution_fingerprint(sol_in)) {
+    if (solution_fingerprint(sol) != solution_fingerprint(sol)) {
         eprint("Different fingerprint after solution copy");
         exit(4);
     }
 #endif
 
-    debug2("BEF");
-    for (int i = 0; i < sol_out->model->n_courses * sol_out->model->n_rooms * sol_out->model->n_slots; i++)
-        debug2("%d ", sol_out->timetable[i]);
-
-    int cost = solution_cost(sol_out);
+    int cost = solution_cost(sol);
 
     int i = 0;
     bool improved;
     do {
+        int c1, r1, d1, s1, c2, r2, d2, s2;
+        int j = 0;
+
         improved = false;
 
-        debug2("AFT");
-        for (int j = 0; j < sol_out->model->n_courses * sol_out->model->n_rooms * sol_out->model->n_slots; j++)
-            debug2("%d ", sol_out->timetable[j]);
+        solution sol_neigh;
+        solution_init(&sol_neigh, sol->model);
+        solution_copy(&sol_neigh, sol);
 
-//        write_solution(sol_out, "/tmp/sol_out_before_init2.sol");
-//        render_solution_overview(sol_out, "/tmp/sol_out_before_init2.png");
-
-        neighbourhood_iter iter;
-        neighbourhood_iter_init(&iter, sol_out);
-
-        int c1, r1, d1, s1, r2, d2, s2;
-
-        int j = 0;
-        while (neighbourhood_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
+        neighbourhood_swap_iter iter;
+        neighbourhood_swap_iter_init(&iter, sol);
+        while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
             bool restart = false;
 
-            solution sol_ls;
-            solution_init(&sol_ls, sol_in->model);
-            debug2(" [%d.%d] LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
+            debug("[%d.%d] LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
                    i, j, c1, r1, d1, s1, r2, d2, s2);
 
-            if (neighbourhood_swap_assignment(sol_out, &sol_ls, c1, r1, d1, s1, r2, d2, s2)) {
+//            render_solution_overview(&sol_neigh, "/tmp/before-swap.png");
+#if 0
+            debug("---- BEFORE SWAP ----");
+            print_solution(&sol_neigh);
+            char tmp[256];
+            snprintf(tmp, 256, "/tmp/%d-%d_a_before-swap.png", i, j);
+            render_solution_overview(&sol_neigh, tmp);
+#endif
+
+            if (neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2, &c2)) {
+#if 0
+                debug("---- AFTER SWAP ----");
+                print_solution(&sol_neigh);
+                snprintf(tmp, 256, "/tmp/%d-%d_b_after-swap.png", i, j);
+                render_solution_overview(&sol_neigh, tmp);
+#endif
                 // Feasible solution after swap
-                debug(" [%d.%d] Feasible LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)",
+                debug("[%d.%d] Performed feasible LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)",
                       i, j, c1, r1, d1, s1, r2, d2, s2);
 
 #if DEBUG
-                if (!solution_satisfy_hard_constraints(&sol_ls)) {
+                if (!solution_satisfy_hard_constraints(&sol_neigh)) {
                     eprint("After valid swap, solution must satisfy hard constraints");
-                    render_solution_overview(sol_out, "/tmp/sol_before_neigh.png");
-                    render_solution_overview(&sol_ls, "/tmp/sol_after_neigh.png");
+                    render_solution_overview(&sol_neigh, "/tmp/failure.png");
                     exit(3);
                 }
 #endif
-                int ls_cost = solution_cost(&sol_ls);
-                if (ls_cost < cost) {
-                    cost = ls_cost;
-                    debug("  [%d.%d] LS: solution improved, cost = %d", i, j, cost);
-
-                    solution_copy(sol_out, &sol_ls);
-                    solution_finalize(sol_out);
+                int neigh_cost = solution_cost(&sol_neigh);
+                if (neigh_cost < cost) {
+                    debug("[%d.%d] LS: solution improved, cost = %d", i, j, neigh_cost);
+                    cost = neigh_cost;
+                    solution_copy(sol, &sol_neigh);
                     improved = true;
                     restart = true;
                 } else {
-                    debug("  [%d.%d] LS: solution NOT improved, cost %d >= %d", i, j, ls_cost, cost);
+                    debug("[%d.%d] LS: solution NOT improved, cost %d >= %d", i, j, neigh_cost, cost);
+
+                    // Swap back
+                    debug("[%d.%d] swap back", i, j);
+                    neighbourhood_swap_back(&sol_neigh, c1, r1, d1, s1, c2, r2, d2, s2);
+#if 0
+                    debug("---- AFTER SWAP BACK ----");
+                    print_solution(&sol_neigh);
+                    snprintf(tmp, 256, "/tmp/%d-%d_c_after-swap.back.png", i, j);
+                    render_solution_overview(&sol_neigh, tmp);
+#endif
                 }
             } else {
-#if DEBUG
-                debug(" [%d.%d] Infeasible LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)",
+#if 0
+                debug("[%d.%d] Skipped infeasible LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)",
                       i, j, c1, r1, d1, s1, r2, d2, s2);
 
-                if (solution_satisfy_hard_constraints(&sol_ls)) {
+                if (solution_satisfy_hard_constraints(&sol_neigh)) {
                     eprint("After invalid swap, solution must NOT satisfy hard constraints");
-                    render_solution_overview(sol_out, "/tmp/sol_before_neigh.png");
-                    render_solution_overview(&sol_ls, "/tmp/sol_after_neigh.png");
+                    render_solution_overview(sol, "/tmp/sol_before_neigh.png");
+                    render_solution_overview(&sol_neigh, "/tmp/sol_after_neigh.png");
                     exit(3);
                 }
 #endif
             }
 
-            solution_destroy(&sol_ls);
             j++;
 
             if (restart)
                 break;
         }
 
-        neighbourhood_iter_destroy(&iter);
+        solution_destroy(&sol_neigh);
+        neighbourhood_swap_iter_destroy(&iter);
         i++;
     } while (cost > 0 && improved);
 }
@@ -131,6 +140,7 @@ void local_search_solver_reinit(local_search_solver *solver) {
 bool local_search_solver_solve(local_search_solver *solver,
                                local_search_solver_config *config,
                                solution *sol_out) {
+    const model *model = sol_out->model;
     local_search_solver_reinit(solver);
 
     feasible_solution_finder finder;
@@ -146,30 +156,22 @@ bool local_search_solver_solve(local_search_solver *solver,
 
     for (int i = 0; i < iters && best_solution_cost > 0; i++) {
         solution s;
-        solution_init(&s, sol_out->model);
+        solution_init(&s, model);
 
         debug("[%d] Finding initial feasible solution...", i);
         if (feasible_solution_finder_find(&finder, &finder_config, &s)) {
-            solution_finalize(&s);
-
-            debug("[%d] Initial solution is feasible, cost = %d",
-                  i, solution_cost(&s));
+            debug("[%d] Initial solution is feasible, cost = %d", i, solution_cost(&s));
 
             // Local search starting from this feasible solution
-            solution s_ls;
-            solution_init(&s_ls, sol_out->model);
-
-            do_local_search(&s, &s_ls);
+            do_local_search(&s);
 
             // Check if the solution found is better than the best known
-            int ls_cost = solution_cost(&s_ls);
-            if (ls_cost < best_solution_cost) {
-                verbose("[%d] LS: new best solution found, cost = %d", i, ls_cost);
-                best_solution_cost = ls_cost;
-                solution_copy(sol_out, &s_ls);
+            int cost = solution_cost(&s);
+            if (cost < best_solution_cost) {
+                verbose("[%d] LS: new best solution found, cost = %d", i, cost);
+                best_solution_cost = cost;
+                solution_copy(sol_out, &s);
             }
-
-            solution_destroy(&s_ls);
         }
 
         solution_destroy(&s);

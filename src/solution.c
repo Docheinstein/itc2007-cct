@@ -4,46 +4,33 @@
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
 #include "log/debug.h"
-#include "config.h"
 #include "log/verbose.h"
 #include "utils/def_utils.h"
-
-#define CRDSQT \
-    const int C = sol->model->n_courses; \
-    const int R = sol->model->n_rooms;   \
-    const int D = sol->model->n_days;   \
-    const int S = sol->model->n_slots;   \
-    const int T = sol->model->n_teachers; \
-    const int Q = sol->model->n_curriculas; \
-
-#define FOR_C for (int c = 0; c < C; c++)
-#define FOR_R for (int r = 0; r < R; r++)
-#define FOR_D for (int d = 0; d < D; d++)
-#define FOR_S for (int s = 0; s < S; s++)
-#define FOR_Q for (int q = 0; q < Q; q++)
-#define FOR_T for (int t = 0; t < T; t++)
+#include "config.h"
 
 
-static void solution_helper_init(solution_helper *helper, const solution *sol) {
-    CRDSQT
+static void solution_helper_init(solution_helper *helper, const model *model) {
+    CRDSQT(model)
 
     helper->c_rds = mallocx(R * D * S, sizeof(int));
+    helper->r_cds = mallocx(C * D * S, sizeof(int));
 
     helper->timetable_cdsr = mallocx(C * D * S * R, sizeof(bool));
     helper->sum_cds = mallocx(C * D * S, sizeof(int));
-    
+
     helper->timetable_rdsc = mallocx(R * D * S * C, sizeof(bool));
     helper->sum_rds = mallocx(R * D * S, sizeof(int));
 
     helper->timetable_qdscr = mallocx(Q * D * S * C * R, sizeof(bool));
     helper->sum_qds = mallocx(Q * D * S, sizeof(int));
-    
+
     helper->timetable_tdscr = mallocx(T * D * S * C * R, sizeof(bool));
     helper->sum_tds = mallocx(T * D * S, sizeof(int));
 }
 
 static void solution_helper_destroy(solution_helper *helper) {
     free(helper->c_rds);
+    free(helper->r_cds);
 
     free(helper->timetable_cdsr);
     free(helper->sum_cds);
@@ -59,10 +46,11 @@ static void solution_helper_destroy(solution_helper *helper) {
 }
 
 static void solution_helper_compute(solution_helper *helper, const solution *sol) {
-    CRDSQT
+    CRDSQT(sol->model)
     const model *model = sol->model;
 
     memset(helper->c_rds, -1, R * D * S * sizeof(int));
+    memset(helper->r_cds, -1, C * D * S * sizeof(int));
 
     memset(helper->timetable_cdsr, 0, C * D * S * R * sizeof(bool));
     memset(helper->sum_cds, 0, C * D * S * sizeof(int));
@@ -85,6 +73,20 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                         helper->c_rds[INDEX3(r, R, d, D, s, S)] = c;
                     debug2("helper->c_rds[INDEX3(%d, %d, %d)] = %d",
                            r, d, s, helper->c_rds[INDEX3(r, R, d, D, s, S)]);
+                }
+            }
+        }
+    }
+
+    // r_cds
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    if (sol->timetable[INDEX4(c, C, r, R, d, D, s, S)])
+                        helper->r_cds[INDEX3(c, C, d, D, s, S)] = r;
+                    debug2("helper->r_cds[INDEX3(%d, %d, %d)] = %d",
+                           c, d, s, helper->c_rds[INDEX3(c, C, d, D, s, S)]);
                 }
             }
         }
@@ -137,8 +139,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
         FOR_D {
             FOR_S {
                 FOR_C {
-                    debug2("was %d", helper->sum_rds[INDEX3(r, R, d, D, s, S)]);
-                    helper->sum_rds[INDEX3(r, R, d, D, s, S)] += 
+                    helper->sum_rds[INDEX3(r, R, d, D, s, S)] +=
                             helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)];
                     debug2("summing helper->timetable_rdsc[INDEX4(%s, %d, %d, %s) = %d",
                            model->rooms[r].id, d, s, model->courses[c].id,
@@ -247,7 +248,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
 
 static void solution_helper_copy(solution_helper *helper_dest, solution_helper *helper_src,
                                  const solution *sol) {
-    CRDSQT
+    CRDSQT(sol->model)
 
     memcpy(helper_dest->timetable_cdsr, helper_src->timetable_cdsr,
            C * D * S * R * sizeof(bool));
@@ -271,21 +272,26 @@ static void solution_helper_copy(solution_helper *helper_dest, solution_helper *
 }
 
 void solution_init(solution *sol, const model *model) {
+    CRDSQT(model)
     sol->model = model;
-    CRDSQT
-
-    sol->timetable = callocx(C * R * D *S, sizeof(bool));
-
-    solution_helper_init(&sol->helper, sol);
+    sol->timetable = callocx(C * R * D * S, sizeof(bool));
+    sol->helper = NULL;
 }
 
 void solution_destroy(solution *sol) {
     free(sol->timetable);
-    solution_helper_destroy(&sol->helper);
+    if (sol->helper)
+        solution_helper_destroy(sol->helper);
+    free(sol->helper);
 }
 
-void solution_finalize(solution *sol) {
-    solution_helper_compute(&sol->helper, sol);
+const solution_helper *solution_get_helper(solution *solution) {
+    if (!solution->helper) {
+        solution->helper = mallocx(1, sizeof(solution_helper));
+        solution_helper_init(solution->helper, solution->model);
+        solution_helper_compute(solution->helper, solution);
+    }
+    return solution->helper;
 }
 
 void solution_copy(solution *solution_dest, const solution *solution_src) {
@@ -298,7 +304,7 @@ void solution_copy(solution *solution_dest, const solution *solution_src) {
 }
 
 char * solution_to_string(const solution *sol) {
-    CRDSQT
+    CRDSQT(sol->model)
     
     char *buffer = NULL;
     size_t buflen;
@@ -382,8 +388,7 @@ bool solution_satisfy_hard_constraint_conflicts(const solution *sol) {
 }
 
 static int solution_hard_constraint_lectures_violations_a(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
     int violations = 0;
 
     FOR_C {
@@ -408,8 +413,8 @@ static int solution_hard_constraint_lectures_violations_a(const solution *sol) {
 }
 
 static int solution_hard_constraint_lectures_violations_b(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int violations = 0;
     int *room_usage = callocx(sol->model->n_courses * sol->model->n_days * sol->model->n_slots, sizeof(int));
 //#if 0
@@ -465,8 +470,8 @@ int solution_hard_constraint_lectures_violations(const solution *sol) {
 }
 
 int solution_hard_constraint_room_occupancy_violations(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int violations = 0;
 
     FOR_R {
@@ -490,8 +495,8 @@ int solution_hard_constraint_room_occupancy_violations(const solution *sol) {
 }
 
 static int solution_hard_constraint_conflicts_violations_a(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int violations = 0;
 
     FOR_Q {
@@ -522,8 +527,8 @@ static int solution_hard_constraint_conflicts_violations_a(const solution *sol) 
 }
 
 static int solution_hard_constraint_conflicts_violations_b(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int violations = 0;
 
     FOR_T {
@@ -559,8 +564,8 @@ int solution_hard_constraint_conflicts_violations(const solution *sol) {
 }
 
 int solution_hard_constraint_availabilities_violations(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int violations = 0;
 
     FOR_C {
@@ -594,8 +599,8 @@ int solution_cost(const solution *sol) {
 
 
 int solution_soft_constraint_room_capacity(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int penalties = 0;
 
     FOR_C {
@@ -603,7 +608,7 @@ int solution_soft_constraint_room_capacity(const solution *sol) {
             FOR_D {
                 FOR_S {
                     if (solution_get(sol, c, r, d, s)) {
-                        int delta = sol->model->courses[c].n_students > sol->model->rooms[r].capacity;
+                        int delta = sol->model->courses[c].n_students - sol->model->rooms[r].capacity;
                         if (delta > 0) {
                             debug2("S1 (RoomCapacity) penalty: course '%s' has %d"
                                   " students but it's scheduled in room '%s' with %d "
@@ -623,8 +628,8 @@ int solution_soft_constraint_room_capacity(const solution *sol) {
 }
 
 int solution_soft_constraint_min_working_days(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int penalties = 0;
 
     FOR_C {
@@ -656,8 +661,8 @@ int solution_soft_constraint_min_working_days(const solution *sol) {
 }
 
 int solution_soft_constraint_curriculum_compactness(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int penalties = 0;
 
     bool * slots = mallocx(sol->model->n_slots, sizeof(bool));
@@ -699,8 +704,8 @@ int solution_soft_constraint_curriculum_compactness(const solution *sol) {
 }
 
 int solution_soft_constraint_room_stability(const solution *sol) {
-    CRDSQT
-    
+    CRDSQT(sol->model)
+
     int penalties = 0;
 
     FOR_C {
@@ -721,7 +726,7 @@ int solution_soft_constraint_room_stability(const solution *sol) {
         if (sum_w_cr > 1) {
             debug2("S4 (RoomStability) penalty: course '%s' uses %d rooms",
                   sol->model->courses[c].id, sum_w_cr);
-            penalties++;
+            penalties += sum_w_cr - 1;
         }
     };
 
@@ -841,10 +846,10 @@ bool solution_get_at(const solution *sol, int index) {
 }
 
 bool write_solution(const solution *sol, const char *output_file) {
-    char *sol_str = solution_to_string(sol);
-
     if (!output_file)
         return false;
+
+    char *sol_str = solution_to_string(sol);
 
     bool success = filewrite(output_file, sol_str);
     if (!success)
@@ -854,4 +859,10 @@ bool write_solution(const solution *sol, const char *output_file) {
     free(sol_str);
 
     return success;
+}
+
+void print_solution(const solution *sol) {
+    char *sol_str = solution_to_string(sol);
+    print("%s", sol_str);
+    free(sol_str);
 }

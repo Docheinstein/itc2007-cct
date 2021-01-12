@@ -421,6 +421,16 @@ MUNIT_TEST(test_solution_cost_comp01) {
                          true, true, true, true, 4, 0, 0, 1);
 }
 
+MUNIT_TEST(test_solution_cost_comp01_463) {
+    return test_solution("datasets/comp01.ctt", "tests/solutions/comp01.ctt.sol.463",
+                         true, true, true, true, 424, 0, 0, 39);
+}
+
+MUNIT_TEST(test_solution_cost_comp01_57) {
+    return test_solution("datasets/comp01.ctt", "tests/solutions/comp01.ctt.sol.57",
+                         true, true, true, true, 30, 0, 6, 21);
+}
+
 MUNIT_TEST(test_index_rindex) {
     const int C = rand_int_range(1, 30);
     const int R = rand_int_range(1, 30);
@@ -494,6 +504,8 @@ static MunitTest tests[] = {
     { "test_solution_to_string", test_solution_to_string, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_toy", test_solution_cost_toy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_comp01", test_solution_cost_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_solution_cost_comp01_463", test_solution_cost_comp01_463, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_solution_cost_comp01_57", test_solution_cost_comp01_57, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_index_rindex", test_index_rindex, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     MUNIT_TESTS_END
 };

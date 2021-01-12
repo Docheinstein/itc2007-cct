@@ -146,7 +146,7 @@ double strtodouble(const char *str, bool *ok) {
 
 
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens) {
-    if (max_tokens <= 1)
+    if (max_tokens <= 0)
         return 0;
 
     int i = 0;

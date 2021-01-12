@@ -45,15 +45,8 @@ int course_assignment_compare(const void *_1, const void *_2) {
 bool feasible_solution_finder_find(feasible_solution_finder *finder,
                                    feasible_solution_finder_config *config,
                                    solution *sol) {
-
+    CRDSQT(sol->model)
     feasible_solution_finder_reinit(finder);
-
-    const int C = sol->model->n_courses;
-    const int R = sol->model->n_rooms;
-    const int D = sol->model->n_days;
-    const int S = sol->model->n_slots;
-    const int Q = sol->model->n_curriculas;
-    const int T = sol->model->n_teachers;
 
     const model *m = sol->model;
 

@@ -299,7 +299,6 @@ static bool prologue(
     *col_width = config->width / *cols;
     *row_height = config->height / *rows;
 
-
     *surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
                                          config->width, config->height);
     *cr = cairo_create(*surface);
@@ -701,27 +700,26 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
 
     debug("renderer_render_overview_timetable -> '%s'", path);
 
-    int max_slot_assignments = 0;
+//    int max_slot_assignments = 0;
+//
+//    for (int d = 0; d < model->n_days; d++) {
+//        for (int s = 0; s < model->n_slots; s++) {
+//            int slot_assignments = 0;
+//            for (int c = 0; c < model->n_courses; c++) {
+//                for (int r = 0; r < model->n_rooms; r++) {
+//                    slot_assignments += solution_get(solution, c, r, d, s);
+//                }
+//            }
+//            max_slot_assignments = MAX(max_slot_assignments, slot_assignments);
+//        }
+//    }
+
+//    debug("renderer_render_overview_timetable max_slot_assignments = %d",
+//          max_slot_assignments);
+    double H = ((double) row_height / model->n_rooms);
 
     for (int d = 0; d < model->n_days; d++) {
         for (int s = 0; s < model->n_slots; s++) {
-            int slot_assignments = 0;
-            for (int c = 0; c < model->n_courses; c++) {
-                for (int r = 0; r < model->n_rooms; r++) {
-                    slot_assignments += solution_get(solution, c, r, d, s);
-                }
-            }
-            max_slot_assignments = MAX(max_slot_assignments, slot_assignments);
-        }
-    }
-
-    debug("renderer_render_overview_timetable max_slot_assignments = %d",
-          max_slot_assignments);
-    double H = ((double) row_height / max_slot_assignments);
-
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
-            int slot_index = 0;
             for (int c = 0; c < model->n_courses; c++) {
                 for (int r = 0; r < model->n_rooms; r++) {
                     if(solution->timetable[
@@ -732,14 +730,13 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
                         draw_box_text(
                                 renderer, cr,
                                 (d + 1) * col_width,
-                                (s + 1) * row_height + H * slot_index,
+                                (s + 1) * row_height + H * r,
                                 col_width,
                                 H,
                                 red[c], green[c], blue[c],
                                 config->font_size_small, false, false,
                                 BLACK,
                                 "%s (%s)", model->courses[c].id, model->rooms[r].id);
-                        slot_index++;
                     }
                 }
             }

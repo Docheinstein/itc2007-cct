@@ -5,6 +5,21 @@
 #include <stdbool.h>
 #include <glib.h>
 
+#define CRDSQT(model) \
+    const int C = (model)->n_courses; \
+    const int R = (model)->n_rooms;   \
+    const int D = (model)->n_days;   \
+    const int S = (model)->n_slots;   \
+    const int T = (model)->n_teachers; \
+    const int Q = (model)->n_curriculas;
+
+#define FOR_C for (int c = 0; c < C; c++)
+#define FOR_R for (int r = 0; r < R; r++)
+#define FOR_D for (int d = 0; d < D; d++)
+#define FOR_S for (int s = 0; s < S; s++)
+#define FOR_Q for (int q = 0; q < Q; q++)
+#define FOR_T for (int t = 0; t < T; t++)
+
 // <course> := <CourseID> <Teacher> <# Lectures> <MinWorkingDays> <# Students>
 // e.g.     :=   c0001       t000         6            4               130
 typedef struct course {
