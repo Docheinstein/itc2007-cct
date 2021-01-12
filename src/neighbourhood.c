@@ -99,11 +99,19 @@ void neighbourhood_swap_assignment(solution *sol) {
 }
 #endif
 
+
+#define CRDSQT \
+    const int C = model->n_courses; \
+    const int R = model->n_rooms;   \
+    const int D = model->n_days;   \
+    const int S = model->n_slots;   \
+    const int T = model->n_teachers; \
+    const int Q = model->n_curriculas; \
+
 void neighbourhood_iter_init(neighbourhood_iter *iter, const solution *sol) {
-    const int C = sol->model->n_courses;
-    const int R = sol->model->n_rooms;
-    const int D = sol->model->n_days;
-    const int S = sol->model->n_slots;
+    const model *model = sol->model;
+    CRDSQT
+
     size_t ttsize = C * R * D * S;
 
     iter->solution = sol;
@@ -136,10 +144,8 @@ bool neighbourhood_iter_next(neighbourhood_iter *iter, int *c1,
     if (iter->assignment_index < 0)
         return false;
 
-    const int C = iter->solution->model->n_courses;
-    const int R = iter->solution->model->n_rooms;
-    const int D = iter->solution->model->n_days;
-    const int S = iter->solution->model->n_slots;
+    const model *model = iter->solution->model;
+    CRDSQT
 
     *c1 = RINDEX4_0(iter->assignments[iter->assignment_index], C, R, D, S);
     *r1 = RINDEX4_1(iter->assignments[iter->assignment_index], C, R, D, S);
@@ -155,6 +161,107 @@ bool neighbourhood_iter_next(neighbourhood_iter *iter, int *c1,
     return iter->assignment_index < iter->n_assignments;
 }
 
+//static bool fastcheck_hard_constraints_partial(const solution *sol,
+//                                               int c1, int r2, int d2, int s2) {
+//
+//}
+
+static bool fastcheck_hard_constraints(const solution *sol,
+                                       int c1, int r1, int d1, int s1,
+                                       int c2, int r2, int d2, int s2) {
+//    return
+//        fastcheck_hard_constraints_partial(sol, c1, r2, d2, s2) &&
+//        fastcheck_hard_constraints_partial(sol, c2, r1, d2, s1);
+    const bool same_period = d1 == d2 && s1 == s2;
+
+    if (c2 >= 0) {
+        debug2("Non empty slot (c=%d, r=%d, d=%d, s=%d) NOT IMPL", c2, r2, d2, s2);
+        return false; // non empty second slot, not implemented yet
+    }
+
+    const model *model = sol->model;
+    CRDSQT
+
+    // H1b
+    debug2("Check H1b (c=%d, d=%d, s=%d)", c1, d2, s2);
+    if (sol->helper.sum_cds[INDEX3(c1, C, d2, D, s2, S)] && !same_period)
+        return false;
+
+    // H2
+    debug2("Check H2 (r=%d, d=%d, s=%d)", r2, d2, s2);
+    if (sol->helper.sum_rds[INDEX3(r2, R, d2, D, s2, S)] && !same_period)
+        return false;
+
+    // H3a
+    int c_n_curriculas;
+    int * c_curriculas = model_curriculas_of_course(model, c1, &c_n_curriculas);
+    for (int cq = 0; cq < c_n_curriculas; cq++) {
+        const int q = c_curriculas[cq];
+        debug2("Check H3a (q=%d, d=%d, s=%d)", q, d2, s2);
+        if (sol->helper.sum_qds[INDEX3(q, Q, d2, D, s2, S)] && !same_period)
+            return false;
+    }
+
+    // H3b
+    const int t = model_teacher_by_id(model, model->courses[c1].teacher_id)->index;
+    debug2("Check H3b (t=%d, d=%d, s=%d)", t, d2, s2);
+    if (sol->helper.sum_tds[INDEX3(t, T, d2, D, s2, S)] && !same_period)
+        return false;
+
+    // H4
+    debug2("Check H4 (c=%d, d=%d, s=%d)", c1, d2, s2);
+    if (!model_course_is_available_on_period(model, c1, d2, s2))
+        return false;
+
+    return true;
+}
+
+bool neighbourhood_swap_assignment(const solution *sol_in, solution *sol_out, int c1,
+                                   int r1, int d1, int s1,
+                                   int r2, int d2, int s2) {
+    const model *model = sol_in->model;
+    CRDSQT
+
+#if DEBUG
+    if (!solution_get(sol_in, c1, r1, d1, s1)) {
+        eprint("Expected true in timetable");
+        exit(0);
+    }
+#endif
+
+    // Check if there is already a course in the picked (room,day,slot)
+    int c_star = -1;
+    for (int c = 0; c < C; c++) {
+        if (solution_get(sol_in, c, r2, d2, s2)) {
+            c_star = c;
+            break;
+        }
+    }
+
+    if (!fastcheck_hard_constraints(sol_in, c1, r1, d1, s1, c_star, r2, d2, s2))
+        return false;
+
+    // Satisfy hard constraints, do swaps
+    solution_copy(sol_out, sol_in);
+
+    // Swap assignments
+    solution_set(sol_out, c1, r1, d1, s1, false);
+    solution_set(sol_out, c1, r2, d2, s2, true);
+
+    if (c_star >= 0) {
+        debug2("Found course %s scheduled in slot (%s, %d, %d)",
+                sol_in->model->courses[c_star].id,
+                sol_in->model->rooms[r2].id, d2, s2);
+        solution_set(sol_out, c_star, r2, d2, s2, false);
+        solution_set(sol_out, c_star, r1, d1, s1, true);
+    } else {
+        debug2("No course found in slot (%s, %d, %d)",
+              sol_in->model->rooms[r2].id, d2, s2);
+    }
+
+    return true;
+}
+/*
 void neighbourhood_swap_assignment(const solution *sol_in, solution *sol_out, int c1,
                                    int r1, int d1, int s1,
                                    int r2, int d2, int s2) {
@@ -165,10 +272,6 @@ void neighbourhood_swap_assignment(const solution *sol_in, solution *sol_out, in
         exit(0);
     }
 #endif
-
-    if (solution_get(sol_in, c1, r2, d2, s2))
-        return; // avoid to swap two lectures of the same course
-
 
     int c_star = -1;
     // Check if there is already a course in the picked (room,day,slot)
@@ -196,3 +299,4 @@ void neighbourhood_swap_assignment(const solution *sol_in, solution *sol_out, in
               sol_in->model->rooms[r2].id, d2, s2);
     }
 }
+*/

@@ -24,6 +24,7 @@ void model_init(model *model) {
     model->teachers = NULL;
     model->course_belongs_to_curricula = NULL;
     model->curriculas_of_course = NULL;
+    model->courses_of_curricula = NULL;
     model->courses_of_teacher = NULL;
     model->course_taught_by_teacher = NULL;
     model->course_availabilities = NULL;
@@ -81,6 +82,10 @@ void model_destroy(const model *model) {
     for (int t = 0; t < model->n_teachers; t++)
         g_array_free(model->courses_of_teacher[t], true);
     free(model->courses_of_teacher);
+
+    for (int q = 0; q < model->n_curriculas; q++)
+        free(model->courses_of_curricula[q]);
+    free(model->courses_of_curricula);
 
     free(model->course_belongs_to_curricula);
     free(model->course_taught_by_teacher);
@@ -278,8 +283,17 @@ void model_finalize(model *model) {
         for (int c = 0; c < C; c++) {
             const course *course = &model->courses[c];
             if (streq(teacher->id, course->teacher_id)) {
-                g_array_append_val(model->courses_of_teacher[t], course->id);
+                g_array_append_val(model->courses_of_teacher[t], c);
             }
+        }
+    }
+
+    model->courses_of_curricula = mallocx(model->n_curriculas, sizeof(int *));
+    for (int q = 0; q < Q; q++) {
+        const curricula *curricula = &model->curriculas[q];
+        model->courses_of_curricula[q] = mallocx(curricula->n_courses, sizeof(int));
+        for (int qc = 0; qc < curricula->n_courses; qc++) {
+            model->courses_of_curricula[q][qc] = model_course_by_id(model, curricula->courses_ids[qc])->index;
         }
     }
 }
@@ -342,6 +356,12 @@ int *model_curriculas_of_course(const model *model, int course_idx, int *n_curri
     if (n_curriculas)
         *n_curriculas = model->curriculas_of_course[course_idx]->len;
     return (int *) model->curriculas_of_course[course_idx]->data;
+}
+
+int *model_courses_of_curricula(const model *model, int curricula_idx, int *n_courses) {
+    if (n_courses)
+        *n_courses = model->curriculas[curricula_idx].n_courses;
+    return model->courses_of_curricula[curricula_idx];
 }
 
 int *model_courses_of_teacher(const model *model, int teacher_idx, int *n_courses) {

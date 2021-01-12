@@ -8,33 +8,278 @@
 #include "log/verbose.h"
 #include "utils/def_utils.h"
 
-#define FOR_C for (int c = 0; c < sol->model->n_courses; c++)
-#define FOR_R for (int r = 0; r < sol->model->n_rooms; r++)
-#define FOR_D for (int d = 0; d < sol->model->n_days; d++)
-#define FOR_S for (int s = 0; s < sol->model->n_slots; s++)
-#define FOR_Q for (int q = 0; q < sol->model->n_curriculas; q++)
-#define FOR_T for (int t = 0; t < sol->model->n_teachers; t++)
+#define CRDSQT \
+    const int C = sol->model->n_courses; \
+    const int R = sol->model->n_rooms;   \
+    const int D = sol->model->n_days;   \
+    const int S = sol->model->n_slots;   \
+    const int T = sol->model->n_teachers; \
+    const int Q = sol->model->n_curriculas; \
+
+#define FOR_C for (int c = 0; c < C; c++)
+#define FOR_R for (int r = 0; r < R; r++)
+#define FOR_D for (int d = 0; d < D; d++)
+#define FOR_S for (int s = 0; s < S; s++)
+#define FOR_Q for (int q = 0; q < Q; q++)
+#define FOR_T for (int t = 0; t < T; t++)
+
+
+static void solution_helper_init(solution_helper *helper, const solution *sol) {
+    CRDSQT
+
+    helper->timetable_cdsr = mallocx(C * D * S * R, sizeof(bool));
+    helper->sum_cds = mallocx(C * D * S, sizeof(int));
+    
+    helper->timetable_rdsc = mallocx(R * D * S * C, sizeof(bool));
+    helper->sum_rds = mallocx(R * D * S, sizeof(int));
+
+    helper->timetable_qdscr = mallocx(Q * D * S * C * R, sizeof(bool));
+    helper->sum_qds = mallocx(Q * D * S, sizeof(int));
+    
+    helper->timetable_tdscr = mallocx(T * D * S * C * R, sizeof(bool));
+    helper->sum_tds = mallocx(T * D * S, sizeof(int));
+}
+
+static void solution_helper_destroy(solution_helper *helper) {
+    free(helper->timetable_cdsr);
+    free(helper->sum_cds);
+
+    free(helper->timetable_rdsc);
+    free(helper->sum_rds);
+
+    free(helper->timetable_qdscr);
+    free(helper->sum_qds);
+    
+    free(helper->timetable_tdscr);
+    free(helper->sum_tds);
+}
+
+static void solution_helper_compute(solution_helper *helper, const solution *sol) {
+    CRDSQT
+    const model *model = sol->model;
+
+    memset(helper->timetable_cdsr, 0, C * D * S * R * sizeof(bool));
+    memset(helper->sum_cds, 0, C * D * S * sizeof(int));
+
+    memset(helper->timetable_rdsc, 0, R * D * S * C * sizeof(bool));
+    memset(helper->sum_rds, 0, R * D * S * sizeof(int));
+
+    memset(helper->timetable_qdscr, 0, Q * D * S * C * R * sizeof(bool));
+    memset(helper->sum_qds, 0, Q * D * S * sizeof(int));
+
+    memset(helper->timetable_tdscr, 0, T * D * S * C * R * sizeof(bool));
+    memset(helper->sum_tds, 0, T * D * S * sizeof(int));
+
+    // timetable_cdsr
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)] =
+                            sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
+                    debug2("helper->timetable_cdsr[INDEX4(%d, %d, %d, %d)] = %d",
+                           c, d, s, r, helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)]);
+                }
+            }
+        }
+    }
+
+    // sum_cds
+    FOR_C {
+        FOR_D {
+            FOR_S {
+                FOR_R {
+                    helper->sum_cds[INDEX3(c, C, d, D, s, S)] += 
+                            helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)];
+                }
+                debug2("helper->sum_cds[INDEX3(%d, %d, %d)] = %d",
+                       c, d, s, helper->sum_cds[INDEX3(c, C, d, D, s, S)]);
+            }
+        }
+    };
+    
+    // timetable_rdsc
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)] =
+                            sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
+                    debug2("helper->timetable_rdsc[INDEX4(%d, %d, %d, %d)] = %d",
+                           r, d, s, c, helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)]);
+                }
+            }
+        }
+    }    
+    
+    // sum_rds
+    FOR_R {
+        FOR_D {
+            FOR_S {
+                FOR_C {
+                    debug2("was %d", helper->sum_rds[INDEX3(r, R, d, D, s, S)]);
+                    helper->sum_rds[INDEX3(r, R, d, D, s, S)] += 
+                            helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)];
+                    debug2("summing helper->timetable_rdsc[INDEX4(%s, %d, %d, %s) = %d",
+                           model->rooms[r].id, d, s, model->courses[c].id,
+                           helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)]);
+                }
+                debug2("helper->sum_rds[INDEX3(%d, %d, %d)] = %d",
+                       r, d, s, helper->sum_rds[INDEX3(r, R, d, D, s, S)]);
+            }
+        }
+    }
+
+    // timetable_qdscr
+    FOR_Q {
+        int q_n_courses;
+        int * q_courses = model_courses_of_curricula(model, q, &q_n_courses);
+
+        FOR_D {
+            FOR_S {
+                for (int qc = 0; qc < q_n_courses; qc++) {
+                    int c = q_courses[qc];
+                    FOR_R {
+                        helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)] =
+                                sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
+                        debug2("helper->timetable_qdscr[INDEX5(%s, %d, %d, %s, %s) = %d] = %d",
+                           model->curriculas[q].id, d, s, model->courses[c].id, model->rooms[r].id,
+                           INDEX5(q, Q, d, D, s, S, c, C, r, R),
+                           helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)]);
+                    }
+                }
+            }
+        }
+    }
+    // timetable_qdscr DUMP DEBUG
+    FOR_Q {
+        int q_n_courses;
+        int * q_courses = model_courses_of_curricula(model, q, &q_n_courses);
+
+        FOR_D {
+            FOR_S {
+                for (int qc = 0; qc < q_n_courses; qc++) {
+                    int c = q_courses[qc];
+                    FOR_R {
+                        debug2("DUMP timetable_qdscr[INDEX5(%s, %d, %d, %s, %s)] = %d",
+                           model->curriculas[q].id, d, s, model->courses[c].id, model->rooms[r].id,
+                           helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)]);
+                    }
+                }
+            }
+        }
+    }
+
+    // sum_qds
+    FOR_Q {
+        int q_n_courses;
+        int * q_courses = model_courses_of_curricula(model, q, &q_n_courses);
+
+        FOR_D {
+            FOR_S {
+                for (int qc = 0; qc < q_n_courses; qc++) {
+                    int c = q_courses[qc];
+                    FOR_R {
+                        debug2("summing timetable_qdscr[INDEX5(%s, %d, %d, %s, %s)] = %d",
+                           model->curriculas[q].id, d, s, model->courses[c].id, model->rooms[r].id,
+                           helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)]);
+                        helper->sum_qds[INDEX3(q, Q, d, D, s, S)] +=
+                            helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)];
+                    }
+                }
+                debug2("helper->sum_qds[INDEX3(%s, %d, %d)] = %d",
+                           model->curriculas[q].id, d, s, helper->sum_qds[INDEX3(q, Q, d, D, s, S)]);
+            }
+        }
+    }
+    
+    // timetable_tdscr
+    FOR_C {
+        const int t = model_teacher_by_id(model, model->courses[c].teacher_id)->index;
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    helper->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)] =
+                            sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
+                    debug2("helper->timetable_tdscr[INDEX5(%s, %d, %d, %s, %d)] = %d",
+                            model->teachers[t].id, d, s, model->courses[c].id, r, helper->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)]);
+                }
+            }
+        }
+    }
+
+    // sum_tds
+    FOR_C {
+        const int t = model_teacher_by_id(model, model->courses[c].teacher_id)->index;
+        FOR_D {
+            FOR_S {
+                FOR_R {
+                    helper->sum_tds[INDEX3(t, T, d, D, s, S)] +=
+                        helper->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)];
+                }
+                debug2("helper->sum_tds[INDEX3(%s, %d, %d)] = %d",
+                       model->teachers[t].id, d, s, helper->sum_tds[INDEX3(t, T, d, D, s, S)]);
+            }
+        }
+    };
+    
+}
+
+static void solution_helper_copy(solution_helper *helper_dest, solution_helper *helper_src,
+                                 const solution *sol) {
+    CRDSQT
+
+    memcpy(helper_dest->timetable_cdsr, helper_src->timetable_cdsr,
+           C * D * S * R * sizeof(bool));
+    memcpy(helper_dest->timetable_rdsc, helper_src->timetable_rdsc,
+           R * D * S * C * sizeof(bool));
+    memcpy(helper_dest->timetable_qdscr, helper_src->timetable_qdscr,
+           Q * D * S * R * C * sizeof(bool));
+    memcpy(helper_dest->timetable_tdscr, helper_src->timetable_tdscr,
+           T * D * S * R * C * sizeof(bool));
+
+
+    memcpy(helper_dest->sum_cds, helper_src->timetable_cdsr,
+           C * D * S * sizeof(bool));
+    memcpy(helper_dest->sum_rds, helper_src->timetable_rdsc,
+           R * D * S * sizeof(bool));
+    memcpy(helper_dest->sum_qds, helper_src->timetable_qdscr,
+           Q * D * S * sizeof(bool));
+    memcpy(helper_dest->sum_tds, helper_src->timetable_tdscr,
+           T * D * S * sizeof(bool));
+
+}
 
 void solution_init(solution *sol, const model *model) {
-    sol->timetable = callocx(
-            model->n_courses * model->n_rooms * model->n_days * model->n_slots,
-            sizeof(bool));
     sol->model = model;
+    CRDSQT
+
+    sol->timetable = callocx(C * R * D *S, sizeof(bool));
+
+    solution_helper_init(&sol->helper, sol);
 }
 
 void solution_destroy(solution *sol) {
     free(sol->timetable);
+    solution_helper_destroy(&sol->helper);
 }
 
+void solution_finalize(solution *sol) {
+    solution_helper_compute(&sol->helper, sol);
+}
 
 void solution_copy(solution *solution_dest, const solution *solution_src) {
     memcpy(solution_dest->timetable, solution_src->timetable,
            solution_dest->model->n_courses * solution_dest->model->n_rooms *
            solution_dest->model->n_days * solution_dest->model->n_slots * sizeof(bool));
     solution_dest->model = solution_src->model; // should already be the same
+
+//    solution_helper_copy(&solution_dest->helper, &solution_src->helper);
 }
 
 char * solution_to_string(const solution *sol) {
+    CRDSQT
+    
     char *buffer = NULL;
     size_t buflen;
 
@@ -116,8 +361,9 @@ bool solution_satisfy_hard_constraint_conflicts(const solution *sol) {
     return solution_hard_constraint_conflicts_violations(sol) == 0;
 }
 
-
-int solution_hard_constraint_lectures_violations(const solution *sol) {
+static int solution_hard_constraint_lectures_violations_a(const solution *sol) {
+    CRDSQT
+    
     int violations = 0;
 
     FOR_C {
@@ -138,27 +384,69 @@ int solution_hard_constraint_lectures_violations(const solution *sol) {
         }
     }
 
+    return violations;
+}
+
+static int solution_hard_constraint_lectures_violations_b(const solution *sol) {
+    CRDSQT
+    
+    int violations = 0;
+    int *room_usage = callocx(sol->model->n_courses * sol->model->n_days * sol->model->n_slots, sizeof(int));
+//#if 0
+//    FOR_C {
+//        FOR_D {
+//            FOR_S {
+//                int n = 0;
+//                FOR_R {
+//                    n += solution_get(sol, c, r, d, s);
+//                }
+//                if (!(n <= 1)) {
+//                    debug2("H1 (Lectures) violation: %d rooms used for course '%s' "
+//                          "on (day=%d, slot=%d)",
+//                          n, sol->model->courses[c].id, d, s);
+//                    violations++;
+//                }
+//            }
+//        }
+//    }
+//#endif
     FOR_C {
-        FOR_D {
-            FOR_S {
-                int n = 0;
-                FOR_R {
-                    n += solution_get(sol, c, r, d, s);
-                }
-                if (!(n <= 1)) {
-                    debug2("H1 (Lectures) violation: %d rooms used for course '%s' "
-                          "on (day=%d, slot=%d)",
-                          n, sol->model->courses[c].id, d, s);
-                    violations++;
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    room_usage[INDEX3(c, C, d, D, s, S)] += solution_get(sol, c, r, d, s);
                 }
             }
         }
     }
 
+    FOR_C {
+         FOR_D {
+             FOR_S {
+                 int n = room_usage[INDEX3(c, C, d, D, s, S)];
+                 if (!(n <= 1)) {
+                    debug2("H1 (Lectures) violation: %d rooms used for course '%s' "
+                          "on (day=%d, slot=%d)",
+                          n, sol->model->courses[c].id, d, s);
+                    violations++;
+                }
+             }
+         }
+    };
+    free(room_usage);
+
     return violations;
 }
 
+int solution_hard_constraint_lectures_violations(const solution *sol) {
+    return
+        solution_hard_constraint_lectures_violations_a(sol) +
+        solution_hard_constraint_lectures_violations_b(sol);
+}
+
 int solution_hard_constraint_room_occupancy_violations(const solution *sol) {
+    CRDSQT
+    
     int violations = 0;
 
     FOR_R {
@@ -181,19 +469,24 @@ int solution_hard_constraint_room_occupancy_violations(const solution *sol) {
     return violations;
 }
 
-int solution_hard_constraint_conflicts_violations(const solution *sol) {
+static int solution_hard_constraint_conflicts_violations_a(const solution *sol) {
+    CRDSQT
+    
     int violations = 0;
 
     FOR_Q {
+        int q_n_courses;
+        int * q_courses = model_courses_of_curricula(sol->model, q, &q_n_courses);
+
         FOR_D {
             FOR_S {
                 int n = 0;
-                FOR_C {
-                    FOR_R {
-                        if (model_course_belongs_to_curricula(sol->model, c, q))
-                            n += solution_get(sol, c, r, d, s);
+
+                for (int qc = 0; qc < q_n_courses; qc++) {
+                    for (int r = 0; r < sol->model->n_rooms; r++) {
+                        n += solution_get(sol, q_courses[qc], r, d, s);
                     }
-                };
+                }
 
                 if (!(n <= 1)) {
                     debug2("H3 (Conflicts) violation: %d courses of curriculum '%s' "
@@ -205,16 +498,26 @@ int solution_hard_constraint_conflicts_violations(const solution *sol) {
         }
     }
 
+    return violations;
+}
+
+static int solution_hard_constraint_conflicts_violations_b(const solution *sol) {
+    CRDSQT
+    
+    int violations = 0;
+
     FOR_T {
+        int t_n_courses;
+        int * t_courses = model_courses_of_teacher(sol->model, t, &t_n_courses);
+
         FOR_D {
             FOR_S {
                 int n = 0;
-                FOR_C {
+                for (int tc = 0; tc < t_n_courses; tc++) {
                     FOR_R {
-                        if (model_course_is_taught_by_teacher(sol->model, c, t))
-                            n += solution_get(sol, c, r, d, s);
+                        n += solution_get(sol, t_courses[tc], r, d, s);
                     }
-                };
+                }
 
                 if (!(n <= 1)) {
                     debug2("H3 (Conflicts) violation: %d courses taught by "
@@ -226,12 +529,18 @@ int solution_hard_constraint_conflicts_violations(const solution *sol) {
         }
     }
 
-
-
     return violations;
 }
 
+int solution_hard_constraint_conflicts_violations(const solution *sol) {
+    return
+        solution_hard_constraint_conflicts_violations_a(sol) +
+        solution_hard_constraint_conflicts_violations_b(sol);
+}
+
 int solution_hard_constraint_availabilities_violations(const solution *sol) {
+    CRDSQT
+    
     int violations = 0;
 
     FOR_C {
@@ -265,6 +574,8 @@ int solution_cost(const solution *sol) {
 
 
 int solution_soft_constraint_room_capacity(const solution *sol) {
+    CRDSQT
+    
     int penalties = 0;
 
     FOR_C {
@@ -292,6 +603,8 @@ int solution_soft_constraint_room_capacity(const solution *sol) {
 }
 
 int solution_soft_constraint_min_working_days(const solution *sol) {
+    CRDSQT
+    
     int penalties = 0;
 
     FOR_C {
@@ -323,21 +636,23 @@ int solution_soft_constraint_min_working_days(const solution *sol) {
 }
 
 int solution_soft_constraint_curriculum_compactness(const solution *sol) {
+    CRDSQT
+    
     int penalties = 0;
 
     bool * slots = mallocx(sol->model->n_slots, sizeof(bool));
 
     FOR_Q {
+        int q_n_courses;
+        int * q_courses = model_courses_of_curricula(sol->model, q, &q_n_courses);
+
         FOR_D {
             FOR_S {
-
                 int z_qds = 0;
 
-                FOR_C {
-                    FOR_R {
-                        z_qds = z_qds ||
-                                (solution_get(sol, c, r, d, s) *
-                                 model_course_belongs_to_curricula(sol->model, c, q));
+                for (int qc = 0; qc < q_n_courses && !z_qds; qc++) {
+                    for (int r = 0; r < sol->model->n_rooms && !z_qds; r++) {
+                        z_qds = solution_get(sol, q_courses[qc], r, d, s);
                     }
                 }
 
@@ -364,6 +679,8 @@ int solution_soft_constraint_curriculum_compactness(const solution *sol) {
 }
 
 int solution_soft_constraint_room_stability(const solution *sol) {
+    CRDSQT
+    
     int penalties = 0;
 
     FOR_C {
@@ -502,4 +819,3 @@ void solution_set_at(solution *sol, int index, bool value) {
 bool solution_get_at(const solution *sol, int index) {
     return sol->timetable[index];
 }
-

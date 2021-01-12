@@ -66,6 +66,7 @@ typedef struct model {
 
     GArray **curriculas_of_course;
     GArray **courses_of_teacher;
+    int **courses_of_curricula;
 
     bool *course_belongs_to_curricula;     // b_cq
     bool *course_taught_by_teacher;        // e_ct
@@ -100,6 +101,7 @@ bool model_course_belongs_to_curricula(const model *model, int course_idx, int c
 bool model_course_is_taught_by_teacher(const model *model, int course_idx, int teacher_idx);
 bool model_course_is_available_on_period(const model *model, int course_idx, int day, int slot);
 int *model_curriculas_of_course(const model *model, int course_idx, int *n_curriculas);
+int *model_courses_of_curricula(const model *model, int curricula_dx, int *n_courses);
 int *model_courses_of_teacher(const model *model, int teacher_id, int *n_courses);
 
 #endif // MODEL_H

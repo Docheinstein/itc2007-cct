@@ -12,6 +12,9 @@
 #define INDEX4(i4, n4, i3, n3, i2, n2, i1, n1) \
     ((i4) * (n3) * (n2) * (n1) + (i3) * (n2) * (n1) + (i2) * (n1) + (i1))
 
+#define INDEX5(i5, n5, i4, n4, i3, n3, i2, n2, i1, n1) \
+    ((i5) * (n4) * (n3) * (n2) * (n1) + (i4) * (n3) * (n2) * (n1) + (i3) * (n2) * (n1) + (i2) * (n1) + (i1))
+
 #define RINDEX1_0(i, n1) ((i))
 
 #define RINDEX2_0(i, n2, n1) \

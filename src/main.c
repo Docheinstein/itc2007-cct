@@ -90,24 +90,6 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "neighbourhood.h"
 #include "local_search_solver.h"
 
-static void render_solution(const model *model, const solution *sol,
-                            const args *args) {
-    renderer renderer;
-    renderer_init(&renderer);
-
-    renderer_config config;
-    renderer_config_init(&config);
-    config.output_dir = args->draw_directory;
-    config.output_file = args->draw_overview_file;
-
-    if (!renderer_render(&renderer, &config, model, sol)) {
-        eprint("WARN: failed to render solution (%s)", renderer_get_error(&renderer));
-    }
-
-    renderer_config_destroy(&config);
-    renderer_destroy(&renderer);
-}
-
 int main (int argc, char **argv) {
     args args;
     args_init(&args);
@@ -323,7 +305,7 @@ int main (int argc, char **argv) {
         free(sol_str);
 
         if (args.draw_overview_file || args.draw_directory)
-            render_solution(&model, &sol, &args);
+            render_solution(&sol, args.draw_overview_file, args.draw_directory);
     }
 
     solution_destroy(&sol);

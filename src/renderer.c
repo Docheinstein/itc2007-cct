@@ -1,4 +1,5 @@
 #include <utils/random_utils.h>
+#include <utils/io_utils.h>
 #include "renderer.h"
 #include "cairo.h"
 #include "utils/str_utils.h"
@@ -15,6 +16,31 @@
 
 #define DARK_THRESHOLD 0.3
 #define LIGHT_THRESHOLD 0.95
+
+
+bool render_solution(const solution *sol, char *overview_file, char *output_dir) {
+    renderer renderer;
+    renderer_init(&renderer);
+
+    renderer_config config;
+    renderer_config_init(&config);
+    config.output_dir = output_dir;
+    config.output_file = overview_file;
+
+    bool success = renderer_render(&renderer, &config, sol);
+    if (!success)
+        eprint("WARN: failed to render solution (%s)", renderer_get_error(&renderer));
+
+    renderer_config_destroy(&config);
+    renderer_destroy(&renderer);
+
+    return success;
+}
+
+
+bool render_solution_overview(const solution *sol, char *overview_file) {
+    return render_solution(sol, overview_file, NULL);
+}
 
 void renderer_config_init(renderer_config *config) {
     config->output_dir = NULL;
@@ -224,12 +250,14 @@ static void draw_grid(renderer *renderer, cairo_t *cr,
 
 static bool prologue(
     renderer *renderer, const renderer_config *config,
-    const model *model, const solution *solution,
+    const solution *solution,
     const char *folder, const char *drawing_name,
     cairo_t **cr, cairo_surface_t **surface,
     char **path,
     int *cols, int *rows, int *col_width, int *row_height,
     int n_colors, double **r, double **g, double **b) {
+
+    const model *model = solution->model;
 
     if (strempty(config->output_dir) && strempty(config->output_file)) {
         renderer->error = strmake("output directory or output file must be specified");
@@ -286,7 +314,7 @@ static bool prologue(
 
 static bool epilogue(
         renderer *renderer, const renderer_config *config,
-        const model *model, const solution *solution,
+        const solution *solution,
         cairo_t *cr, cairo_surface_t *surface,
         const char *path,
         int cols, int rows, int col_width, int row_height,
@@ -313,15 +341,15 @@ static bool epilogue(
 }
 
 bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_config *config,
-                                          const model *model, const solution *solution,
-                                          const curricula *q) {
+                                          const solution *solution, const curricula *q) {
     cairo_t *cr;
     cairo_surface_t *surface;
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
+    const model *model = solution->model;
 
-    if (!prologue(renderer, config, model, solution,
+    if (!prologue(renderer, config, solution,
                   "curriculums", q->id,
                   &cr, &surface,
                   &path,
@@ -394,7 +422,7 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
         }
     }
 
-    return epilogue(renderer, config, model, solution,
+    return epilogue(renderer, config, solution,
                     cr, surface,
                     path,
                     cols, rows, col_width, row_height,
@@ -403,15 +431,15 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
 
 
 bool renderer_render_course_timetable(renderer *renderer, const renderer_config *config,
-                                      const model *model, const solution *solution,
-                                      const course *course) {
+                                      const solution *solution, const course *course) {
     cairo_t *cr;
     cairo_surface_t *surface;
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
+    const model *model = solution->model;
 
-    if (!prologue(renderer, config, model, solution,
+    if (!prologue(renderer, config, solution,
                   "courses", course->id,
                   &cr, &surface,
                   &path,
@@ -476,7 +504,7 @@ bool renderer_render_course_timetable(renderer *renderer, const renderer_config 
         }
     }
 
-    return epilogue(renderer, config, model, solution,
+    return epilogue(renderer, config, solution,
                     cr, surface,
                     path,
                     cols, rows, col_width, row_height,
@@ -484,15 +512,15 @@ bool renderer_render_course_timetable(renderer *renderer, const renderer_config 
 }
 
 bool renderer_render_room_timetable(renderer *renderer, const renderer_config *config,
-                                    const model *model, const solution *solution,
-                                    const room *room) {
+                                    const solution *solution, const room *room) {
     cairo_t *cr;
     cairo_surface_t *surface;
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
+    const model *model = solution->model;
 
-    if (!prologue(renderer, config, model, solution,
+    if (!prologue(renderer, config, solution,
                   "rooms", room->id,
                   &cr, &surface,
                   &path,
@@ -557,7 +585,7 @@ bool renderer_render_room_timetable(renderer *renderer, const renderer_config *c
         }
     }
 
-    return epilogue(renderer, config, model, solution,
+    return epilogue(renderer, config, solution,
                     cr, surface,
                     path,
                     cols, rows, col_width, row_height,
@@ -565,15 +593,15 @@ bool renderer_render_room_timetable(renderer *renderer, const renderer_config *c
 }
 
 bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config *config,
-                                       const model *model, const solution *solution,
-                                       const teacher *teacher) {
+                                       const solution *solution, const teacher *teacher) {
     cairo_t *cr;
     cairo_surface_t *surface;
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
+    const model *model = solution->model;
 
-    if (!prologue(renderer, config, model, solution,
+    if (!prologue(renderer, config, solution,
                   "teachers", teacher->id,
                   &cr, &surface,
                   &path,
@@ -646,7 +674,7 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
         }
     }
 
-    return epilogue(renderer, config, model, solution,
+    return epilogue(renderer, config, solution,
                     cr, surface,
                     path,
                     cols, rows, col_width, row_height,
@@ -655,14 +683,15 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
 
 
 bool renderer_render_overview_timetable(renderer *renderer, const renderer_config *config,
-                                        const model *model, const solution *solution) {
+                                        const solution *solution) {
     cairo_t *cr;
     cairo_surface_t *surface;
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
+    const model *model = solution->model;
 
-    if (!prologue(renderer, config, model, solution,
+    if (!prologue(renderer, config, solution,
                   NULL, "overview",
                   &cr, &surface,
                   &path,
@@ -717,7 +746,7 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
         }
     }
 
-    return epilogue(renderer, config, model, solution,
+    return epilogue(renderer, config, solution,
                     cr, surface,
                     path,
                     cols, rows, col_width, row_height,
@@ -726,7 +755,9 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
 
 
 bool renderer_render(renderer *renderer, const renderer_config *config,
-                     const model *model, const solution *solution) {
+                     const solution *solution) {
+    const model *model = solution->model;
+
     renderer_reinit(renderer);
 
     if (strempty(config->output_dir) && strempty(config->output_file)) {
@@ -742,32 +773,32 @@ bool renderer_render(renderer *renderer, const renderer_config *config,
     if (!strempty(config->output_dir)) {
         for (int q = 0; q < model->n_curriculas; q++) {
             verbose("Rendering timetable of curriculum '%s'", model->curriculas[q].id);
-            if (!renderer_render_curriculum_timetable(renderer, config, model,
+            if (!renderer_render_curriculum_timetable(renderer, config,
                                                       solution, &model->curriculas[q]))
                 return false;
         }
         for (int c = 0; c < model->n_courses; c++) {
             verbose("Rendering timetable of course '%s'", model->courses[c].id);
-            if (!renderer_render_course_timetable(renderer, config, model,
+            if (!renderer_render_course_timetable(renderer, config,
                                                   solution, &model->courses[c]))
                 return false;
         }
         for (int r = 0; r < model->n_rooms; r++) {
             verbose("Rendering timetable of room '%s'", model->rooms[r].id);
-            if (!renderer_render_room_timetable(renderer, config, model,
+            if (!renderer_render_room_timetable(renderer, config,
                                                 solution, &model->rooms[r]))
                 return false;
         }
         for (int t = 0; t < model->n_teachers; t++) {
             verbose("Rendering timetable of teacher '%s'", model->teachers[t].id);
-            if (!renderer_render_teacher_timetable(renderer, config, model,
+            if (!renderer_render_teacher_timetable(renderer, config,
                                                    solution, &model->teachers[t]))
                 return false;
         }
     }
 
     verbose("Rendering overview timetable");
-    renderer_render_overview_timetable(renderer, config, model, solution);
+    renderer_render_overview_timetable(renderer, config, solution);
 
     return strempty(renderer->error);
 }

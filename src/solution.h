@@ -46,9 +46,25 @@ room used for the lectures of a course_id, but the first, counts as 1 point of p
 
 #include <stdbool.h>
 
+typedef struct solution_helper {
+    bool *timetable_cdsr;
+    int *sum_cds;
+
+    bool *timetable_rdsc;
+    int *sum_rds;
+
+    bool *timetable_qdscr;
+    int *sum_qds;
+
+    bool *timetable_tdscr;
+    int *sum_tds;
+} solution_helper;
+
 typedef struct solution {
     bool *timetable;
     const model *model;
+
+    solution_helper helper;
 } solution;
 
 
@@ -56,15 +72,17 @@ typedef struct solution_parser {
     char *error;
 } solution_parser;
 
+
 void solution_parser_init(solution_parser *solution_parser);
 bool solution_parser_parse(solution_parser *solution_parser, const char * input,
                            solution *solution);
 void solution_parser_destroy(solution_parser *solution_parser);
 const char * solution_parser_get_error(solution_parser *solution_parser);
 
-
 void solution_init(solution *solution, const model *model);
 void solution_destroy(solution *solution);
+
+void solution_finalize(solution *solution);
 
 void solution_copy(solution *solution_dest, const solution *solution_src);
 

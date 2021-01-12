@@ -17,7 +17,7 @@ bool neighbourhood_iter_next(neighbourhood_iter *iter, int *c1,
                              int *r1, int *d1, int *s1,
                              int *r2, int *d2, int *s2);
 
-void neighbourhood_swap_assignment(const solution *sol_in, solution *sol_out,
+bool neighbourhood_swap_assignment(const solution *sol_in, solution *sol_out,
                                    int c1, int r1, int d1, int s1, int r2, int d2, int s2);
 
 #endif // NEIGHBOURHOOD_H
