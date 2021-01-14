@@ -9,152 +9,110 @@
 #include "utils/math_utils.h"
 #include "config.h"
 
-#if 0
-void neighbourhood_swap_assignment(solution *sol) {
-#if DEBUG
-    unsigned long long fingerprint = solution_fingerprint(sol);
-#endif
-    const int C = sol->model->n_courses;
-    const int R = sol->model->n_rooms;
-    const int D = sol->model->n_days;
-    const int S = sol->model->n_slots;
-    size_t ttsize = C * R * D * S;
-
-    // Find the assignments in the timetable
-    int * assignment_indexes = mallocx(ttsize, sizeof(int));
-    int cursor = 0;
-    for (int i = 0; i < ttsize; i++) {
-        if (solution_get_at(sol, i))
-            assignment_indexes[cursor++] = i;
-    }
-
-    debug("There are %d/%lu", cursor, ttsize);
-
-    if (!cursor)
-        return; // nothing to do, no assignments in timetable
-
-    // Pick an assignment at random
-    int assignment_index = assignment_indexes[rand_int_range(0, cursor)];
-    debug("Random assignment_index = %d", assignment_index);
-    int a_c = RINDEX4_0(assignment_index, C, R, D, S);
-    int a_r = RINDEX4_1(assignment_index, C, R, D, S);
-    int a_d = RINDEX4_2(assignment_index, C, R, D, S);
-    int a_s = RINDEX4_3(assignment_index, C, R, D, S);
-
-#if DEBUG
-    if (!solution_get(sol, a_c, a_r, a_d, a_s)) {
-        eprint("Expected 1 in timetable");
-        exit(0);
-    }
-#endif
-
-    // Pick a (room,day,slot) at random
-    int r_r, r_d, r_s;
-    do {  // avoid to swap two lectures of the same course
-        r_r = rand_int_range(0, sol->model->n_rooms);
-        r_d = rand_int_range(0, sol->model->n_days);
-        r_s = rand_int_range(0, sol->model->n_slots);
-    } while (solution_get(sol, a_c, r_r, r_d, r_s));
-
-    debug("Random (room,day,slot) = (%s, %d, %d)",
-          sol->model->rooms[r_r].id, r_d, r_s);
-
-    int c_star = -1;
-    // Check if there is already a course in the picked (room,day,slot)
-    for (int c = 0; c < C; c++) {
-        if (solution_get(sol, c, r_r, r_d, r_s)) {
-            c_star = c;
-            break;
-        }
-    }
-
-    // Swap assignments
-    solution_set_at(sol, assignment_index, false);
-    solution_set(sol, a_c, r_r, r_d, r_s, true);
-
-    if (c_star >= 0) {
-        debug("Found course %s scheduled in slot (%s, %d, %d)",
-                sol->model->courses[c_star].id, sol->model->rooms[r_r].id, r_d, r_s);
-        solution_set(sol, c_star, r_r, r_d, r_s, false);
-        solution_set(sol, c_star, a_r, a_d, a_s, true);
-    } else {
-        debug("No course found in slot (%s, %d, %d)",
-              sol->model->rooms[r_r].id, r_d, r_s);
-    }
-
-    if (!solution_satisfy_hard_constraints(sol)) {
-        debug("Swap breaks hard constraints, reverting changes");
-
-        solution_set_at(sol, assignment_index, true);
-        solution_set(sol, a_c, r_r, r_d, r_s, false);
-
-        if (c_star >= 0) {
-            solution_set(sol, c_star, r_r, r_d, r_s, true);
-            solution_set(sol, c_star, a_r, a_d, a_s, false);
-        }
-
-#ifdef DEBUG
-        if (solution_fingerprint(sol) != fingerprint) {
-            eprint("Fingeprint should be the same after reverting");
-            exit(2);
-        }
-#endif
-    }
-}
-#endif
-
 
 void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, const solution *sol) {
-    CRDSQT(sol->model)
-
-    size_t ttsize = C * R * D * S;
-
     iter->solution = sol;
+    iter->begin = true;
+    iter->end = false;
+    iter->c1 = iter->r1 = iter->d1 = iter->s1 = -1;
+    iter->r2 = iter->d2 = iter->s2 = -1;
 
-    iter->assignments = mallocx(ttsize, sizeof(int));
+#if 0
+    iter->entries = mallocx(ttsize, sizeof(neighbourhood_swap_iter_entry));
     // Find the assignments in the timetable
     int cursor = 0;
-    for (int i = 0; i < ttsize; i++) {
-        if (solution_get_at(sol, i)) {
-            debug("Found assignment[%d]=%d", cursor, i);
-            iter->assignments[cursor++] = i;
+    int i = 0;
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    if (solution_get_at(sol, i)) {
+                        debug("Found assignment[%d]=%d", cursor, i);
+                        neighbourhood_swap_iter_entry *entry = &iter->entries[cursor++];
+                        entry->c1 = c;
+                        entry->r1 = r;
+                        entry->d1 = d;
+                        entry->s1 = s;
+                    }
+                    i++;
+                }
+            }
         }
-    }
+    };
 
-    iter->n_assignments = cursor;
+    iter->n_entries = cursor;
     debug2("There are %d/%lu assignments", iter->n_assignments, ttsize);
 
     if (cursor > 0) {
-        iter->assignment_index = iter->roomdayslot_index = 0;
-    } else {
-        iter->assignment_index = iter->roomdayslot_index = -1;
+        iter->c1 = iter->r1 = iter->d1 = iter->s1 = 0;
+        iter->r2 = iter->d2 = iter->s2 = 0;
     }
+#endif
+
 }
 
 void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter) {
-    free(iter->assignments);
 }
 
 bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter, int *c1,
                                   int *r1, int *d1, int *s1,
                                   int *r2, int *d2, int *s2) {
-    if (iter->assignment_index < 0)
+    if (iter->end)
         return false;
 
     CRDSQT(iter->solution->model)
 
-    *c1 = RINDEX4_0(iter->assignments[iter->assignment_index], C, R, D, S);
-    *r1 = RINDEX4_1(iter->assignments[iter->assignment_index], C, R, D, S);
-    *d1 = RINDEX4_2(iter->assignments[iter->assignment_index], C, R, D, S);
-    *s1 = RINDEX4_3(iter->assignments[iter->assignment_index], C, R, D, S);
-    *r2 = RINDEX3_0(iter->roomdayslot_index, R, D, S);
-    *d2 = RINDEX3_1(iter->roomdayslot_index, R, D, S);
-    *s2 = RINDEX3_2(iter->roomdayslot_index, R, D, S);
 
-    iter->roomdayslot_index = (iter->roomdayslot_index + 1) % (R * D * S);
-    iter->assignment_index += iter->roomdayslot_index == 0 ? 1 : 0;
+#define ADVANCE_ASSIGNMENT \
+    iter->s1 = (iter->s1 + 1) % S; \
+    if (!iter->s1) { \
+        iter->d1 = (iter->d1 + 1) % D; \
+        if (!iter->d1) { \
+            iter->r1 = (iter->r1 + 1) % R; \
+            if (!iter->r1) { \
+                iter->c1 = (iter->c1 + 1); \
+            } \
+        } \
+    }
 
-    return iter->assignment_index < iter->n_assignments;
+    iter->s2 = (iter->s2 + 1) % S;
+    if (!iter->s2) {
+        iter->d2 = (iter->d2 + 1) % D;
+        if (!iter->d2) {
+            iter->r2 = (iter->r2 + 1) % R;
+            if (!iter->r2) {
+
+                ADVANCE_ASSIGNMENT
+
+                int i = INDEX4(iter->c1, C, iter->r1, R, iter->d1, D, iter->s1, S);
+
+                do {
+                    // Find next assignment
+                    ADVANCE_ASSIGNMENT
+                    i++;
+                } while (!solution_get_at(iter->solution, i) && iter->c1 < C);
+
+                if (iter->c1 < C) {
+                    debug("Found next assignment (%d %d %d %d -> i=%d)",
+                          iter->c1, iter->r1, iter->d1, iter->s1, i);
+                } else {
+                    debug("No assignment found, iter exhausted");
+                    iter->end = true;
+                    return false;
+                }
+            }
+        }
+    }
+
+    *c1 = iter->c1;
+    *r1 = iter->r1;
+    *d1 = iter->d1;
+    *s1 = iter->s1;
+    *r2 = iter->r2;
+    *d2 = iter->d2;
+    *s2 = iter->s2;
+
+    return true;
 }
 
 
@@ -386,7 +344,7 @@ static int compute_neighbourhood_swap_curriculum_compactness_cost(
 
         if (c_to >= 0 && model_share_curricula(model, c_to, c_from, q)) {
             debug("c=%d and c=%d share same curriculum q=%d, no swap cost", c_from, c_to, q);
-            continue; // swap of courses of the same curriculum has not cost
+            continue; // swap of courses of the same curriculum has no cost
         }
 
 #define Z(q, d, s) \
@@ -500,7 +458,7 @@ static int compute_neighbourhood_swap_curriculum_compactness_cost(
 
         int q_cost =
             (out_prev_cost_after - out_prev_cost_before) +
-            (out_next_cost_after - out_prev_cost_before) +
+            (out_next_cost_after - out_next_cost_before) +
             (in_prev_cost_after - in_prev_cost_before) +
             (in_next_cost_after - in_next_cost_before) +
             (in_itself_cost - out_itself_cost);

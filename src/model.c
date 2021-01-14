@@ -22,36 +22,18 @@ void model_init(model *model) {
     model->unavailability_constraints = NULL;
     model->n_teachers = 0;
     model->teachers = NULL;
+    model->course_by_id = NULL;
+    model->room_by_id = NULL;
+    model->curricula_by_id = NULL;
+    model->teacher_by_id = NULL;
     model->course_belongs_to_curricula = NULL;
     model->curriculas_of_course = NULL;
     model->courses_of_curricula = NULL;
     model->courses_of_teacher = NULL;
     model->course_taught_by_teacher = NULL;
     model->course_availabilities = NULL;
-    model->share_curricula = NULL;
-    model->same_teacher = NULL;
-}
-
-void course_destroy(const course *c) {
-    free(c->id);
-    free(c->teacher_id);
-}
-
-void room_destroy(const room *r) {
-    free(r->id);
-}
-
-void curricula_destroy(const curricula *q) {
-    free(q->id);
-    freearray(q->courses_ids, q->n_courses);
-}
-
-void unavailability_constraint_destroy(const unavailability_constraint *uc) {
-    free(uc->course_id);
-}
-
-void teacher_destroy(const teacher *t) {
-    free(t->id);
+    model->courses_share_curricula = NULL;
+    model->courses_same_teacher = NULL;
 }
 
 void model_destroy(const model *model) {
@@ -92,8 +74,39 @@ void model_destroy(const model *model) {
     free(model->course_belongs_to_curricula);
     free(model->course_taught_by_teacher);
     free(model->course_availabilities);
-    free(model->share_curricula);
-    free(model->same_teacher);
+    free(model->courses_share_curricula);
+    free(model->courses_same_teacher);
+
+    if (model->course_by_id)
+        g_hash_table_destroy(model->course_by_id);
+    if (model->room_by_id)
+        g_hash_table_destroy(model->room_by_id);
+    if (model->curricula_by_id)
+        g_hash_table_destroy(model->curricula_by_id);
+    if (model->teacher_by_id)
+        g_hash_table_destroy(model->teacher_by_id);
+}
+
+void course_destroy(const course *c) {
+    free(c->id);
+    free(c->teacher_id);
+}
+
+void room_destroy(const room *r) {
+    free(r->id);
+}
+
+void curricula_destroy(const curricula *q) {
+    free(q->id);
+    freearray(q->courses_ids, q->n_courses);
+}
+
+void unavailability_constraint_destroy(const unavailability_constraint *uc) {
+    free(uc->course_id);
+}
+
+void teacher_destroy(const teacher *t) {
+    free(t->id);
 }
 
 void course_to_string(const course *course, char *buffer, size_t buflen) {
@@ -199,6 +212,46 @@ void model_finalize(model *model) {
     static const int TMP_LEN = 256;
     char tmp[TMP_LEN];
 
+
+    // T
+    GHashTable *teachers_set = g_hash_table_new(g_str_hash, g_str_equal);
+
+    for (int c = 0; c < C; c++)
+        g_hash_table_add(teachers_set, model->courses[c].teacher_id);
+
+    const uint T = g_hash_table_size(teachers_set);
+    model->teachers = mallocx(T, sizeof(teacher));
+    model->n_teachers = T;
+
+    GHashTableIter iter;
+    gpointer key, value;
+
+    g_hash_table_iter_init(&iter, teachers_set);
+    int i = 0;
+    while (g_hash_table_iter_next(&iter, &key, &value)) {
+        model->teachers[i].index = i;
+        model->teachers[i++].id = strdup(key);
+    }
+
+    g_hash_table_destroy(teachers_set);
+
+    model->course_by_id = g_hash_table_new(g_str_hash, g_str_equal);
+    for (int c = 0; c < C; c++)
+        g_hash_table_insert(model->course_by_id, model->courses[c].id, &model->courses[c]);
+
+    model->room_by_id = g_hash_table_new(g_str_hash, g_str_equal);
+    for (int r = 0; r < R; r++)
+        g_hash_table_insert(model->room_by_id, model->rooms[r].id, &model->rooms[r]);
+
+    model->curricula_by_id = g_hash_table_new(g_str_hash, g_str_equal);
+    for (int q = 0; q < Q; q++)
+        g_hash_table_insert(model->curricula_by_id, model->curriculas[q].id, &model->curriculas[q]);
+
+    model->teacher_by_id = g_hash_table_new(g_str_hash, g_str_equal);
+    for (int t = 0; t < T; t++)
+        g_hash_table_insert(model->teacher_by_id, model->teachers[t].id, &model->teachers[t]);
+
+
     model->curriculas_of_course = mallocx(C, sizeof(GArray *));
     for (int c = 0; c < C; c++) {
         model->curriculas_of_course[c] = g_array_new(false, false, sizeof(int));
@@ -222,28 +275,6 @@ void model_finalize(model *model) {
             }
         }
     }
-
-    // T
-    GHashTable *teachers_set = g_hash_table_new(g_str_hash, g_str_equal);
-
-    for (int c = 0; c < C; c++)
-        g_hash_table_add(teachers_set, model->courses[c].teacher_id);
-
-    const uint T = g_hash_table_size(teachers_set);
-    model->teachers = mallocx(T, sizeof(teacher));
-    model->n_teachers = T;
-
-    GHashTableIter iter;
-    gpointer key, value;
-
-    g_hash_table_iter_init (&iter, teachers_set);
-    int i = 0;
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        model->teachers[i].index = i;
-        model->teachers[i++].id = strdup(key);
-    }
-
-    g_hash_table_destroy(teachers_set);
 
     // e_ct
     model->course_taught_by_teacher = mallocx(T, sizeof(bool) * C);
@@ -301,7 +332,7 @@ void model_finalize(model *model) {
         }
     }
 
-    model->share_curricula = mallocx(C * C * Q, sizeof(bool));
+    model->courses_share_curricula = mallocx(C * C * Q, sizeof(bool));
     for (int c1 = 0; c1 < C; c1++) {
         for (int c2 = 0; c2 < C; c2++) {
             int c1_n_curriculas, c2_n_curriculas;
@@ -317,15 +348,15 @@ void model_finalize(model *model) {
                 for (int c2_qi = 0; c2_qi < c2_n_curriculas && !in_c2; c2_qi++)
                     in_c2 = q == c2_curriculas[c2_qi];
 
-                model->share_curricula[INDEX3(c1, C, c2, C, q, Q)] = in_c1 && in_c2;
+                model->courses_share_curricula[INDEX3(c1, C, c2, C, q, Q)] = in_c1 && in_c2;
             }
         }
     }
 
-    model->same_teacher = mallocx(C * C, sizeof(bool));
+    model->courses_same_teacher = mallocx(C * C, sizeof(bool));
     for (int c1 = 0; c1 < C; c1++) {
         for (int c2 = 0; c2 < C; c2++) {
-            model->same_teacher[INDEX2(c1, C, c2, C)] =
+            model->courses_same_teacher[INDEX2(c1, C, c2, C)] =
                     streq(model->courses[c1].teacher_id,
                           model->courses[c2].teacher_id);
         }
@@ -333,43 +364,20 @@ void model_finalize(model *model) {
 }
 
 course *model_course_by_id(const model *model, char *id) {
-    for (int i = 0; i < model->n_courses; i++) {
-        course *c = &model->courses[i];
-        if (streq(id, c->id))
-            return c;
-    }
-    return NULL;
+    return g_hash_table_lookup(model->course_by_id, id);
 }
 
 room *model_room_by_id(const model *model, char *id) {
-    for (int i = 0; i < model->n_rooms; i++) {
-        room *r = &model->rooms[i];
-        if (streq(id, r->id))
-            return r;
-    }
-    return NULL;
+    return g_hash_table_lookup(model->room_by_id, id);
 }
 
 curricula *model_curricula_by_id(const model *model, char *id) {
-    for (int i = 0; i < model->n_curriculas; i++) {
-        curricula *q = &model->curriculas[i];
-        if (streq(id, q->id))
-            return q;
-    }
-    return NULL;
+    return g_hash_table_lookup(model->curricula_by_id, id);
 }
-
 
 teacher *model_teacher_by_id(const model *model, char *id) {
-    for (int i = 0; i < model->n_teachers; i++) {
-        teacher *t = &model->teachers[i];
-        if (streq(id, t->id))
-            return t;
-    }
-    return NULL;
+    return g_hash_table_lookup(model->teacher_by_id, id);
 }
-
-
 
 bool model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx) {
     return model->course_belongs_to_curricula[
@@ -405,12 +413,12 @@ int *model_courses_of_teacher(const model *model, int teacher_idx, int *n_course
 }
 
 bool model_share_curricula(const model *model, int course1_idx, int course2_idx, int curricula_idx) {
-    return model->share_curricula[INDEX3(course1_idx, model->n_courses,
-                                        course2_idx, model->n_courses,
-                                        curricula_idx, model->n_curriculas)];
+    return model->courses_share_curricula[INDEX3(course1_idx, model->n_courses,
+                                                 course2_idx, model->n_courses,
+                                                 curricula_idx, model->n_curriculas)];
 }
 
 bool model_same_teacher(const model *model, int course1_idx, int course2_idx) {
-    return model->same_teacher[INDEX2(course1_idx, model->n_courses,
-                                      course2_idx, model->n_courses)];
+    return model->courses_same_teacher[INDEX2(course1_idx, model->n_courses,
+                                              course2_idx, model->n_courses)];
 }

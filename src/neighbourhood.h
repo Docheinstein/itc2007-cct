@@ -5,10 +5,9 @@
 
 typedef struct neighbourhood_swap_iter {
     const solution *solution;
-    int *assignments;
-    int n_assignments;
-    int assignment_index;
-    int roomdayslot_index;
+    bool begin, end;
+    int c1, r1, d1, s1;
+    int r2, d2, s2;
 } neighbourhood_swap_iter;
 
 typedef struct neighbourhood_swap_result {

@@ -79,6 +79,11 @@ typedef struct model {
     int n_teachers;
     teacher *teachers;                       // T
 
+    GHashTable *course_by_id;
+    GHashTable *room_by_id;
+    GHashTable *curricula_by_id;
+    GHashTable *teacher_by_id;
+
     GArray **curriculas_of_course;
     GArray **courses_of_teacher;
     int **courses_of_curricula;
@@ -87,18 +92,18 @@ typedef struct model {
     bool *course_taught_by_teacher;        // e_ct
     bool *course_availabilities;           // e_cds
 
-    bool *share_curricula;
-    bool *same_teacher;
+    bool *courses_share_curricula;
+    bool *courses_same_teacher;
 } model;
 
 void model_init(model *model);
+void model_destroy(const model *model);
 
 void course_destroy(const course *c);
 void room_destroy(const room *r);
 void curricula_destroy(const curricula *q);
 void unavailability_constraint_destroy(const unavailability_constraint *uc);
 void teacher_destroy(const teacher *t);
-void model_destroy(const model *model);
 
 void course_to_string(const course *c, char *buffer, size_t buflen);
 void room_to_string(const room *r, char *buffer, size_t buflen);
