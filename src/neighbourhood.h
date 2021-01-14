@@ -4,8 +4,9 @@
 #include "solution.h"
 
 typedef struct neighbourhood_swap_iter {
-    const solution *solution;
-    bool begin, end;
+    solution *solution;
+    bool end;
+    int rds_index;
     int c1, r1, d1, s1;
     int r2, d2, s2;
 } neighbourhood_swap_iter;
@@ -20,7 +21,7 @@ typedef struct neighbourhood_swap_result {
     int delta_cost_room_stability;
 } neighbourhood_swap_result;
 
-void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, const solution *sol);
+void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol);
 void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter);
 bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter, int *c1,
                                   int *r1, int *d1, int *s1,

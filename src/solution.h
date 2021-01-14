@@ -3,6 +3,7 @@
 
 #include <glib.h>
 #include "model.h"
+#include <stdio.h>
 
 /*
 ------------------
@@ -79,7 +80,7 @@ typedef struct solution_parser {
 } solution_parser;
 
 bool write_solution(const solution *sol, const char *output_file);
-void print_solution(const solution *sol);
+void print_solution(const solution *sol, FILE *stream);
 
 void solution_parser_init(solution_parser *solution_parser);
 bool solution_parser_parse(solution_parser *solution_parser, const char * input,

@@ -2,57 +2,21 @@
 #include <utils/io_utils.h>
 #include <utils/str_utils.h>
 #include "neighbourhood.h"
-#include "utils/mem_utils.h"
 #include "utils/array_utils.h"
 #include "solution.h"
 #include "model.h"
-#include "utils/math_utils.h"
 #include "config.h"
 
 
-void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, const solution *sol) {
+void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol) {
     iter->solution = sol;
-    iter->begin = true;
     iter->end = false;
+    iter->rds_index = -1;
     iter->c1 = iter->r1 = iter->d1 = iter->s1 = -1;
     iter->r2 = iter->d2 = iter->s2 = -1;
-
-#if 0
-    iter->entries = mallocx(ttsize, sizeof(neighbourhood_swap_iter_entry));
-    // Find the assignments in the timetable
-    int cursor = 0;
-    int i = 0;
-    FOR_C {
-        FOR_R {
-            FOR_D {
-                FOR_S {
-                    if (solution_get_at(sol, i)) {
-                        debug("Found assignment[%d]=%d", cursor, i);
-                        neighbourhood_swap_iter_entry *entry = &iter->entries[cursor++];
-                        entry->c1 = c;
-                        entry->r1 = r;
-                        entry->d1 = d;
-                        entry->s1 = s;
-                    }
-                    i++;
-                }
-            }
-        }
-    };
-
-    iter->n_entries = cursor;
-    debug2("There are %d/%lu assignments", iter->n_assignments, ttsize);
-
-    if (cursor > 0) {
-        iter->c1 = iter->r1 = iter->d1 = iter->s1 = 0;
-        iter->r2 = iter->d2 = iter->s2 = 0;
-    }
-#endif
-
 }
 
-void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter) {
-}
+void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter) {}
 
 bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter, int *c1,
                                   int *r1, int *d1, int *s1,
@@ -61,19 +25,8 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter, int *c1,
         return false;
 
     CRDSQT(iter->solution->model)
-
-
-#define ADVANCE_ASSIGNMENT \
-    iter->s1 = (iter->s1 + 1) % S; \
-    if (!iter->s1) { \
-        iter->d1 = (iter->d1 + 1) % D; \
-        if (!iter->d1) { \
-            iter->r1 = (iter->r1 + 1) % R; \
-            if (!iter->r1) { \
-                iter->c1 = (iter->c1 + 1); \
-            } \
-        } \
-    }
+    const int RDS = R * D * S;
+    const solution_helper *helper = solution_get_helper(iter->solution);
 
     iter->s2 = (iter->s2 + 1) % S;
     if (!iter->s2) {
@@ -82,19 +35,18 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter, int *c1,
             iter->r2 = (iter->r2 + 1) % R;
             if (!iter->r2) {
 
-                ADVANCE_ASSIGNMENT
-
-                int i = INDEX4(iter->c1, C, iter->r1, R, iter->d1, D, iter->s1, S);
-
+                // Find next assignment
                 do {
-                    // Find next assignment
-                    ADVANCE_ASSIGNMENT
-                    i++;
-                } while (!solution_get_at(iter->solution, i) && iter->c1 < C);
+                    iter->rds_index++;
+                } while ((helper->c_rds[iter->rds_index]) < 0 && iter->rds_index < RDS);
 
-                if (iter->c1 < C) {
-                    debug("Found next assignment (%d %d %d %d -> i=%d)",
-                          iter->c1, iter->r1, iter->d1, iter->s1, i);
+                if (iter->rds_index < RDS) {
+                    iter->c1 = helper->c_rds[iter->rds_index];
+                    iter->r1 = RINDEX3_0(iter->rds_index, R, D, S);
+                    iter->d1 = RINDEX3_1(iter->rds_index, R, D, S);
+                    iter->s1 = RINDEX3_2(iter->rds_index, R, D, S);
+                    debug("Found next assignment (%d %d %d %d)",
+                          iter->c1, iter->r1, iter->d1, iter->s1);
                 } else {
                     debug("No assignment found, iter exhausted");
                     iter->end = true;
@@ -194,14 +146,14 @@ static bool check_neighbourhood_swap_hard_constraints(solution *sol,
 
     // H3b
     if (c1 >= 0) {
-        const int t1 = model_teacher_by_id(model, model->courses[c1].teacher_id)->index;
+        const int t1 = model->courses[c1].teacher->index;
         debug2("Check H3b (t=%d, d=%d, s=%d)", t1, d2, s2);
         if (helper->sum_tds[INDEX3(t1, T, d2, D, s2, S)] - same_period - same_teacher > 0)
             return false;
     }
 
     if (c2 >= 0) {
-        const int t2 = model_teacher_by_id(model, model->courses[c2].teacher_id)->index;
+        const int t2 = model->courses[c2].teacher->index;
         debug2("Check H3b (t=%d, d=%d, s=%d)", t2, d1, s1);
         if (helper->sum_tds[INDEX3(t2, T, d1, D, s1, S)] - same_period - same_teacher > 0)
             return false;
@@ -533,7 +485,9 @@ void neighbourhood_swap(solution *sol, int c1,
 
 #if DEBUG
     if (!solution_get(sol, c1, r1, d1, s1)) {
-        eprint("Expected true in timetable");
+        eprint("Expected true in timetable (%d %d %d %d) -> %d",
+               c1, r1, d1, s1, INDEX4(c1, C, r1, R, d1, D, s1, S));
+        print_solution(sol, stderr);
         exit(0);
     }
 #endif

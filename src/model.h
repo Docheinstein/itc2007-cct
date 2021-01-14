@@ -20,6 +20,13 @@
 #define FOR_Q for (int q = 0; q < Q; q++)
 #define FOR_T for (int t = 0; t < T; t++)
 
+
+typedef struct teacher {
+    char *id;
+    int index;
+} teacher;
+
+
 // <course> := <CourseID> <Teacher> <# Lectures> <MinWorkingDays> <# Students>
 // e.g.     :=   c0001       t000         6            4               130
 typedef struct course {
@@ -29,6 +36,8 @@ typedef struct course {
     int n_lectures;
     int min_working_days;
     int n_students;
+
+    teacher *teacher; // redundant, for faster access
 } course;
 
 // <room> := <RoomID> <Capacity>
@@ -56,11 +65,6 @@ typedef struct unavailability_constraint {
     int slot;
 } unavailability_constraint;
 
-
-typedef struct teacher {
-    char *id;
-    int index;
-} teacher;
 
 typedef struct model {
     char *name;

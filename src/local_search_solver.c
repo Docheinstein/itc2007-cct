@@ -22,6 +22,8 @@ static void do_local_search(solution *sol) {
     int i = 0;
     bool improved;
     do {
+        debug("Begin LS major cycle %d", i);
+
         int c1, r1, d1, s1, c2, r2, d2, s2;
         int j = 0;
 
@@ -32,7 +34,7 @@ static void do_local_search(solution *sol) {
         solution_copy(&sol_neigh, sol);
 
         neighbourhood_swap_iter iter;
-        neighbourhood_swap_iter_init(&iter, sol);
+        neighbourhood_swap_iter_init(&iter, &sol_neigh);
         while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
             bool restart = false;
 

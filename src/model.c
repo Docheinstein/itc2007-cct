@@ -361,6 +361,11 @@ void model_finalize(model *model) {
                           model->courses[c2].teacher_id);
         }
     }
+
+    for (int c = 0; c < C; c++) {
+        model->courses[c].teacher =
+                model_teacher_by_id(model, model->courses[c].teacher_id);
+    }
 }
 
 course *model_course_by_id(const model *model, char *id) {

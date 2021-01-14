@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #define print(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#define fprint(stream, fmt, ...) fprintf(stream, fmt "\n", ##__VA_ARGS__)
 #define eprintf(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
 #define eprint(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__)
 

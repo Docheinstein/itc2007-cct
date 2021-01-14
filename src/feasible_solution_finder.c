@@ -90,7 +90,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
 
         // 2. H3b: How many courses the teacher of the course teaches?
         int n_teacher_courses;
-        model_courses_of_teacher(m, model_teacher_by_id(m, course->teacher_id)->index,
+        model_courses_of_teacher(m, course->teacher->index,
                                  &n_teacher_courses);
         debug2("Course %s has teacher %s which teaches %d courses",
               course->id, m->courses[c].teacher_id, n_teacher_courses);
@@ -171,7 +171,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
                         }
 
                         // H3b: Conflicts (Teacher)
-                        int t = model_teacher_by_id(m, course->teacher_id)->index;
+                        int t = course->teacher->index;
 
                         if (teacher_is_busy[INDEX3(t, T, d, D, s, S)]) {
                             debug2("\t\tfailed (TeacherConflict %s)", m->teachers[t].id);

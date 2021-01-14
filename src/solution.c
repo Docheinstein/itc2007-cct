@@ -55,6 +55,8 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
     CRDSQT(sol->model)
     const model *model = sol->model;
 
+    debug("@@ solution_helper_compute @@");
+
     memset(helper->c_rds, -1, R * D * S * sizeof(int));
     memset(helper->r_cds, -1, C * D * S * sizeof(int));
 
@@ -95,7 +97,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                     if (sol->timetable[INDEX4(c, C, r, R, d, D, s, S)])
                         helper->r_cds[INDEX3(c, C, d, D, s, S)] = r;
                     debug2("helper->r_cds[INDEX3(%d, %d, %d)] = %d",
-                           c, d, s, helper->c_rds[INDEX3(c, C, d, D, s, S)]);
+                           c, d, s, helper->r_cds[INDEX3(c, C, d, D, s, S)]);
                 }
             }
         }
@@ -253,7 +255,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
     
     // timetable_tdscr
     FOR_C {
-        const int t = model_teacher_by_id(model, model->courses[c].teacher_id)->index;
+        const int t = model->courses[c].teacher->index;
         FOR_R {
             FOR_D {
                 FOR_S {
@@ -268,7 +270,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
 
     // sum_tds
     FOR_C {
-        const int t = model_teacher_by_id(model, model->courses[c].teacher_id)->index;
+        const int t = model->courses[c].teacher->index;
         FOR_D {
             FOR_S {
                 FOR_R {
@@ -898,8 +900,8 @@ bool write_solution(const solution *sol, const char *output_file) {
     return success;
 }
 
-void print_solution(const solution *sol) {
+void print_solution(const solution *sol, FILE *stream) {
     char *sol_str = solution_to_string(sol);
-    print("%s", sol_str);
+    fprint(stream, "%s", sol_str);
     free(sol_str);
 }
