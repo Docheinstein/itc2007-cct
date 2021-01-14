@@ -6,6 +6,8 @@
 #include "utils/array_utils.h"
 #include "solution.h"
 #include "model.h"
+#include "utils/math_utils.h"
+#include "config.h"
 
 #if 0
 void neighbourhood_swap_assignment(solution *sol) {
@@ -293,15 +295,283 @@ static bool do_neighbourhood_swap_if_possible(
     return true;
 }
 
-bool neighbourhood_swap(solution *sol, int c1,
-                        int r1, int d1, int s1,
-                        int r2, int d2, int s2,
-                        int *c2) {
+static int compute_neighbourhood_swap_room_capacity_cost(
+        solution *sol, int c, int r_from, int r_to) {
+    if (c < 0)
+        return 0;
+
+    int cost =
+        MIN(0, sol->model->rooms[r_from].capacity - sol->model->courses[c].n_students) +
+        MAX(0, sol->model->courses[c].n_students - sol->model->rooms[r_to].capacity);
+    cost *= ROOM_CAPACITY_COST;
+
+    debug("RoomCapacity delta cost: %d", cost);
+    return cost;
+}
+
+static int compute_neighbourhood_swap_min_working_days_cost(
+        solution *sol, int c_from, int d_from, int c_to, int d_to) {
+
+    if (c_from < 0)
+        return 0;
+    if (c_from == c_to)
+        return 0;
+
+    CRDSQT(sol->model)
+    const solution_helper *helper = solution_get_helper(sol);
+
+    int min_working_days = sol->model->courses[c_from].min_working_days;
+    int prev_working_days = 0;
+    int cur_working_days = 0;
+    FOR_D {
+        prev_working_days += MIN(1, helper->sum_cd[INDEX2(c_from, C, d, D)]);
+        cur_working_days += MIN(1, helper->sum_cd[INDEX2(c_from, C, d, D)] - (d == d_from) + (d == d_to));
+    }
+
+    int cost =
+            MIN(0, prev_working_days - min_working_days) +
+            MAX(0, min_working_days - cur_working_days);
+    cost *= MIN_WORKING_DAYS_COST;
+
+    debug("MinWorkingDays delta cost: %d", cost);
+    return cost;
+}
+
+static int compute_neighbourhood_swap_room_stability_cost(
+        solution *sol, int c_from, int r_from, int c_to, int r_to) {
+    if (c_from < 0)
+        return 0;
+    if (r_from == r_to)
+        return 0;
+    if (c_from == c_to)
+        return 0;
+
+    CRDSQT(sol->model)
+    const solution_helper *helper = solution_get_helper(sol);
+
+    int prev_rooms = 0;
+    int cur_rooms = 0;
+    FOR_R {
+        prev_rooms += MIN(1, helper->sum_cr[INDEX2(c_from, C, r, R)]);
+        cur_rooms += MIN(1, helper->sum_cr[INDEX2(c_from, C, r, R)] - (r == r_from) + (r == r_to));
+    };
+
+    int cost = MAX(0, cur_rooms - 1) - MAX(0, prev_rooms - 1);
+    cost *= ROOM_STABILITY_COST;
+
+    debug("RoomStability delta cost: %d", cost);
+    return cost;
+}
+
+static int compute_neighbourhood_swap_curriculum_compactness_cost(
+     solution *sol, int c_from, int d_from, int s_from, int c_to, int d_to, int s_to) {
+    debug("CurriculumCompactness c=%d d=%d s=%d -> c=%d d=%d s=%d",
+          c_from, d_from, s_from, c_to, d_to, s_to);
+    if (c_from < 0)
+        return 0;
+    if (c_from == c_to)
+        return 0;
+
+    CRDSQT(sol->model)
+    const model *model = sol->model;
+    const solution_helper *helper = solution_get_helper(sol);
+
+    int cost = 0;
+
+    int c_n_curriculas;
+    int *c_curriculas = model_curriculas_of_course(model, c_from, &c_n_curriculas);
+
+    for (int cq = 0; cq < c_n_curriculas; cq++) {
+        int q = c_curriculas[cq];
+
+        if (c_to >= 0 && model_share_curricula(model, c_to, c_from, q)) {
+            debug("c=%d and c=%d share same curriculum q=%d, no swap cost", c_from, c_to, q);
+            continue; // swap of courses of the same curriculum has not cost
+        }
+
+#define Z(q, d, s) \
+    ((s) >= 0 && (s) < S && helper->sum_qds[INDEX3(q, Q, d, D, s, S)])
+
+#define Z_OUT_AFTER(q, d, s) \
+    (!((d) == d_from && (s) == s_from) && \
+    ((Z(q, d, s))))
+
+#define Z_IN_AFTER(q, d, s) \
+    (((s) == s_to && (d) == d_to) || \
+    (!((d) == d_from && (s) == s_from) && \
+    ((Z(q, d, s)))))
+
+
+#define ALONE_OUT_BEFORE(q, d, s) \
+    (Z(q, d, s) && !Z(q, d, (s) - 1) && !Z(q, d, (s) + 1))
+
+#define ALONE_OUT_AFTER(q, d, s) \
+    (Z_OUT_AFTER(q, d, s) && !Z_OUT_AFTER(q, d, (s) - 1) && !Z_OUT_AFTER(q, d, (s) + 1))
+
+#define ALONE_IN_BEFORE(q, d, s) \
+    (ALONE_OUT_BEFORE(q, d, s) && (!((d) == d_from && (s) == s_from)))
+
+#define ALONE_IN_AFTER(q, d, s) \
+    (Z_IN_AFTER(q, d, s) && !Z_IN_AFTER(q, d, (s) - 1) && !Z_IN_AFTER(q, d, (s) + 1))
+
+        for (int s = 0; s < S; s++)
+            debug("Z[q=%d, d=d_from=%d, s=%d] = %d", q, d_from, s, Z(q, d_from, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("Z[q=%d, d=d_to=%d, s=%d] = %d", q, d_to, s, Z(q, d_to, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("Z_OUT_AFTER[q=%d, d=d_from=%d, s=%d] = %d", q, d_from, s, Z_OUT_AFTER(q, d_from, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("Z_OUT_AFTER[q=%d, d=d_to=%d, s=%d] = %d", q, d_to, s, Z_OUT_AFTER(q, d_to, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("Z_IN_AFTER[q=%d, d=d_from=%d, s=%d] = %d", q, d_from, s, Z_IN_AFTER(q, d_from, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("Z_IN_AFTER[q=%d, d=d_to=%d, s=%d] = %d", q, d_to, s, Z_IN_AFTER(q, d_to, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("ALONE_OUT_BEFORE[q=%d, d=d_from=%d, s=%d] = %d", q, d_from, s, ALONE_OUT_BEFORE(q, d_from, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("ALONE_OUT_BEFORE[q=%d, d=d_to=%d, s=%d] = %d", q, d_to, s, ALONE_OUT_BEFORE(q, d_to, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("ALONE_OUT_AFTER[q=%d, d=d_from=%d, s=%d] = %d", q, d_from, s, ALONE_OUT_AFTER(q, d_from, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("ALONE_OUT_AFTER[q=%d, d=d_to=%d, s=%d] = %d", q, d_to, s, ALONE_OUT_AFTER(q, d_to, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("ALONE_IN_BEFORE[q=%d, d=d_from=%d, s=%d] = %d", q, d_from, s, ALONE_IN_BEFORE(q, d_from, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("ALONE_IN_BEFORE[q=%d, d=d_to=%d, s=%d] = %d", q, d_to, s, ALONE_IN_BEFORE(q, d_to, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("ALONE_IN_AFTER[q=%d, d=d_from=%d, s=%d] = %d", q, d_from, s, ALONE_IN_AFTER(q, d_from, s));
+        debug("----");
+
+        for (int s = 0; s < S; s++)
+            debug("ALONE_IN_AFTER[q=%d, d=d_to=%d, s=%d] = %d", q, d_to, s, ALONE_IN_AFTER(q, d_to, s));
+        debug("----");
+
+        int out_prev_cost_before = ALONE_OUT_BEFORE(q, d_from, s_from - 1);
+        int out_itself_cost = ALONE_OUT_BEFORE(q, d_from, s_from);
+        int out_next_cost_before = ALONE_OUT_BEFORE(q, d_from, s_from + 1);
+
+        int out_prev_cost_after = ALONE_OUT_AFTER(q, d_from, s_from - 1);
+        int out_next_cost_after = ALONE_OUT_AFTER(q, d_from, s_from + 1);
+
+        int in_prev_cost_before = ALONE_OUT_AFTER(q, d_to, s_to - 1);
+        int in_next_cost_before = ALONE_OUT_AFTER(q, d_to, s_to + 1);
+        int in_prev_cost_after = ALONE_IN_AFTER(q, d_to, s_to - 1);
+        int in_next_cost_after = ALONE_IN_AFTER(q, d_to, s_to + 1);
+
+        int in_itself_cost = ALONE_IN_AFTER(q, d_to, s_to);
+
+        debug("[q=%d] out_prev_cost_before = %d", q, out_prev_cost_before);
+        debug("[q=%d] out_itself_cost = %d", q, out_itself_cost);
+        debug("[q=%d] out_next_cost_before = %d", q, out_next_cost_before);
+
+        debug("[q=%d] out_prev_cost_after = %d", q, out_prev_cost_after);
+        debug("[q=%d] out_next_cost_after = %d", q, out_next_cost_after);
+
+        debug("[q=%d] in_prev_cost_before = %d", q, in_prev_cost_before);
+        debug("[q=%d] in_next_cost_before = %d", q, in_next_cost_before);
+        debug("[q=%d] in_prev_cost_after = %d", q, in_prev_cost_after);
+        debug("[q=%d] in_next_cost_after = %d", q, in_next_cost_after);
+
+        debug("[q=%d] in_itself_cost = %d", q, in_itself_cost);
+
+        int q_cost =
+            (out_prev_cost_after - out_prev_cost_before) +
+            (out_next_cost_after - out_prev_cost_before) +
+            (in_prev_cost_after - in_prev_cost_before) +
+            (in_next_cost_after - in_next_cost_before) +
+            (in_itself_cost - out_itself_cost);
+
+        debug("[q=%d] cost = %d", q, q_cost);
+
+#undef Z
+#undef ALONE_OUT_BEFORE
+
+        cost += q_cost;
+    }
+
+    cost *= CURRICULUM_COMPACTNESS_COST;
+
+    debug("CurriculumCompactness delta cost: %d", cost);
+
+    return cost;
+}
+
+static void compute_neighbourhood_swap_cost(
+        solution *sol,
+        int c1, int r1, int d1, int s1,
+        int c2, int r2, int d2, int s2,
+        neighbourhood_swap_result *result) {
     CRDSQT(sol->model)
 
-    int c2_ = solution_get_helper(sol)->c_rds[INDEX3(r2, R, d2, D, s2, S)];
-    if (c2)
-        *c2 = c2_;
+    result->delta_cost_room_capacity = 0;
+    result->delta_cost_min_working_days = 0;
+    result->delta_cost_curriculum_compactness = 0;
+    result->delta_cost_room_stability = 0;
+
+    const solution_helper *helper = solution_get_helper(sol);
+    const model *model = sol->model;
+
+    // Room capacity
+    result->delta_cost_room_capacity +=
+        compute_neighbourhood_swap_room_capacity_cost(sol, c1, r1, r2) +
+        compute_neighbourhood_swap_room_capacity_cost(sol, c2, r2, r1);
+
+    // MinWorkingDays
+    result->delta_cost_min_working_days +=
+        compute_neighbourhood_swap_min_working_days_cost(sol, c1, d1, c2, d2) +
+        compute_neighbourhood_swap_min_working_days_cost(sol, c2, d2, c1, d1);
+
+    // CurriculumCompactness
+    result->delta_cost_curriculum_compactness +=
+        compute_neighbourhood_swap_curriculum_compactness_cost(sol, c1, d1, s1, c2, d2, s2) +
+        compute_neighbourhood_swap_curriculum_compactness_cost(sol, c2, d2, s2, c1, d1, s1);
+
+    // RoomStability
+    result->delta_cost_room_stability +=
+        compute_neighbourhood_swap_room_stability_cost(sol, c1, r1, c2, r2) +
+        compute_neighbourhood_swap_room_stability_cost(sol, c2, r2, c1, r1);
+
+    result->delta_cost =
+            result->delta_cost_room_capacity +
+            result->delta_cost_min_working_days +
+            result->delta_cost_curriculum_compactness +
+            result->delta_cost_room_stability;
+
+    debug("DELTA cost = %d", result->delta_cost);
+}
+
+void neighbourhood_swap(solution *sol, int c1,
+                        int r1, int d1, int s1,
+                        int r2, int d2, int s2,
+                        neighbourhood_swap_result *result) {
+    CRDSQT(sol->model)
+
+    int c2 = solution_get_helper(sol)->c_rds[INDEX3(r2, R, d2, D, s2, S)];
+    result->c2 = c2;
 
 #if DEBUG
     if (!solution_get(sol, c1, r1, d1, s1)) {
@@ -310,7 +580,9 @@ bool neighbourhood_swap(solution *sol, int c1,
     }
 #endif
 
-    return do_neighbourhood_swap_if_possible(sol, c1, r1, d1, s1, c2_, r2, d2, s2);
+    result->feasible = do_neighbourhood_swap_if_possible(sol, c1, r1, d1, s1, c2, r2, d2, s2);
+    if (result->feasible)
+        compute_neighbourhood_swap_cost(sol, c1, r1, d1, s1, c2, r2, d2, s2, result);
 }
 
 void neighbourhood_swap_course_lectures_room_iter_init(

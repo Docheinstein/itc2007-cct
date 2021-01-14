@@ -15,8 +15,11 @@ static void solution_helper_init(solution_helper *helper, const model *model) {
     helper->c_rds = mallocx(R * D * S, sizeof(int));
     helper->r_cds = mallocx(C * D * S, sizeof(int));
 
+    helper->sum_cr = mallocx(C * R, sizeof(int));
+
     helper->timetable_cdsr = mallocx(C * D * S * R, sizeof(bool));
     helper->sum_cds = mallocx(C * D * S, sizeof(int));
+    helper->sum_cd = mallocx(C * D, sizeof(int));
 
     helper->timetable_rdsc = mallocx(R * D * S * C, sizeof(bool));
     helper->sum_rds = mallocx(R * D * S, sizeof(int));
@@ -32,8 +35,11 @@ static void solution_helper_destroy(solution_helper *helper) {
     free(helper->c_rds);
     free(helper->r_cds);
 
+    free(helper->sum_cr);
+
     free(helper->timetable_cdsr);
     free(helper->sum_cds);
+    free(helper->sum_cd);
 
     free(helper->timetable_rdsc);
     free(helper->sum_rds);
@@ -52,8 +58,11 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
     memset(helper->c_rds, -1, R * D * S * sizeof(int));
     memset(helper->r_cds, -1, C * D * S * sizeof(int));
 
+    memset(helper->sum_cr, 0, C * R * sizeof(int));
+
     memset(helper->timetable_cdsr, 0, C * D * S * R * sizeof(bool));
     memset(helper->sum_cds, 0, C * D * S * sizeof(int));
+    memset(helper->sum_cd, 0, C * D * sizeof(int));
 
     memset(helper->timetable_rdsc, 0, R * D * S * C * sizeof(bool));
     memset(helper->sum_rds, 0, R * D * S * sizeof(int));
@@ -92,6 +101,20 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
         }
     }
 
+    // sum_cr
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    helper->sum_cr[INDEX2(c, C, r, R)] +=
+                            sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
+                }
+                debug2("helper->sum_cr[INDEX2(%d, %d)] = %d",
+                       c, r, helper->sum_cr[INDEX2(c, C, r, R)]);
+            }
+        }
+    };
+
     // timetable_cdsr
     FOR_C {
         FOR_R {
@@ -119,7 +142,21 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
             }
         }
     };
-    
+
+    // sum_cd
+    FOR_C {
+        FOR_D {
+            FOR_S {
+                FOR_R {
+                    helper->sum_cd[INDEX2(c, C, d, D)] +=
+                            helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)];
+                }
+                debug2("helper->sum_cd[INDEX2(%d, %d, %d)] = %d",
+                       c, d, helper->sum_cds[INDEX2(c, C, d, D)]);
+            }
+        }
+    };
+
     // timetable_rdsc
     FOR_C {
         FOR_R {
@@ -249,25 +286,25 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
 static void solution_helper_copy(solution_helper *helper_dest, solution_helper *helper_src,
                                  const solution *sol) {
     CRDSQT(sol->model)
-
-    memcpy(helper_dest->timetable_cdsr, helper_src->timetable_cdsr,
-           C * D * S * R * sizeof(bool));
-    memcpy(helper_dest->timetable_rdsc, helper_src->timetable_rdsc,
-           R * D * S * C * sizeof(bool));
-    memcpy(helper_dest->timetable_qdscr, helper_src->timetable_qdscr,
-           Q * D * S * R * C * sizeof(bool));
-    memcpy(helper_dest->timetable_tdscr, helper_src->timetable_tdscr,
-           T * D * S * R * C * sizeof(bool));
-
-
-    memcpy(helper_dest->sum_cds, helper_src->timetable_cdsr,
-           C * D * S * sizeof(bool));
-    memcpy(helper_dest->sum_rds, helper_src->timetable_rdsc,
-           R * D * S * sizeof(bool));
-    memcpy(helper_dest->sum_qds, helper_src->timetable_qdscr,
-           Q * D * S * sizeof(bool));
-    memcpy(helper_dest->sum_tds, helper_src->timetable_tdscr,
-           T * D * S * sizeof(bool));
+//
+//    memcpy(helper_dest->timetable_cdsr, helper_src->timetable_cdsr,
+//           C * D * S * R * sizeof(bool));
+//    memcpy(helper_dest->timetable_rdsc, helper_src->timetable_rdsc,
+//           R * D * S * C * sizeof(bool));
+//    memcpy(helper_dest->timetable_qdscr, helper_src->timetable_qdscr,
+//           Q * D * S * R * C * sizeof(bool));
+//    memcpy(helper_dest->timetable_tdscr, helper_src->timetable_tdscr,
+//           T * D * S * R * C * sizeof(bool));
+//
+//
+//    memcpy(helper_dest->sum_cds, helper_src->timetable_cdsr,
+//           C * D * S * sizeof(bool));
+//    memcpy(helper_dest->sum_rds, helper_src->timetable_rdsc,
+//           R * D * S * sizeof(bool));
+//    memcpy(helper_dest->sum_qds, helper_src->timetable_qdscr,
+//           Q * D * S * sizeof(bool));
+//    memcpy(helper_dest->sum_tds, helper_src->timetable_tdscr,
+//           T * D * S * sizeof(bool));
 
 }
 
@@ -328,14 +365,14 @@ char * solution_to_string(const solution *sol) {
 }
 
 char *solution_quality_to_string(solution *sol) {
-    int h1 = solution_hard_constraint_lectures_violations(sol);
-    int h2 = solution_hard_constraint_room_occupancy_violations(sol);
-    int h3 = solution_hard_constraint_conflicts_violations(sol);
-    int h4 = solution_hard_constraint_availabilities_violations(sol);
-    int s1 = solution_soft_constraint_room_capacity(sol);
-    int s2 = solution_soft_constraint_min_working_days(sol);
-    int s3 = solution_soft_constraint_curriculum_compactness(sol);
-    int s4 = solution_soft_constraint_room_stability(sol);
+    int h1 = solution_lectures_violations(sol);
+    int h2 = solution_room_occupancy_violations(sol);
+    int h3 = solution_conflicts_violations(sol);
+    int h4 = solution_availabilities_violations(sol);
+    int s1 = solution_room_capacity_cost(sol);
+    int s2 = solution_min_working_days_cost(sol);
+    int s3 = solution_curriculum_compactness_cost(sol);
+    int s4 = solution_room_stability_cost(sol);
 
     return strmake(
             "HARD constraints satisfied: %s\n"
@@ -364,27 +401,27 @@ char *solution_quality_to_string(solution *sol) {
 
 bool solution_satisfy_hard_constraints(const solution *sol) {
     return
-        solution_satisfy_hard_constraint_lectures(sol) &&
-        solution_satisfy_hard_constraint_room_occupancy(sol) &&
-        solution_satisfy_hard_constraint_conflicts(sol) &&
-        solution_satisfy_hard_constraint_availabilities(sol);
+            solution_satisfy_lectures(sol) &&
+            solution_satisfy_room_occupancy(sol) &&
+            solution_satisfy_conflicts(sol) &&
+                    solution_satisfy_availabilities(sol);
 }
 
-bool solution_satisfy_hard_constraint_lectures(const solution *sol) {
-    return solution_hard_constraint_lectures_violations(sol) == 0;
+bool solution_satisfy_lectures(const solution *sol) {
+    return solution_lectures_violations(sol) == 0;
 }
 
-bool solution_satisfy_hard_constraint_room_occupancy(const solution *sol) {
-    return solution_hard_constraint_room_occupancy_violations(sol) == 0;
+bool solution_satisfy_room_occupancy(const solution *sol) {
+    return solution_room_occupancy_violations(sol) == 0;
 }
 
 
-bool solution_satisfy_hard_constraint_availabilities(const solution *sol) {
-    return solution_hard_constraint_availabilities_violations(sol) == 0;
+bool solution_satisfy_availabilities(const solution *sol) {
+    return solution_availabilities_violations(sol) == 0;
 }
 
-bool solution_satisfy_hard_constraint_conflicts(const solution *sol) {
-    return solution_hard_constraint_conflicts_violations(sol) == 0;
+bool solution_satisfy_conflicts(const solution *sol) {
+    return solution_conflicts_violations(sol) == 0;
 }
 
 static int solution_hard_constraint_lectures_violations_a(const solution *sol) {
@@ -463,13 +500,13 @@ static int solution_hard_constraint_lectures_violations_b(const solution *sol) {
     return violations;
 }
 
-int solution_hard_constraint_lectures_violations(const solution *sol) {
+int solution_lectures_violations(const solution *sol) {
     return
         solution_hard_constraint_lectures_violations_a(sol) +
         solution_hard_constraint_lectures_violations_b(sol);
 }
 
-int solution_hard_constraint_room_occupancy_violations(const solution *sol) {
+int solution_room_occupancy_violations(const solution *sol) {
     CRDSQT(sol->model)
 
     int violations = 0;
@@ -557,13 +594,13 @@ static int solution_hard_constraint_conflicts_violations_b(const solution *sol) 
     return violations;
 }
 
-int solution_hard_constraint_conflicts_violations(const solution *sol) {
+int solution_conflicts_violations(const solution *sol) {
     return
         solution_hard_constraint_conflicts_violations_a(sol) +
         solution_hard_constraint_conflicts_violations_b(sol);
 }
 
-int solution_hard_constraint_availabilities_violations(const solution *sol) {
+int solution_availabilities_violations(const solution *sol) {
     CRDSQT(sol->model)
 
     int violations = 0;
@@ -590,15 +627,15 @@ int solution_hard_constraint_availabilities_violations(const solution *sol) {
 
 int solution_cost(const solution *sol) {
     return
-        solution_soft_constraint_room_capacity(sol) +
-        solution_soft_constraint_min_working_days(sol) +
-        solution_soft_constraint_curriculum_compactness(sol) +
-        solution_soft_constraint_room_stability(sol);
+            solution_room_capacity_cost(sol) +
+            solution_min_working_days_cost(sol) +
+            solution_curriculum_compactness_cost(sol) +
+            solution_room_stability_cost(sol);
 }
 
 
 
-int solution_soft_constraint_room_capacity(const solution *sol) {
+int solution_room_capacity_cost(const solution *sol) {
     CRDSQT(sol->model)
 
     int penalties = 0;
@@ -627,7 +664,7 @@ int solution_soft_constraint_room_capacity(const solution *sol) {
     return penalties * ROOM_CAPACITY_COST;
 }
 
-int solution_soft_constraint_min_working_days(const solution *sol) {
+int solution_min_working_days_cost(const solution *sol) {
     CRDSQT(sol->model)
 
     int penalties = 0;
@@ -653,14 +690,14 @@ int solution_soft_constraint_min_working_days(const solution *sol) {
                   "but Minimum Working Days is %d",
                   sol->model->courses[c].id, sum_y_cd,
                   sol->model->courses[c].min_working_days);
-            penalties++;
+            penalties += delta;
         }
     };
 
     return penalties * MIN_WORKING_DAYS_COST;
 }
 
-int solution_soft_constraint_curriculum_compactness(const solution *sol) {
+int solution_curriculum_compactness_cost(const solution *sol) {
     CRDSQT(sol->model)
 
     int penalties = 0;
@@ -703,7 +740,7 @@ int solution_soft_constraint_curriculum_compactness(const solution *sol) {
     return penalties * CURRICULUM_COMPACTNESS_COST;
 }
 
-int solution_soft_constraint_room_stability(const solution *sol) {
+int solution_room_stability_cost(const solution *sol) {
     CRDSQT(sol->model)
 
     int penalties = 0;

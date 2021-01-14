@@ -3,11 +3,11 @@
 
 #ifndef MAX
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
-#endif // MAX
+#endif
 
 #ifndef MIN
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
-#endif // MIN
+#endif
 
 #define RANGIFY(lb, x, ub) (MAX((lb), MIN((ub), (x))))
 

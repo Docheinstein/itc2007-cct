@@ -392,15 +392,15 @@ static MunitResult test_solution(const char *dataset_file, const char *solution_
 
     munit_assert_true(solution_parser_parse(&sol_parser, solution_file, &sol));
 
-    munit_assert(h1 == solution_satisfy_hard_constraint_lectures(&sol));
-    munit_assert(h2 == solution_satisfy_hard_constraint_room_occupancy(&sol));
-    munit_assert(h3 == solution_satisfy_hard_constraint_availabilities(&sol));
-    munit_assert(h4 == solution_satisfy_hard_constraint_conflicts(&sol));
+    munit_assert(h1 == solution_satisfy_lectures(&sol));
+    munit_assert(h2 == solution_satisfy_room_occupancy(&sol));
+    munit_assert(h3 == solution_satisfy_availabilities(&sol));
+    munit_assert(h4 == solution_satisfy_conflicts(&sol));
 
-    munit_assert_int(s1, ==, solution_soft_constraint_room_capacity(&sol));
-    munit_assert_int(s2, ==, solution_soft_constraint_min_working_days(&sol));
-    munit_assert_int(s3, ==, solution_soft_constraint_curriculum_compactness(&sol));
-    munit_assert_int(s4, ==, solution_soft_constraint_room_stability(&sol));
+    munit_assert_int(s1, ==, solution_room_capacity_cost(&sol));
+    munit_assert_int(s2, ==, solution_min_working_days_cost(&sol));
+    munit_assert_int(s3, ==, solution_curriculum_compactness_cost(&sol));
+    munit_assert_int(s4, ==, solution_room_stability_cost(&sol));
 
     parser_destroy(&parser);
     solution_parser_destroy(&sol_parser);
@@ -429,6 +429,11 @@ MUNIT_TEST(test_solution_cost_comp01_463) {
 MUNIT_TEST(test_solution_cost_comp01_57) {
     return test_solution("datasets/comp01.ctt", "tests/solutions/comp01.ctt.sol.57",
                          true, true, true, true, 30, 0, 6, 21);
+}
+
+MUNIT_TEST(test_solution_cost_toytoy_39) {
+    return test_solution("datasets/toytoy.ctt", "tests/solutions/toytoy.ctt.sol.39",
+                         true, true, true, true, 18, 15, 4, 2);
 }
 
 MUNIT_TEST(test_index_rindex) {
@@ -504,6 +509,7 @@ static MunitTest tests[] = {
     { "test_solution_to_string", test_solution_to_string, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_toy", test_solution_cost_toy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_comp01", test_solution_cost_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_solution_cost_toytoy_39", test_solution_cost_toytoy_39, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_comp01_463", test_solution_cost_comp01_463, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_comp01_57", test_solution_cost_comp01_57, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_index_rindex", test_index_rindex, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

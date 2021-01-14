@@ -1,0 +1,28 @@
+Name: ToyExample
+Courses: 3
+Rooms: 2
+Days: 3
+Periods_per_day: 3
+Curricula: 2
+Constraints: 4
+
+COURSES:
+Sce Ocra 2 2 30
+Tec Indaco 3 3 42
+Geo Rosa 2 2 40
+
+ROOMS:
+A 32
+B 50
+
+CURRICULA:
+Cur1 2 Sce Tec
+Cur2 2 Geo Tec
+
+UNAVAILABILITY_CONSTRAINTS:
+Tec 2 0
+Tec 2 2
+Sce 1 0
+Sce 1 1
+
+END.

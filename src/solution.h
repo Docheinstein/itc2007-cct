@@ -50,8 +50,11 @@ typedef struct solution_helper {
     int *c_rds;
     int *r_cds;
 
+    int *sum_cr;
+
     bool *timetable_cdsr;
     int *sum_cds;
+    int *sum_cd;
 
     bool *timetable_rdsc;
     int *sum_rds;
@@ -102,21 +105,24 @@ char * solution_quality_to_string(solution *sol);
 
 unsigned long long solution_fingerprint(const solution *sol);
 
+// Hard constraints
 bool solution_satisfy_hard_constraints(const solution *sol);
-bool solution_satisfy_hard_constraint_lectures(const solution *sol);
-bool solution_satisfy_hard_constraint_room_occupancy(const solution *sol);
-bool solution_satisfy_hard_constraint_conflicts(const solution *sol);
-bool solution_satisfy_hard_constraint_availabilities(const solution *sol);
 
-int solution_hard_constraint_lectures_violations(const solution *sol);
-int solution_hard_constraint_room_occupancy_violations(const solution *sol);
-int solution_hard_constraint_conflicts_violations(const solution *sol);
-int solution_hard_constraint_availabilities_violations(const solution *sol);
+bool solution_satisfy_lectures(const solution *sol);
+bool solution_satisfy_room_occupancy(const solution *sol);
+bool solution_satisfy_conflicts(const solution *sol);
+bool solution_satisfy_availabilities(const solution *sol);
 
+int solution_lectures_violations(const solution *sol);
+int solution_room_occupancy_violations(const solution *sol);
+int solution_conflicts_violations(const solution *sol);
+int solution_availabilities_violations(const solution *sol);
+
+// Soft constraints
 int solution_cost(const solution *sol);
-int solution_soft_constraint_room_capacity(const solution *sol);
-int solution_soft_constraint_min_working_days(const solution *sol);
-int solution_soft_constraint_curriculum_compactness(const solution *sol);
-int solution_soft_constraint_room_stability(const solution *sol);
+int solution_room_capacity_cost(const solution *sol);
+int solution_min_working_days_cost(const solution *sol);
+int solution_curriculum_compactness_cost(const solution *sol);
+int solution_room_stability_cost(const solution *sol);
 
 #endif // SOLUTION_H
