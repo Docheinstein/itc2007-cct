@@ -366,47 +366,12 @@ char * solution_to_string(const solution *sol) {
     return buffer;
 }
 
-char *solution_quality_to_string(solution *sol) {
-    int h1 = solution_lectures_violations(sol);
-    int h2 = solution_room_occupancy_violations(sol);
-    int h3 = solution_conflicts_violations(sol);
-    int h4 = solution_availabilities_violations(sol);
-    int s1 = solution_room_capacity_cost(sol);
-    int s2 = solution_min_working_days_cost(sol);
-    int s3 = solution_curriculum_compactness_cost(sol);
-    int s4 = solution_room_stability_cost(sol);
-
-    return strmake(
-            "HARD constraints satisfied: %s\n"
-            "\tLectures violations: %d\n"
-            "\tRoomOccupancy violations: %d\n"
-            "\tConflicts violations: %d\n"
-            "\tAvailabilities violations: %d\n"
-            "SOFT constraints cost: %d\n"
-            "\tRoomCapacity cost: %d\n"
-            "\tMinWorkingDays cost: %d\n"
-            "\tCurriculumCompactness cost: %d\n"
-            "\tRoomStability cost: %d",
-            BOOL_TO_STR(!h1 && !h2 && !h3 && !h4),
-            h1,
-            h2,
-            h3,
-            h4,
-            s1 + s2 + s3 + s4,
-            s1,
-            s2,
-            s3,
-            s4
-    );
-}
-
-
 bool solution_satisfy_hard_constraints(const solution *sol) {
     return
             solution_satisfy_lectures(sol) &&
             solution_satisfy_room_occupancy(sol) &&
             solution_satisfy_conflicts(sol) &&
-                    solution_satisfy_availabilities(sol);
+            solution_satisfy_availabilities(sol);
 }
 
 bool solution_satisfy_lectures(const solution *sol) {
@@ -426,7 +391,7 @@ bool solution_satisfy_conflicts(const solution *sol) {
     return solution_conflicts_violations(sol) == 0;
 }
 
-static int solution_hard_constraint_lectures_violations_a(const solution *sol) {
+static int solution_hard_constraint_lectures_violations_a(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
     int violations = 0;
 
@@ -444,6 +409,11 @@ static int solution_hard_constraint_lectures_violations_a(const solution *sol) {
             debug2("H1 (Lectures) violation: %d lectures assigned instead of %d "
                   "for course '%s'",
                   n, course->n_lectures, course->id);
+            if (*strout)
+                strappend_realloc(strout, strsize,
+                  "H1 (Lectures) violation: %d lectures assigned instead of %d "
+                  "for course '%s'\n",
+                  n, course->n_lectures, course->id);
             violations++;
         }
     }
@@ -451,29 +421,12 @@ static int solution_hard_constraint_lectures_violations_a(const solution *sol) {
     return violations;
 }
 
-static int solution_hard_constraint_lectures_violations_b(const solution *sol) {
+static int solution_hard_constraint_lectures_violations_b(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int violations = 0;
     int *room_usage = callocx(sol->model->n_courses * sol->model->n_days * sol->model->n_slots, sizeof(int));
-//#if 0
-//    FOR_C {
-//        FOR_D {
-//            FOR_S {
-//                int n = 0;
-//                FOR_R {
-//                    n += solution_get(sol, c, r, d, s);
-//                }
-//                if (!(n <= 1)) {
-//                    debug2("H1 (Lectures) violation: %d rooms used for course '%s' "
-//                          "on (day=%d, slot=%d)",
-//                          n, sol->model->courses[c].id, d, s);
-//                    violations++;
-//                }
-//            }
-//        }
-//    }
-//#endif
+
     FOR_C {
         FOR_R {
             FOR_D {
@@ -492,6 +445,11 @@ static int solution_hard_constraint_lectures_violations_b(const solution *sol) {
                     debug2("H1 (Lectures) violation: %d rooms used for course '%s' "
                           "on (day=%d, slot=%d)",
                           n, sol->model->courses[c].id, d, s);
+                    if (*strout)
+                        strappend_realloc(strout, strsize,
+                          "H1 (Lectures) violation: %d rooms used for course '%s' "
+                          "on (day=%d, slot=%d)\n",
+                          n, sol->model->courses[c].id, d, s);
                     violations++;
                 }
              }
@@ -502,13 +460,17 @@ static int solution_hard_constraint_lectures_violations_b(const solution *sol) {
     return violations;
 }
 
-int solution_lectures_violations(const solution *sol) {
+static int solution_lectures_violations_dump(const solution *sol, char **strout, size_t *strsize) {
     return
-        solution_hard_constraint_lectures_violations_a(sol) +
-        solution_hard_constraint_lectures_violations_b(sol);
+        solution_hard_constraint_lectures_violations_a(sol, strout, strsize) +
+        solution_hard_constraint_lectures_violations_b(sol, strout, strsize);
 }
 
-int solution_room_occupancy_violations(const solution *sol) {
+int solution_lectures_violations(const solution *sol) {
+    return solution_lectures_violations_dump(sol, NULL, NULL);
+}
+
+static int solution_room_occupancy_violations_dump(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int violations = 0;
@@ -524,6 +486,11 @@ int solution_room_occupancy_violations(const solution *sol) {
                     debug2("H2 (RoomOccupancy) violation: %d courses in room '%s' "
                           "on (day=%d, slot=%d)",
                           n, sol->model->rooms[r].id, d, s);
+                    if (*strout)
+                        strappend_realloc(strout, strsize,
+                        "H2 (RoomOccupancy) violation: %d courses in room '%s' "
+                        "on (day=%d, slot=%d)\n",
+                        n, sol->model->rooms[r].id, d, s);
                     violations++;
                 }
             };
@@ -533,7 +500,11 @@ int solution_room_occupancy_violations(const solution *sol) {
     return violations;
 }
 
-static int solution_hard_constraint_conflicts_violations_a(const solution *sol) {
+int solution_room_occupancy_violations(const solution *sol) {
+    return solution_room_occupancy_violations_dump(sol, NULL, NULL);
+}
+
+static int solution_hard_constraint_conflicts_violations_a(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int violations = 0;
@@ -556,6 +527,11 @@ static int solution_hard_constraint_conflicts_violations_a(const solution *sol) 
                     debug2("H3 (Conflicts) violation: %d courses of curriculum '%s' "
                           "scheduled on (day=%d, slot=%d)",
                           n, sol->model->curriculas[q].id, d, s);
+                    if (*strout)
+                        strappend_realloc(strout, strsize,
+                        "H3 (Conflicts) violation: %d courses of curriculum '%s' "
+                        "scheduled on (day=%d, slot=%d)\n",
+                        n, sol->model->curriculas[q].id, d, s);
                     violations++;
                 }
             }
@@ -565,7 +541,7 @@ static int solution_hard_constraint_conflicts_violations_a(const solution *sol) 
     return violations;
 }
 
-static int solution_hard_constraint_conflicts_violations_b(const solution *sol) {
+static int solution_hard_constraint_conflicts_violations_b(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int violations = 0;
@@ -587,6 +563,11 @@ static int solution_hard_constraint_conflicts_violations_b(const solution *sol) 
                     debug2("H3 (Conflicts) violation: %d courses taught by "
                           "teacher '%s' scheduled on (day=%d, slot=%d)",
                           n, sol->model->teachers[t].id, d, s);
+                    if (*strout)
+                        strappend_realloc(strout, strsize,
+                        "H3 (Conflicts) violation: %d courses taught by "
+                        "teacher '%s' scheduled on (day=%d, slot=%d)\n",
+                        n, sol->model->teachers[t].id, d, s);
                     violations++;
                 }
             }
@@ -596,13 +577,17 @@ static int solution_hard_constraint_conflicts_violations_b(const solution *sol) 
     return violations;
 }
 
-int solution_conflicts_violations(const solution *sol) {
+static int solution_conflicts_violations_dump(const solution *sol, char **strout, size_t *strsize) {
     return
-        solution_hard_constraint_conflicts_violations_a(sol) +
-        solution_hard_constraint_conflicts_violations_b(sol);
+        solution_hard_constraint_conflicts_violations_a(sol, strout, strsize) +
+        solution_hard_constraint_conflicts_violations_b(sol, strout, strsize);
 }
 
-int solution_availabilities_violations(const solution *sol) {
+int solution_conflicts_violations(const solution *sol) {
+    return solution_conflicts_violations_dump(sol, NULL, NULL);
+}
+
+static int solution_availabilities_violations_dump(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int violations = 0;
@@ -618,6 +603,11 @@ int solution_availabilities_violations(const solution *sol) {
                     debug2("H4 (Availabilities) violation: course '%s' scheduled %d time(s) on "
                           "(day=%d, slot=%d) but breaks unavailability constraint",
                           sol->model->courses[c].id, n, d, s);
+                    if (*strout)
+                        strappend_realloc(strout, strsize,
+                            "H4 (Availabilities) violation: course '%s' scheduled %d time(s) on "
+                            "(day=%d, slot=%d) but breaks unavailability constraint\n",
+                            sol->model->courses[c].id, n, d, s);
                     violations++;
                 }
             };
@@ -625,6 +615,10 @@ int solution_availabilities_violations(const solution *sol) {
     }
 
     return violations;
+}
+
+int solution_availabilities_violations(const solution *sol) {
+    return solution_availabilities_violations_dump(sol, NULL, NULL);
 }
 
 int solution_cost(const solution *sol) {
@@ -637,7 +631,7 @@ int solution_cost(const solution *sol) {
 
 
 
-int solution_room_capacity_cost(const solution *sol) {
+static int solution_room_capacity_cost_dump(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int penalties = 0;
@@ -655,6 +649,14 @@ int solution_room_capacity_cost(const solution *sol) {
                                   sol->model->courses[c].id, sol->model->courses[c].n_students,
                                   sol->model->rooms[r].id, sol->model->rooms[r].capacity,
                                   d, s);
+                            if (*strout)
+                                strappend_realloc(strout, strsize,
+                                    "S1 (RoomCapacity) penalty: course '%s' has %d"
+                                    " students but it's scheduled in room '%s' with %d "
+                                    "seats on (day=%d, slot=%d)\n",
+                                    sol->model->courses[c].id, sol->model->courses[c].n_students,
+                                    sol->model->rooms[r].id, sol->model->rooms[r].capacity,
+                                    d, s);
                             penalties += delta;
                         }
                     }
@@ -666,7 +668,11 @@ int solution_room_capacity_cost(const solution *sol) {
     return penalties * ROOM_CAPACITY_COST;
 }
 
-int solution_min_working_days_cost(const solution *sol) {
+int solution_room_capacity_cost(const solution *sol) {
+    return solution_room_capacity_cost_dump(sol, NULL, NULL);
+}
+
+static int solution_min_working_days_cost_dump(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int penalties = 0;
@@ -692,6 +698,13 @@ int solution_min_working_days_cost(const solution *sol) {
                   "but Minimum Working Days is %d",
                   sol->model->courses[c].id, sum_y_cd,
                   sol->model->courses[c].min_working_days);
+            if (*strout)
+                strappend_realloc(strout, strsize,
+                    "S2 (MinWorkingDays) penalty: course '%s' spread among %d different days "
+                    "but Minimum Working Days is %d\n",
+                    sol->model->courses[c].id, sum_y_cd,
+                    sol->model->courses[c].min_working_days);
+
             penalties += delta;
         }
     };
@@ -699,7 +712,12 @@ int solution_min_working_days_cost(const solution *sol) {
     return penalties * MIN_WORKING_DAYS_COST;
 }
 
-int solution_curriculum_compactness_cost(const solution *sol) {
+int solution_min_working_days_cost(const solution *sol) {
+    return solution_min_working_days_cost_dump(sol, NULL, NULL);
+}
+
+static int solution_curriculum_compactness_cost_dump(const solution *sol,
+                                                     char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int penalties = 0;
@@ -732,6 +750,12 @@ int solution_curriculum_compactness_cost(const solution *sol) {
                     debug2("S3 (CurriculumCompactness) penalty: curriculum '%s' "
                           "has a course scheduled alone on (day=%d, slot=%d) without adjacent lessons",
                           sol->model->curriculas[q].id, d, s);
+                    if (*strout)
+                        strappend_realloc(strout, strsize,
+                            "S3 (CurriculumCompactness) penalty: curriculum '%s' "
+                            "has a course scheduled alone on (day=%d, slot=%d) without adjacent lessons\n",
+                            sol->model->curriculas[q].id, d, s);
+
                     penalties++;
                 }
             }
@@ -742,7 +766,12 @@ int solution_curriculum_compactness_cost(const solution *sol) {
     return penalties * CURRICULUM_COMPACTNESS_COST;
 }
 
-int solution_room_stability_cost(const solution *sol) {
+int solution_curriculum_compactness_cost(const solution *sol) {
+    return solution_curriculum_compactness_cost_dump(sol, NULL, NULL);
+}
+
+static int solution_room_stability_cost_dump(const solution *sol,
+                                             char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
     int penalties = 0;
@@ -765,12 +794,68 @@ int solution_room_stability_cost(const solution *sol) {
         if (sum_w_cr > 1) {
             debug2("S4 (RoomStability) penalty: course '%s' uses %d rooms",
                   sol->model->courses[c].id, sum_w_cr);
+            if (*strout)
+                strappend_realloc(strout, strsize,
+                    "S4 (RoomStability) penalty: course '%s' uses %d rooms\n",
+                    sol->model->courses[c].id, sum_w_cr);
+
             penalties += sum_w_cr - 1;
         }
     };
 
     return penalties * ROOM_STABILITY_COST;
 }
+
+int solution_room_stability_cost(const solution *sol) {
+    return solution_room_stability_cost_dump(sol, NULL, NULL);
+}
+
+char *solution_quality_to_string(solution *sol, bool verbose) {
+    char *str = NULL;
+    size_t strsize;
+
+    if (verbose)
+        strappend_realloc(&str, &strsize, "%s", "");
+
+    int h1 = solution_lectures_violations_dump(sol, &str, &strsize);
+    int h2 = solution_room_occupancy_violations_dump(sol, &str, &strsize);
+    int h3 = solution_conflicts_violations_dump(sol, &str, &strsize);
+    int h4 = solution_availabilities_violations_dump(sol, &str, &strsize);
+    int s1 = solution_room_capacity_cost_dump(sol, &str, &strsize);
+    int s2 = solution_min_working_days_cost_dump(sol, &str, &strsize);
+    int s3 = solution_curriculum_compactness_cost_dump(sol, &str, &strsize);
+    int s4 = solution_room_stability_cost_dump(sol, &str, &strsize);
+
+    if (!str)
+        strappend_realloc(&str, &strsize, "");
+
+    strappend_realloc(&str, &strsize,
+        "HARD constraints satisfied: %s\n"
+        "  Lectures violations: %d\n"
+        "  RoomOccupancy violations: %d\n"
+        "  Conflicts violations: %d\n"
+        "  Availabilities violations: %d\n"
+        "SOFT constraints cost: %d\n"
+        "  RoomCapacity cost: %d\n"
+        "  MinWorkingDays cost: %d\n"
+        "  CurriculumCompactness cost: %d\n"
+        "  RoomStability cost: %d",
+        BOOL_TO_STR(!h1 && !h2 && !h3 && !h4),
+        h1,
+        h2,
+        h3,
+        h4,
+        s1 + s2 + s3 + s4,
+        s1,
+        s2,
+        s3,
+        s4
+    );
+
+    return str;
+}
+
+
 
 void solution_parser_init(solution_parser *solution_parser) {
     solution_parser->error = NULL;

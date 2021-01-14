@@ -286,14 +286,14 @@ int main (int argc, char **argv) {
 
     if (solution_loaded || args.force_draw) {
         char *sol_str = solution_to_string(&sol);
-        char *sol_quality_str = solution_quality_to_string(&sol);
+        char *sol_quality_str = solution_quality_to_string(&sol, true);
 
         print("====== SOLUTION ======\n"
               "%s\n"
               "----------------------\n"
               "%s",
-              sol_quality_str,
-              sol_str);
+              sol_str,
+              sol_quality_str);
 
         free(sol_str);
         free(sol_quality_str);

@@ -102,7 +102,7 @@ void solution_set_at(solution *sol, int index, bool value);
 bool solution_get_at(const solution *sol, int index);
 
 char * solution_to_string(const solution *sol);
-char * solution_quality_to_string(solution *sol);
+char * solution_quality_to_string(solution *sol, bool verbose);
 
 unsigned long long solution_fingerprint(const solution *sol);
 

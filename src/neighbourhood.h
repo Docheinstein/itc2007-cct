@@ -15,6 +15,7 @@ typedef struct neighbourhood_swap_result {
     int c2;
     bool feasible;
     int delta_cost;
+    // TODO: remove, keep just for debug
     int delta_cost_room_capacity;
     int delta_cost_min_working_days;
     int delta_cost_curriculum_compactness;
