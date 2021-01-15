@@ -89,6 +89,9 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "log/debug.h"
 #include "neighbourhood.h"
 #include "local_search_solver.h"
+#include <sys/time.h>   /* for setitimer */
+#include <unistd.h>     /* for pause */
+#include <signal.h>     /* for signal */
 
 int main (int argc, char **argv) {
     args args;
@@ -168,12 +171,6 @@ int main (int argc, char **argv) {
             exact_solver_config_destroy(&conf);
             exact_solver_destroy(&solver);
         } else if (args.method == RESOLUTION_METHOD_LOCAL_SEARCH) {
-            if (args.time_limit == ARG_INT_NONE && args.multistart == ARG_INT_NONE) {
-                print("WARN: you should probably use either "
-                      "time limit (-t) or multistart (-n) for heuristics methods.\n"
-                      "Will do a single run...");
-            }
-
             local_search_solver_config config;
             local_search_solver_config_init(&config);
             config.multistart = args.multistart;
