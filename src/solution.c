@@ -55,7 +55,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
     CRDSQT(sol->model)
     const model *model = sol->model;
 
-    debug("@@ solution_helper_compute @@");
+    debug2("@@ solution_helper_compute @@");
 
     memset(helper->c_rds, -1, R * D * S * sizeof(int));
     memset(helper->r_cds, -1, C * D * S * sizeof(int));
@@ -409,7 +409,7 @@ static int solution_hard_constraint_lectures_violations_a(const solution *sol, c
             debug2("H1 (Lectures) violation: %d lectures assigned instead of %d "
                   "for course '%s'",
                   n, course->n_lectures, course->id);
-            if (*strout)
+            if (strout)
                 strappend_realloc(strout, strsize,
                   "H1 (Lectures) violation: %d lectures assigned instead of %d "
                   "for course '%s'\n",
@@ -445,7 +445,7 @@ static int solution_hard_constraint_lectures_violations_b(const solution *sol, c
                     debug2("H1 (Lectures) violation: %d rooms used for course '%s' "
                           "on (day=%d, slot=%d)",
                           n, sol->model->courses[c].id, d, s);
-                    if (*strout)
+                    if (strout)
                         strappend_realloc(strout, strsize,
                           "H1 (Lectures) violation: %d rooms used for course '%s' "
                           "on (day=%d, slot=%d)\n",
@@ -486,7 +486,7 @@ static int solution_room_occupancy_violations_dump(const solution *sol, char **s
                     debug2("H2 (RoomOccupancy) violation: %d courses in room '%s' "
                           "on (day=%d, slot=%d)",
                           n, sol->model->rooms[r].id, d, s);
-                    if (*strout)
+                    if (strout)
                         strappend_realloc(strout, strsize,
                         "H2 (RoomOccupancy) violation: %d courses in room '%s' "
                         "on (day=%d, slot=%d)\n",
@@ -527,7 +527,7 @@ static int solution_hard_constraint_conflicts_violations_a(const solution *sol, 
                     debug2("H3 (Conflicts) violation: %d courses of curriculum '%s' "
                           "scheduled on (day=%d, slot=%d)",
                           n, sol->model->curriculas[q].id, d, s);
-                    if (*strout)
+                    if (strout)
                         strappend_realloc(strout, strsize,
                         "H3 (Conflicts) violation: %d courses of curriculum '%s' "
                         "scheduled on (day=%d, slot=%d)\n",
@@ -563,7 +563,7 @@ static int solution_hard_constraint_conflicts_violations_b(const solution *sol, 
                     debug2("H3 (Conflicts) violation: %d courses taught by "
                           "teacher '%s' scheduled on (day=%d, slot=%d)",
                           n, sol->model->teachers[t].id, d, s);
-                    if (*strout)
+                    if (strout)
                         strappend_realloc(strout, strsize,
                         "H3 (Conflicts) violation: %d courses taught by "
                         "teacher '%s' scheduled on (day=%d, slot=%d)\n",
@@ -603,7 +603,7 @@ static int solution_availabilities_violations_dump(const solution *sol, char **s
                     debug2("H4 (Availabilities) violation: course '%s' scheduled %d time(s) on "
                           "(day=%d, slot=%d) but breaks unavailability constraint",
                           sol->model->courses[c].id, n, d, s);
-                    if (*strout)
+                    if (strout)
                         strappend_realloc(strout, strsize,
                             "H4 (Availabilities) violation: course '%s' scheduled %d time(s) on "
                             "(day=%d, slot=%d) but breaks unavailability constraint\n",
@@ -649,7 +649,7 @@ static int solution_room_capacity_cost_dump(const solution *sol, char **strout, 
                                   sol->model->courses[c].id, sol->model->courses[c].n_students,
                                   sol->model->rooms[r].id, sol->model->rooms[r].capacity,
                                   d, s);
-                            if (*strout)
+                            if (strout)
                                 strappend_realloc(strout, strsize,
                                     "S1 (RoomCapacity) penalty: course '%s' has %d"
                                     " students but it's scheduled in room '%s' with %d "
@@ -698,7 +698,7 @@ static int solution_min_working_days_cost_dump(const solution *sol, char **strou
                   "but Minimum Working Days is %d",
                   sol->model->courses[c].id, sum_y_cd,
                   sol->model->courses[c].min_working_days);
-            if (*strout)
+            if (strout)
                 strappend_realloc(strout, strsize,
                     "S2 (MinWorkingDays) penalty: course '%s' spread among %d different days "
                     "but Minimum Working Days is %d\n",
@@ -750,7 +750,7 @@ static int solution_curriculum_compactness_cost_dump(const solution *sol,
                     debug2("S3 (CurriculumCompactness) penalty: curriculum '%s' "
                           "has a course scheduled alone on (day=%d, slot=%d) without adjacent lessons",
                           sol->model->curriculas[q].id, d, s);
-                    if (*strout)
+                    if (strout)
                         strappend_realloc(strout, strsize,
                             "S3 (CurriculumCompactness) penalty: curriculum '%s' "
                             "has a course scheduled alone on (day=%d, slot=%d) without adjacent lessons\n",
@@ -794,7 +794,7 @@ static int solution_room_stability_cost_dump(const solution *sol,
         if (sum_w_cr > 1) {
             debug2("S4 (RoomStability) penalty: course '%s' uses %d rooms",
                   sol->model->courses[c].id, sum_w_cr);
-            if (*strout)
+            if (strout)
                 strappend_realloc(strout, strsize,
                     "S4 (RoomStability) penalty: course '%s' uses %d rooms\n",
                     sol->model->courses[c].id, sum_w_cr);

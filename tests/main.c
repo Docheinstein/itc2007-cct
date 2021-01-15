@@ -9,6 +9,8 @@
 #include <utils/array_utils.h>
 #include <log/debug.h>
 #include <utils/random_utils.h>
+#include <neighbourhood.h>
+#include <feasible_solution_finder.h>
 #include "utils/os_utils.h"
 
 #define BUFLEN 128
@@ -373,8 +375,8 @@ MUNIT_TEST(test_solution_to_string) {
 }
 
 static MunitResult test_solution(const char *dataset_file, const char *solution_file,
-                                      bool h1, bool h2, bool h3, bool h4,
-                                      int s1, int s2, int s3, int s4) {
+                                  bool h1, bool h2, bool h3, bool h4,
+                                  int s1, int s2, int s3, int s4) {
 
     model m;
     model_init(&m);
@@ -486,6 +488,185 @@ MUNIT_TEST(test_index_rindex) {
     return MUNIT_OK;
 }
 
+static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *dataset_file) {
+
+    model m;
+    model_init(&m);
+
+    parser parser;
+    parser_init(&parser);
+    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+
+    feasible_solution_finder finder;
+    feasible_solution_finder_init(&finder);
+
+    feasible_solution_finder_config finder_config;
+    feasible_solution_finder_config_init(&finder_config);
+
+    solution sol;
+    solution_init(&sol, &m);
+
+    while (!feasible_solution_finder_find(&finder, &finder_config, &sol))
+        ;
+
+    neighbourhood_swap_result swap_result;
+    int cost = solution_cost(&sol);
+
+    bool improved;
+    do {
+        int c1, r1, d1, s1, r2, d2, s2;
+        improved = false;
+
+        solution sol_neigh;
+        solution_init(&sol_neigh, &m);
+        solution_copy(&sol_neigh, &sol);
+
+        neighbourhood_swap_iter iter;
+        neighbourhood_swap_iter_init(&iter, &sol_neigh);
+        while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
+            bool restart = false;
+
+            int c_rm = solution_room_capacity_cost(&sol_neigh);
+            int c_mwd = solution_min_working_days_cost(&sol_neigh);
+            int c_cc = solution_curriculum_compactness_cost(&sol_neigh);
+            int c_rs = solution_room_stability_cost(&sol_neigh);
+
+            neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2,
+                               NEIGHBOURHOOD_PREDICT_ALWAYS,
+                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PERFORM_ALWAYS,
+                               &swap_result);
+
+            if (swap_result.feasible) {
+                munit_assert_true(solution_satisfy_hard_constraints(&sol_neigh));
+
+                int c_rm_after = solution_room_capacity_cost(&sol_neigh);
+                int c_mwd_after = solution_min_working_days_cost(&sol_neigh);
+                int c_cc_after = solution_curriculum_compactness_cost(&sol_neigh);
+                int c_rs_after = solution_room_stability_cost(&sol_neigh);
+
+                munit_assert_int(c_rm_after, ==, c_rm + swap_result.delta_cost_room_capacity);
+                munit_assert_int(c_mwd_after, ==, c_mwd + swap_result.delta_cost_min_working_days);
+                munit_assert_int(c_cc_after, ==, c_cc + swap_result.delta_cost_curriculum_compactness);
+                munit_assert_int(c_rs_after, ==, c_rs + swap_result.delta_cost_room_stability);
+
+                int neigh_cost = cost + swap_result.delta_cost;
+
+                if (neigh_cost < cost) {
+                    cost = neigh_cost;
+                    solution_copy(&sol, &sol_neigh);
+                    improved = true;
+                    restart = true;
+                } else {
+                    neighbourhood_swap_back(&sol_neigh, c1, r1, d1, s1, swap_result.c2, r2, d2, s2);
+                }
+            } else {
+                munit_assert_false(solution_satisfy_hard_constraints(&sol_neigh));
+                neighbourhood_swap_back(&sol_neigh, c1, r1, d1, s1, swap_result.c2, r2, d2, s2);
+            }
+
+            if (restart)
+                break;
+        }
+
+        solution_destroy(&sol_neigh);
+        neighbourhood_swap_iter_destroy(&iter);
+    } while (cost > 0 && improved);
+
+    solution_destroy(&sol);
+    model_destroy(&m);
+    return MUNIT_OK;
+}
+
+static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_better(const char *dataset_file) {
+
+    model m;
+    model_init(&m);
+
+    parser parser;
+    parser_init(&parser);
+    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+
+    feasible_solution_finder finder;
+    feasible_solution_finder_init(&finder);
+
+    feasible_solution_finder_config finder_config;
+    feasible_solution_finder_config_init(&finder_config);
+
+    solution sol;
+    solution_init(&sol, &m);
+
+    while (!feasible_solution_finder_find(&finder, &finder_config, &sol))
+        ;
+
+    neighbourhood_swap_result swap_result;
+    int cost = solution_cost(&sol);
+
+    bool improved;
+
+    do {
+        int c1, r1, d1, s1, r2, d2, s2;
+        improved = false;
+
+        solution sol_neigh;
+        solution_init(&sol_neigh, &m);
+        solution_copy(&sol_neigh, &sol);
+
+        neighbourhood_swap_iter iter;
+        neighbourhood_swap_iter_init(&iter, &sol_neigh);
+        while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
+            bool restart = false;
+
+            if (neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2,
+                               NEIGHBOURHOOD_PREDICT_ALWAYS,
+                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
+                               &swap_result)) {
+                munit_assert_true(solution_satisfy_hard_constraints(&sol_neigh));
+                munit_assert_true(swap_result.feasible);
+                int neigh_cost = cost + swap_result.delta_cost;
+                munit_assert_int(neigh_cost, <, cost);
+                cost = neigh_cost;
+                solution_copy(&sol, &sol_neigh);
+                improved = true;
+                restart = true;
+            } else {
+                if (swap_result.feasible) {
+                    munit_assert_true(solution_satisfy_hard_constraints(&sol_neigh));
+                    munit_assert_true(swap_result.feasible);
+                    int neigh_cost = cost + swap_result.delta_cost;
+                    munit_assert_int(neigh_cost, >=, cost);
+                } else {
+                    munit_assert_true(solution_satisfy_hard_constraints(&sol_neigh));
+                    munit_assert_false(swap_result.feasible);
+                }
+            }
+
+            if (restart)
+                break;
+        }
+
+        solution_destroy(&sol_neigh);
+        neighbourhood_swap_iter_destroy(&iter);
+    } while (cost > 0 && improved);
+
+    solution_destroy(&sol);
+    model_destroy(&m);
+    return MUNIT_OK;
+}
+
+MUNIT_TEST(test_compute_neighbourhood_swap_cost_constraints_toytoy) {
+    return test_compute_neighbourhood_swap_cost_constraints("datasets/toytoy.ctt");
+}
+
+MUNIT_TEST(test_compute_neighbourhood_swap_perform_if_feasible_and_better_toytoy) {
+    return test_compute_neighbourhood_swap_perform_if_feasible_and_better("datasets/toytoy.ctt");
+}
+
+MUNIT_TEST(test_compute_neighbourhood_swap_cost_constraints_comp01) {
+    return test_compute_neighbourhood_swap_cost_constraints("datasets/comp01.ctt");
+}
+
 // ======================= END TESTS =======================
 
 static MunitTest tests[] = {
@@ -513,6 +694,9 @@ static MunitTest tests[] = {
     { "test_solution_cost_comp01_463", test_solution_cost_comp01_463, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_comp01_57", test_solution_cost_comp01_57, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_index_rindex", test_index_rindex, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_compute_neighbourhood_swap_cost_constraints_toytoy", test_compute_neighbourhood_swap_cost_constraints_toytoy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_compute_neighbourhood_swap_perform_if_feasible_and_better_toytoy", test_compute_neighbourhood_swap_perform_if_feasible_and_better_toytoy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+//    { "test_compute_neighbourhood_swap_cost_constraints_comp01", test_compute_neighbourhood_swap_cost_constraints_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     MUNIT_TESTS_END
 };
 

@@ -2,19 +2,10 @@
 #include <log/debug.h>
 #include <log/verbose.h>
 #include <utils/str_utils.h>
-#include <utils/io_utils.h>
 #include "neighbourhood.h"
 #include "feasible_solution_finder.h"
-#include "renderer.h"
 
 static void do_local_search(solution *sol) {
-#if DEBUG
-    if (solution_fingerprint(sol) != solution_fingerprint(sol)) {
-        eprint("Different fingerprint after solution copy");
-        exit(4);
-    }
-#endif
-
     neighbourhood_swap_result swap_result;
 
     int cost = solution_cost(sol);
@@ -22,11 +13,8 @@ static void do_local_search(solution *sol) {
     int i = 0;
     bool improved;
     do {
-        debug("Begin LS major cycle %d", i);
-
-        int c1, r1, d1, s1, c2, r2, d2, s2;
+        int c1, r1, d1, s1, r2, d2, s2;
         int j = 0;
-
         improved = false;
 
         solution sol_neigh;
@@ -35,119 +23,26 @@ static void do_local_search(solution *sol) {
 
         neighbourhood_swap_iter iter;
         neighbourhood_swap_iter_init(&iter, &sol_neigh);
+
         while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
             bool restart = false;
 
             debug("[%d.%d] LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
                    i, j, c1, r1, d1, s1, r2, d2, s2);
 
-//            render_solution_overview(&sol_neigh, "/tmp/before-swap.png");
-#if 0
-            debug("---- BEFORE SWAP ----");
-            print_solution(&sol_neigh);
-            char tmp[256];
-            snprintf(tmp, 256, "/tmp/%d-%d_a_before-swap.png", i, j);
-            render_solution_overview(&sol_neigh, tmp);
-#endif
-
-#if DEBUG
-            int cost1 = solution_room_capacity_cost(&sol_neigh);
-            int cost2 = solution_min_working_days_cost(&sol_neigh);
-            int cost3 = solution_curriculum_compactness_cost(&sol_neigh);
-            int cost4 = solution_room_stability_cost(&sol_neigh);
-            debug("cost1=%d", cost1);
-            debug("cost2=%d", cost2);
-            debug("cost3=%d", cost3);
-            debug("cost4=%d", cost4);
-#endif
-
-//          render_solution_overview(&sol_neigh, "/tmp/sol-before.png");
-            neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2, &swap_result);
-            if (swap_result.feasible) {
+            if (neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2,
+                               NEIGHBOURHOOD_PREDICT_ALWAYS,
+                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
+                               &swap_result)) {
                 // Feasible solution after swap
-                debug("[%d.%d] Performed feasible LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)",
-                      i, j, c1, r1, d1, s1, r2, d2, s2);
-
-#if DEBUG
-                if (!solution_satisfy_hard_constraints(&sol_neigh)) {
-                    eprint("After valid swap, solution must satisfy hard constraints");
-                    render_solution_overview(&sol_neigh, "/tmp/failure.png");
-                    exit(3);
-                }
-
-                int cost1_after = solution_room_capacity_cost(&sol_neigh);
-                int cost2_after = solution_min_working_days_cost(&sol_neigh);
-                int cost3_after = solution_curriculum_compactness_cost(&sol_neigh);
-                int cost4_after = solution_room_stability_cost(&sol_neigh);
-                debug("cost1_after=%d", cost1);
-                debug("cost2_after=%d", cost2);
-                debug("cost3_after=%d", cost3);
-                debug("cost4_after=%d", cost4);
-
-
-                if (cost1_after != cost1 + swap_result.delta_cost_room_capacity) {
-                    eprint("Computed wrong RoomCapacity cost; expected %d - found %d + %d",
-                           cost1_after, cost1, swap_result.delta_cost_room_capacity);
-                    exit(1);
-                }
-
-                if (cost2_after != cost2 + swap_result.delta_cost_min_working_days) {
-                    eprint("Computed wrong MinWorkingDays cost; expected %d - found %d + %d",
-                           cost2_after, cost2, swap_result.delta_cost_min_working_days);
-                    render_solution_overview(&sol_neigh, "/tmp/sol.png");
-                    write_solution(&sol_neigh, "/tmp/sol.ctt.sol");
-                    exit(1);
-                }
-
-                if (cost3_after != cost3 + swap_result.delta_cost_curriculum_compactness) {
-                    eprint("Computed wrong CurCompactness cost; expected %d - found %d + %d",
-                           cost3_after, cost3, swap_result.delta_cost_curriculum_compactness);
-                    render_solution_overview(&sol_neigh, "/tmp/sol.png");
-                    exit(1);
-                }
-
-                if (cost4_after != cost4 + swap_result.delta_cost_room_stability) {
-                    eprint("Computed wrong RoomStability cost; expected %d - found %d + %d",
-                           cost4_after, cost4, swap_result.delta_cost_room_stability);
-                    render_solution_overview(&sol_neigh, "/tmp/sol.png");
-                    exit(1);
-                }
-#endif
                 int neigh_cost = cost + swap_result.delta_cost;
+                debug("[%d.%d] LS: solution improved, cost = %d", i, j, neigh_cost);
 
-#if DEBUG
-                int neigh_cost_real = solution_cost(&sol_neigh);
-                if (neigh_cost_real != neigh_cost) {
-                    debug("Expected cost = %d, found = %d", neigh_cost_real, neigh_cost);
-                    exit(1);
-                }
-#endif
-
-                if (neigh_cost < cost) {
-                    debug("[%d.%d] LS: solution improved, cost = %d", i, j, neigh_cost);
-                    cost = neigh_cost;
-                    solution_copy(sol, &sol_neigh);
-                    improved = true;
-                    restart = true;
-                } else {
-                    debug("[%d.%d] LS: solution NOT improved, cost %d >= %d", i, j, neigh_cost, cost);
-
-                    // Swap back
-                    debug("[%d.%d] swap back", i, j);
-                    neighbourhood_swap_back(&sol_neigh, c1, r1, d1, s1, swap_result.c2, r2, d2, s2);
-                }
-            } else {
-#if 0
-                debug("[%d.%d] Skipped infeasible LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)",
-                      i, j, c1, r1, d1, s1, r2, d2, s2);
-
-                if (solution_satisfy_hard_constraints(&sol_neigh)) {
-                    eprint("After invalid swap, solution must NOT satisfy hard constraints");
-                    render_solution_overview(sol, "/tmp/sol_before_neigh.png");
-                    render_solution_overview(&sol_neigh, "/tmp/sol_after_neigh.png");
-                    exit(3);
-                }
-#endif
+                cost = neigh_cost;
+                solution_copy(sol, &sol_neigh);
+                improved = true;
+                restart = true;
             }
 
             j++;

@@ -22,13 +22,31 @@ typedef struct neighbourhood_swap_result {
     int delta_cost_room_stability;
 } neighbourhood_swap_result;
 
+typedef enum neighbourhood_prediction_strategy {
+    NEIGHBOURHOOD_PREDICT_ALWAYS,
+    NEIGHBOURHOOD_PREDICT_IF_FEASIBLE
+} neighbourhood_prediction_strategy;
+
+typedef enum neighbourhood_performing_strategy {
+    NEIGHBOURHOOD_PERFORM_ALWAYS,
+    NEIGHBOURHOOD_PERFORM_IF_FEASIBLE,
+    NEIGHBOURHOOD_PERFORM_IF_BETTER,
+    NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
+} neighbourhood_performing_strategy;
+
 void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol);
 void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter);
 bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter, int *c1,
                                   int *r1, int *d1, int *s1,
                                   int *r2, int *d2, int *s2);
-void neighbourhood_swap(solution *sol,
+void neighbourhood_swap_predict(solution *sol,
                         int c1, int r1, int d1, int s1, int r2, int d2, int s2,
+                        neighbourhood_swap_result *result);
+bool neighbourhood_swap(solution *sol,
+                        int c1, int r1, int d1, int s1, int r2, int d2, int s2,
+                        neighbourhood_prediction_strategy predict_feasibility,
+                        neighbourhood_prediction_strategy predict_cost,
+                        neighbourhood_performing_strategy perform,
                         neighbourhood_swap_result *result);
 
 void neighbourhood_swap_back(solution *sol,

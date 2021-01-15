@@ -45,10 +45,10 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter, int *c1,
                     iter->r1 = RINDEX3_0(iter->rds_index, R, D, S);
                     iter->d1 = RINDEX3_1(iter->rds_index, R, D, S);
                     iter->s1 = RINDEX3_2(iter->rds_index, R, D, S);
-                    debug("Found next assignment (%d %d %d %d)",
+                    debug2("Found next assignment (%d %d %d %d)",
                           iter->c1, iter->r1, iter->d1, iter->s1);
                 } else {
-                    debug("No assignment found, iter exhausted");
+                    debug2("No assignment found, iter exhausted");
                     iter->end = true;
                     return false;
                 }
@@ -181,7 +181,7 @@ static void do_neighbourhood_swap(
         int c1, int r1, int d1, int s1,
         int c2, int r2, int d2, int s2) {
     // Swap assignments
-    debug("do_neighbourhood_swap(%d, %d, %d, %d <-> %d, %d, %d, %d)",
+    debug2("do_neighbourhood_swap(%d, %d, %d, %d <-> %d, %d, %d, %d)",
           c1, r1, d1, s1, c2, r2, d2, s2);
     if (c1 >= 0)
         solution_set(sol, c1, r1, d1, s1, false);
@@ -191,18 +191,6 @@ static void do_neighbourhood_swap(
         solution_set(sol, c1, r2, d2, s2, true);
     if (c2 >= 0)
         solution_set(sol, c2, r1, d1, s1, true);
-}
-
-static bool do_neighbourhood_swap_if_possible(
-        solution *sol,
-        int c1, int r1, int d1, int s1,
-        int c2, int r2, int d2, int s2) {
-    bool satisfy_hard = check_neighbourhood_swap_hard_constraints(sol, c1, r1, d1, s1, c2, r2, d2, s2);
-    if (!satisfy_hard)
-        return false;
-
-    do_neighbourhood_swap(sol, c1, r1, d1, s1, c2, r2, d2, s2);
-    return true;
 }
 
 static int compute_neighbourhood_swap_room_capacity_cost(
@@ -215,7 +203,7 @@ static int compute_neighbourhood_swap_room_capacity_cost(
         MAX(0, sol->model->courses[c].n_students - sol->model->rooms[r_to].capacity);
     cost *= ROOM_CAPACITY_COST;
 
-    debug("RoomCapacity delta cost: %d", cost);
+    debug2("RoomCapacity delta cost: %d", cost);
     return cost;
 }
 
@@ -243,7 +231,7 @@ static int compute_neighbourhood_swap_min_working_days_cost(
             MAX(0, min_working_days - cur_working_days);
     cost *= MIN_WORKING_DAYS_COST;
 
-    debug("MinWorkingDays delta cost: %d", cost);
+    debug2("MinWorkingDays delta cost: %d", cost);
     return cost;
 }
 
@@ -269,7 +257,7 @@ static int compute_neighbourhood_swap_room_stability_cost(
     int cost = MAX(0, cur_rooms - 1) - MAX(0, prev_rooms - 1);
     cost *= ROOM_STABILITY_COST;
 
-    debug("RoomStability delta cost: %d", cost);
+    debug2("RoomStability delta cost: %d", cost);
     return cost;
 }
 
@@ -359,7 +347,7 @@ static int compute_neighbourhood_swap_curriculum_compactness_cost(
 
     cost *= CURRICULUM_COMPACTNESS_COST;
 
-    debug("CurriculumCompactness delta cost: %d", cost);
+    debug2("CurriculumCompactness delta cost: %d", cost);
 
     return cost;
 }
@@ -402,17 +390,18 @@ static void compute_neighbourhood_swap_cost(
             result->delta_cost_curriculum_compactness +
             result->delta_cost_room_stability;
 
-    debug("DELTA cost = %d", result->delta_cost);
+    debug2("DELTA cost = %d", result->delta_cost);
 }
 
-void neighbourhood_swap(solution *sol, int c1,
+
+bool neighbourhood_swap(solution *sol, int c1,
                         int r1, int d1, int s1,
                         int r2, int d2, int s2,
+                        neighbourhood_prediction_strategy predict_feasibility,
+                        neighbourhood_prediction_strategy predict_cost,
+                        neighbourhood_performing_strategy perform,
                         neighbourhood_swap_result *result) {
     CRDSQT(sol->model)
-
-    int c2 = solution_get_helper(sol)->c_rds[INDEX3(r2, R, d2, D, s2, S)];
-    result->c2 = c2;
 
 #if DEBUG
     if (!solution_get(sol, c1, r1, d1, s1)) {
@@ -423,9 +412,24 @@ void neighbourhood_swap(solution *sol, int c1,
     }
 #endif
 
-    result->feasible = do_neighbourhood_swap_if_possible(sol, c1, r1, d1, s1, c2, r2, d2, s2);
-    if (result->feasible)
+    int c2 = solution_get_helper(sol)->c_rds[INDEX3(r2, R, d2, D, s2, S)];
+    result->c2 = c2;
+
+    if (predict_feasibility == NEIGHBOURHOOD_PREDICT_ALWAYS)
+        result->feasible = check_neighbourhood_swap_hard_constraints(sol, c1, r1, d1, s1, c2, r2, d2, s2);
+
+    if (predict_cost == NEIGHBOURHOOD_PREDICT_ALWAYS || (predict_cost == NEIGHBOURHOOD_PREDICT_IF_FEASIBLE && result->feasible))
         compute_neighbourhood_swap_cost(sol, c1, r1, d1, s1, c2, r2, d2, s2, result);
+
+    if (perform == NEIGHBOURHOOD_PERFORM_ALWAYS ||
+            (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE && result->feasible) ||
+            (perform == NEIGHBOURHOOD_PERFORM_IF_BETTER && result->delta_cost < 0) ||
+            (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER && result->feasible && result->delta_cost < 0)) {
+        do_neighbourhood_swap(sol, c1, r1, d1, s1, c2, r2, d2, s2);
+        return true;
+    }
+
+    return false;
 }
 
 void neighbourhood_swap_back(solution *sol,
