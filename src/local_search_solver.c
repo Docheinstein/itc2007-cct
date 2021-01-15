@@ -15,7 +15,6 @@ static void do_local_search_complete(solution *sol) {
     int i = 0;
     bool improved;
     do {
-        int c1, r1, d1, s1, r2, d2, s2;
         int j = 0;
         improved = false;
 
@@ -26,14 +25,16 @@ static void do_local_search_complete(solution *sol) {
         neighbourhood_swap_iter iter;
         neighbourhood_swap_iter_init(&iter, &sol_neigh);
 
-        int best_c1, best_r1, best_d1, best_s1, best_r2, best_d2, best_s2;
+        neighbourhood_swap_move mv;
+
+        neighbourhood_swap_move best_mv;
         int best_delta = INT_MAX;
 
-        while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
+        while (neighbourhood_swap_iter_next(&iter, &mv)) {
             debug("[%d.%d] LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
-                   i, j, c1, r1, d1, s1, r2, d2, s2);
+                   i, j, mv.c1, mv.r1, mv.d1, mv.s1, mv.r2, mv.d2, mv.s2);
 
-            neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2,
+            neighbourhood_swap(&sol_neigh, &mv,
                                NEIGHBOURHOOD_PREDICT_ALWAYS,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
                                NEIGHBOURHOOD_PERFORM_NEVER,
@@ -41,13 +42,7 @@ static void do_local_search_complete(solution *sol) {
 
             if (swap_result.delta_cost < best_delta) {
                 debug("[%d.%d] LS: new candidate for best neighbourhood move, delta = %d", i, j, swap_result.delta_cost);
-                best_c1 = c1;
-                best_r1 = r1;
-                best_d1 = d1;
-                best_s1 = s1;
-                best_r2 = r2;
-                best_d2 = d2;
-                best_s2 = s2;
+                best_mv = mv;
                 best_delta = swap_result.delta_cost;
             }
 
@@ -55,7 +50,7 @@ static void do_local_search_complete(solution *sol) {
         }
 
         if (best_delta < 0) {
-            neighbourhood_swap(&sol_neigh, best_c1, best_r1, best_d1, best_s1, best_r2, best_d2, best_s2,
+            neighbourhood_swap(&sol_neigh, &best_mv,
                                NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PERFORM_ALWAYS,
@@ -82,7 +77,6 @@ static void do_local_search_fast_descend(solution *sol) {
     int i = 0;
     bool improved;
     do {
-        int c1, r1, d1, s1, r2, d2, s2;
         int j = 0;
         improved = false;
 
@@ -93,13 +87,15 @@ static void do_local_search_fast_descend(solution *sol) {
         neighbourhood_swap_iter iter;
         neighbourhood_swap_iter_init(&iter, &sol_neigh);
 
-        while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
+        neighbourhood_swap_move mv;
+
+        while (neighbourhood_swap_iter_next(&iter, &mv)) {
             bool restart = false;
 
             debug("[%d.%d] LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
-                   i, j, c1, r1, d1, s1, r2, d2, s2);
+                   i, j, mv.c1, mv.r1, mv.d1, mv.s1, mv.r2, mv.d2, mv.s2);
 
-            if (neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2,
+            if (neighbourhood_swap(&sol_neigh, &mv,
                                NEIGHBOURHOOD_PREDICT_ALWAYS,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
                                NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
@@ -167,10 +163,8 @@ bool local_search_solver_solve(local_search_solver *solver,
     finder_config.difficulty_ranking_randomness = config->difficulty_ranking_randomness;
 
     long starting_time = ms();
-    debug("Starting time = %lu", starting_time);
     long deadline = config->time_limit > 0 ? (starting_time + config->time_limit * 1000) : 0;
     int multistart = config->multistart;
-        debug("deadline = %lu", deadline);
 
     if (!(deadline > 0) && !(multistart > 0)) {
         print("WARN: you should probably use either "
@@ -192,27 +186,25 @@ bool local_search_solver_solve(local_search_solver *solver,
             break;
         }
 
-
         solution s;
         solution_init(&s, model);
 
         debug("[%d] Finding initial feasible solution...", iter);
-        if (feasible_solution_finder_find(&finder, &finder_config, &s)) {
-            debug("[%d] Initial solution is feasible, cost = %d", iter, solution_cost(&s));
+        feasible_solution_finder_find(&finder, &finder_config, &s);
+        debug("[%d] Initial solution found, cost = %d", iter, solution_cost(&s));
 
-            // Local search starting from this feasible solution
-            do_local_search_fast_descend(&s);
+        // Local search starting from this feasible solution
+        do_local_search_fast_descend(&s);
 
-            // Check if the solution found is better than the best known
-            int cost = solution_cost(&s);
-            if (cost < best_solution_cost) {
-                verbose("[%d] LS: new best solution found, cost = %d", iter, cost);
-                best_solution_cost = cost;
-                solution_copy(sol_out, &s);
-            }
-
-            iter++;
+        // Check if the solution found is better than the best known
+        int cost = solution_cost(&s);
+        if (cost < best_solution_cost) {
+            verbose("[%d] LS: new best solution found, cost = %d", iter, cost);
+            best_solution_cost = cost;
+            solution_copy(sol_out, &s);
         }
+
+        iter++;
 
         solution_destroy(&s);
     }

@@ -317,6 +317,11 @@ void solution_init(solution *sol, const model *model) {
     sol->helper = NULL;
 }
 
+void solution_reinit(solution *sol) {
+    solution_destroy(sol);
+    solution_init(sol, sol->model);
+}
+
 void solution_destroy(solution *sol) {
     free(sol->timetable);
     if (sol->helper)
@@ -367,11 +372,11 @@ char * solution_to_string(const solution *sol) {
 }
 
 bool solution_satisfy_hard_constraints(const solution *sol) {
-    return
-            solution_satisfy_lectures(sol) &&
-            solution_satisfy_room_occupancy(sol) &&
-            solution_satisfy_conflicts(sol) &&
-            solution_satisfy_availabilities(sol);
+    bool h1 = solution_satisfy_lectures(sol);
+    bool h2 = solution_satisfy_room_occupancy(sol);
+    bool h3 = solution_satisfy_conflicts(sol);
+    bool h4 = solution_satisfy_availabilities(sol);
+    return h1 && h2 && h3 && h4;
 }
 
 bool solution_satisfy_lectures(const solution *sol) {

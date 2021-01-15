@@ -488,8 +488,42 @@ MUNIT_TEST(test_index_rindex) {
     return MUNIT_OK;
 }
 
-static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *dataset_file) {
+static MunitResult test_feasible_solution_finder_find(const char *dataset_file, int attempts) {
+    model m;
+    model_init(&m);
 
+    parser parser;
+    parser_init(&parser);
+    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+
+    feasible_solution_finder finder;
+    feasible_solution_finder_init(&finder);
+
+    feasible_solution_finder_config finder_config;
+    feasible_solution_finder_config_init(&finder_config);
+
+    for (int i = 0; i < attempts; i++) {
+        solution sol;
+        solution_init(&sol, &m);
+
+        feasible_solution_finder_find(&finder, &finder_config, &sol);
+        munit_assert_true(solution_satisfy_hard_constraints(&sol));
+
+        solution_destroy(&sol);
+    }
+
+    return MUNIT_OK;
+}
+
+MUNIT_TEST(test_feasible_solution_finder_find_toy) {
+    return test_feasible_solution_finder_find("datasets/toy.ctt", 100);
+}
+
+MUNIT_TEST(test_feasible_solution_finder_find_comp01) {
+    return test_feasible_solution_finder_find("datasets/comp01.ctt", 50);
+}
+
+static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *dataset_file) {
     model m;
     model_init(&m);
 
@@ -506,15 +540,13 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
     solution sol;
     solution_init(&sol, &m);
 
-    while (!feasible_solution_finder_find(&finder, &finder_config, &sol))
-        ;
+    feasible_solution_finder_find(&finder, &finder_config, &sol);
 
     neighbourhood_swap_result swap_result;
     int cost = solution_cost(&sol);
 
     bool improved;
     do {
-        int c1, r1, d1, s1, r2, d2, s2;
         improved = false;
 
         solution sol_neigh;
@@ -523,7 +555,10 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
 
         neighbourhood_swap_iter iter;
         neighbourhood_swap_iter_init(&iter, &sol_neigh);
-        while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
+
+        neighbourhood_swap_move mv;
+
+        while (neighbourhood_swap_iter_next(&iter, &mv)) {
             bool restart = false;
 
             int c_rm = solution_room_capacity_cost(&sol_neigh);
@@ -531,11 +566,12 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
             int c_cc = solution_curriculum_compactness_cost(&sol_neigh);
             int c_rs = solution_room_stability_cost(&sol_neigh);
 
-            neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2,
+            neighbourhood_swap(&sol_neigh, &mv,
                                NEIGHBOURHOOD_PREDICT_ALWAYS,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
                                NEIGHBOURHOOD_PERFORM_ALWAYS,
                                &swap_result);
+
 
             if (swap_result.feasible) {
                 munit_assert_true(solution_satisfy_hard_constraints(&sol_neigh));
@@ -553,16 +589,22 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
                 int neigh_cost = cost + swap_result.delta_cost;
 
                 if (neigh_cost < cost) {
+                    debug("Solution is better, keeping it");
+                    print_solution(&sol_neigh, stdout);
                     cost = neigh_cost;
                     solution_copy(&sol, &sol_neigh);
                     improved = true;
                     restart = true;
                 } else {
-                    neighbourhood_swap_back(&sol_neigh, c1, r1, d1, s1, swap_result.c2, r2, d2, s2);
+                    debug("Solution is worse, swap back");
+                    neighbourhood_swap_back(&sol_neigh, &mv);
+                    print_solution(&sol_neigh, stdout);
                 }
             } else {
+                debug("Solution is not feasible, swap back");
                 munit_assert_false(solution_satisfy_hard_constraints(&sol_neigh));
-                neighbourhood_swap_back(&sol_neigh, c1, r1, d1, s1, swap_result.c2, r2, d2, s2);
+                neighbourhood_swap_back(&sol_neigh, &mv);
+                print_solution(&sol_neigh, stdout);
             }
 
             if (restart)
@@ -596,8 +638,7 @@ static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_bette
     solution sol;
     solution_init(&sol, &m);
 
-    while (!feasible_solution_finder_find(&finder, &finder_config, &sol))
-        ;
+    feasible_solution_finder_find(&finder, &finder_config, &sol);
 
     neighbourhood_swap_result swap_result;
     int cost = solution_cost(&sol);
@@ -614,10 +655,13 @@ static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_bette
 
         neighbourhood_swap_iter iter;
         neighbourhood_swap_iter_init(&iter, &sol_neigh);
-        while (neighbourhood_swap_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
+
+        neighbourhood_swap_move mv;
+
+        while (neighbourhood_swap_iter_next(&iter, &mv)) {
             bool restart = false;
 
-            if (neighbourhood_swap(&sol_neigh, c1, r1, d1, s1, r2, d2, s2,
+            if (neighbourhood_swap(&sol_neigh, &mv,
                                NEIGHBOURHOOD_PREDICT_ALWAYS,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
                                NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
@@ -694,6 +738,8 @@ static MunitTest tests[] = {
     { "test_solution_cost_comp01_463", test_solution_cost_comp01_463, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_solution_cost_comp01_57", test_solution_cost_comp01_57, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_index_rindex", test_index_rindex, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_feasible_solution_finder_find_toy", test_feasible_solution_finder_find_toy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_feasible_solution_finder_find_comp01", test_feasible_solution_finder_find_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_compute_neighbourhood_swap_cost_constraints_toytoy", test_compute_neighbourhood_swap_cost_constraints_toytoy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_compute_neighbourhood_swap_perform_if_feasible_and_better_toytoy", test_compute_neighbourhood_swap_perform_if_feasible_and_better_toytoy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 //    { "test_compute_neighbourhood_swap_cost_constraints_comp01", test_compute_neighbourhood_swap_cost_constraints_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

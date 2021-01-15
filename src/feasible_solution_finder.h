@@ -19,7 +19,12 @@ void feasible_solution_finder_config_destroy(feasible_solution_finder_config *co
 void feasible_solution_finder_init(feasible_solution_finder *finder);
 void feasible_solution_finder_destroy(feasible_solution_finder *finder);
 
-bool feasible_solution_finder_find(feasible_solution_finder *finder,
+bool feasible_solution_finder_try_find(
+        feasible_solution_finder *finder,
+        feasible_solution_finder_config *config,
+        solution *sol);
+
+void feasible_solution_finder_find(feasible_solution_finder *finder,
                                    feasible_solution_finder_config *config,
                                    solution *solution);
 

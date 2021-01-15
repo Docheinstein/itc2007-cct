@@ -89,6 +89,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "log/debug.h"
 #include "neighbourhood.h"
 #include "local_search_solver.h"
+#include "tabu_search_solver.h"
 #include <sys/time.h>   /* for setitimer */
 #include <unistd.h>     /* for pause */
 #include <signal.h>     /* for signal */
@@ -186,99 +187,22 @@ int main (int argc, char **argv) {
 
             local_search_solver_config_destroy(&config);
             local_search_solver_destroy(&solver);
+        } else if (args.method == RESOLUTION_METHOD_TABU_SEARCH) {
+            tabu_search_solver_config config;
+            tabu_search_solver_config_init(&config);
+            config.time_limit = args.time_limit;
+            config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+
+            tabu_search_solver solver;
+            tabu_search_solver_init(&solver);
+
+            solution_loaded = tabu_search_solver_solve(&solver, &config, &sol);
+            if (!solution_loaded)
+                eprint("ERROR: failed to solve model (%s)", tabu_search_solver_get_error(&solver));
+
+            tabu_search_solver_config_destroy(&config);
+            tabu_search_solver_destroy(&solver);
         }
-
-//        } else if (args.method == RESOLUTION_METHOD_TABU_SEARCH) {
-/*
-            int n_feasibles = 0;
-            int n_duplicates = 0;
-
-            // DEBUG, or not?
-            GHashTable *hash = g_hash_table_new(g_int_hash, g_int_equal);
-
-            for (int i = 0; i < iters; i++) {
-
-
-                debug("[%d] Finding initial feasible solution...", i);
-
-                if (feasible_solution_finder_find(&finder, &config, &s)) {
-                    n_feasibles++;
-                    solution_loaded = true;
-                    // TS...
-
-                    int cost = solution_cost(&s);
-//                    verbose("[%d] Initial solution {%#llx} is feasible, cost = %d", i, solution_fingerprint(&s), cost);
-                    unsigned long long fingerprint = solution_fingerprint(&s);
-                    debug("[%d] Initial solution {%#llx} is feasible, cost = %d", i, fingerprint, cost);
-
-                    // DEBUG
-                    if (g_hash_table_contains(hash, GUINT_TO_POINTER(&fingerprint))) {
-//                        print("WARN: duplicate solution");
-                        n_duplicates++;
-                    } else {
-                        g_hash_table_add(hash, GUINT_TO_POINTER(&fingerprint));
-                    }
-
-                    // LS
-                    bool improved;
-
-                    do {
-                        improved = false;
-
-                        neighbourhood_iter iter;
-                        neighbourhood_iter_init(&iter, &s);
-                        int c1, r1, d1, s1, r2, d2, s2;
-                        while (neighbourhood_iter_next(&iter, &c1, &r1, &d1, &s1, &r2, &d2, &s2)) {
-                            bool restart = false;
-
-                            solution s_ls;
-                            solution_init(&s_ls, &model);
-                            debug("neighbourhood_iter_next %d %d %d %d %d %d %d", c1, r1, d1, s1, r2, d2, s2);
-                            neighbourhood_swap_assignment(&s, &s_ls, c1, r1, d1, s1, r2, d2, s2);
-                            int ls_cost = solution_cost(&s_ls);
-
-                            if (solution_satisfy_hard_constraints(&s_ls) &&
-                                ls_cost < cost) {
-                                cost = ls_cost;
-                                solution_copy(&s, &s_ls);
-                                verbose("[%d] LS is doing better, cost = %d", i, cost);
-                                improved = true;
-                                restart = true;
-                            }
-
-                            solution_destroy(&s_ls);
-
-                            if (restart)
-                                break;
-                        }
-                        neighbourhood_iter_destroy(&iter);
-                    } while (improved);
-
-                    if (cost < best_solution_cost) {
-                        best_solution_cost = cost;
-                        solution_copy(&sol, &s);
-
-                        verbose("[%d] New best solution found, cost = %d", i, best_solution_cost);
-                    }
-                } else {
-//                    verbose("[%d] Failed to compute initial solution {%#llx} (%s)",
-                    debug("[%d] Initial solution {%#llx} is unfeasible (%s)",
-                           i,
-                           solution_fingerprint(&s),
-                           feasible_solution_finder_find_get_error(&finder));
-
-                }
-
-                solution_destroy(&s);
-            }
-
-            verbose("Number of duplicate solutions: %d", n_duplicates);
-            verbose("Initial feasible solutions: %d/%d", n_feasibles, iters);
-
-            feasible_solution_finder_config_destroy(&config);
-            feasible_solution_finder_destroy(&finder);
-            */
-//        }
     }
 
     if (solution_loaded || args.force_draw) {

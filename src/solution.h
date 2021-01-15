@@ -89,6 +89,7 @@ void solution_parser_destroy(solution_parser *solution_parser);
 const char * solution_parser_get_error(solution_parser *solution_parser);
 
 void solution_init(solution *solution, const model *model);
+void solution_reinit(solution *solution);
 void solution_destroy(solution *solution);
 
 const solution_helper * solution_get_helper(solution *solution);
