@@ -109,6 +109,7 @@ char * solution_to_string(const solution *sol);
 char * solution_quality_to_string(const solution *sol, bool verbose);
 
 unsigned long long solution_fingerprint(const solution *sol);
+int solution_assignment_count(const solution *sol);
 
 // Hard constraints
 bool solution_satisfy_hard_constraints(const solution *sol);

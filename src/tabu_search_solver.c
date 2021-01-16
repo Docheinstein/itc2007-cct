@@ -6,6 +6,8 @@
 #include <utils/io_utils.h>
 #include <utils/mem_utils.h>
 #include <utils/random_utils.h>
+#include <math.h>
+#include <utils/math_utils.h>
 #include "neighbourhood.h"
 #include "feasible_solution_finder.h"
 #include "renderer.h"
@@ -50,14 +52,14 @@ static bool tabu_list_contains(const tabu_list *tabu, solution_tabu_fingerprint 
 //    debug("tabu_list_contains (rc=%d, mwd=%d, cc=%d, rs=%d)",
 //           f.room_capacity_cost, f.min_working_days_cost,
 //           f.curriculum_compactness_cost, f.room_stability_cost);
-    debug("tabu_list_contains = %llu", f);
+    debug2("tabu_list_contains = %llu", f);
     for (int i = 0; i < tabu->len; i++) {
         if (solution_tabu_fingerprint_equal(f, tabu->banned[i])) {
-            debug("TRUE");
+            debug2("TRUE");
             return true;
         }
     }
-    debug("FALSE");
+    debug2("FALSE");
     return false;
 }
 
@@ -66,7 +68,7 @@ static void tabu_list_insert(tabu_list *tabu, solution_tabu_fingerprint f) {
 //       tabu->index,
 //       f.room_capacity_cost, f.min_working_days_cost,
 //       f.curriculum_compactness_cost, f.room_stability_cost);
-    debug("tabu_list_insert [%lu]=%lu", tabu->index, f);
+    debug2("tabu_list_insert [%lu]=%lu", tabu->index, f);
 
 #ifdef DEBUG
     for (int i = 0; i < tabu->len; i++) {
@@ -75,7 +77,7 @@ static void tabu_list_insert(tabu_list *tabu, solution_tabu_fingerprint f) {
 //           i,
 //           sf->room_capacity_cost, sf->min_working_days_cost,
 //           sf->curriculum_compactness_cost, sf->room_stability_cost);
-        debug("tabu_list[%d]=%llu%s", i, *sf, i == tabu->index ? "   *" : "");
+        debug2("tabu_list[%d]=%llu%s", i, *sf, i == tabu->index ? "   *" : "");
         if (*sf == f) {
             eprint("Inserting duplicate solution already in tabu list");
             exit(5);
@@ -115,9 +117,25 @@ void tabu_search_solver_reinit(tabu_search_solver *solver) {
     tabu_search_solver_init(solver);
 }
 
+typedef struct neighbourhood_swap_move_result {
+    neighbourhood_swap_move move;
+    neighbourhood_swap_result result;
+    solution_tabu_fingerprint solution_fingerprint;
+} neighbourhood_swap_move_result;
+
+
+int neighbourhood_swap_move_result_compare(const void *_1, const void *_2, void *data) {
+    neighbourhood_swap_move_result *mv_res1 = (neighbourhood_swap_move_result *) _1;
+    neighbourhood_swap_move_result *mv_res2 = (neighbourhood_swap_move_result *) _2;
+    tabu_list *tabu = data;
+
+    return mv_res1->result.delta_cost - mv_res2->result.delta_cost;
+}
+
 bool tabu_search_solver_solve(tabu_search_solver *solver,
                               tabu_search_solver_config *config,
                               solution *sol_out) {
+    CRDSQT(sol_out->model);
     const model *model = sol_out->model;
     tabu_search_solver_reinit(solver);
 
@@ -143,6 +161,10 @@ bool tabu_search_solver_solve(tabu_search_solver *solver,
         debug("Finding initial feasible solution...");
         feasible_solution_finder_find(&finder, &finder_config, &s);
     }
+
+    neighbourhood_swap_move_result *swap_moves =
+            mallocx(solution_assignment_count(&s) * R * D * S, sizeof(neighbourhood_swap_move_result));
+    double swap_move_pick_randomizer = 0;
 
     // Compute initial solution's cost
     int room_capacity_cost = solution_room_capacity_cost(&s);
@@ -184,10 +206,11 @@ bool tabu_search_solver_solve(tabu_search_solver *solver,
         neighbourhood_swap_result swap_result;
         neighbourhood_swap_move mv;
 
-        neighbourhood_swap_move best_moves[1000];
-        int best_move_count = 0;
+//        neighbourhood_swap_move best_moves[1000];
+//        int best_move_count = 0;
 
         int best_move_delta = INT_MAX;
+        int swap_move_cursor = 0;
 
         solution_tabu_fingerprint s_fingerprint = solution_fingerprint(&s);
 
@@ -219,18 +242,32 @@ bool tabu_search_solver_solve(tabu_search_solver *solver,
 //                    .curriculum_compactness_cost = curriculum_compactness_cost + swap_result.delta_cost_curriculum_compactness,
 //                    .room_stability_cost = room_stability_cost + swap_result.delta_cost_room_stability
 //                };
-                solution_tabu_fingerprint f = solution_fingerprint(&s);
-
-                if (swap_result.delta_cost <= best_move_delta && f != s_fingerprint && !tabu_list_contains(&tabu, f)) {
-                    debug("[%d.%d] TS: new candidate for best neighbourhood move %llu (c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)), "
-                          "delta = %d", iter, j, f, mv.c1, mv.r1, mv.d1, mv.s1, mv.r2, mv.d2, mv.s2, swap_result.delta_cost);
-                    if (swap_result.delta_cost < best_move_delta) {
-                        best_move_count = 0;
-                        best_move_delta = swap_result.delta_cost;
-                    }
-                    if (best_move_count < 1000)
-                        best_moves[best_move_count++] = mv;
+                // Save the move and the result
+//                solution_tabu_fingerprint f = solution_fingerprint(&s);
+                solution_tabu_fingerprint f = f +
+                        mv.c1 * 9391 +
+                        mv.r1 * 877 + mv.d1 * 86453 + mv.s1 * 2729 +
+                        mv.r2 * 5273 + mv.d2 * 8467 + mv.s2 * 34147;
+                if (f != s_fingerprint && !tabu_list_contains(&tabu, f)) {
+                    neighbourhood_swap_move_result mv_res = {
+                        mv,
+                        swap_result,
+                        f
+                    };
+                    swap_moves[swap_move_cursor++] = mv_res;
                 }
+
+
+//                if (swap_result.delta_cost <= best_move_delta && f != s_fingerprint && !tabu_list_contains(&tabu, f)) {
+//                    debug("[%d.%d] TS: new candidate for best neighbourhood move %llu (c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)), "
+//                          "delta = %d", iter, j, f, mv.c1, mv.r1, mv.d1, mv.s1, mv.r2, mv.d2, mv.s2, swap_result.delta_cost);
+//                    if (swap_result.delta_cost < best_move_delta) {
+//                        best_move_count = 0;
+//                        best_move_delta = swap_result.delta_cost;
+//                    }
+//                    if (best_move_count < 1000)
+//                        best_moves[best_move_count++] = mv;
+//                }
 
                 neighbourhood_swap_back(&s, &mv);
             }
@@ -238,10 +275,23 @@ bool tabu_search_solver_solve(tabu_search_solver *solver,
             j++;
         }
 
-        if (best_move_delta == INT_MAX) {
+        if (swap_move_cursor == 0) {
             verbose("Tabu search can't improve further, stopping here");
             break;
         }
+        g_qsort_with_data(swap_moves, swap_move_cursor, sizeof(neighbourhood_swap_move_result),
+              neighbourhood_swap_move_result_compare, &tabu);
+//        qsort
+        for (int i = 0; i < swap_move_cursor; i++) {
+            debug2("move[%d]=(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)) delta cost = %d -> {%llu}", i,
+                  swap_moves[i].move.c1, swap_moves[i].move.r1, swap_moves[i].move.d1, swap_moves[i].move.s1,
+                  swap_moves[i].move.r2, swap_moves[i].move.d2, swap_moves[i].move.s2, swap_moves[i].result.delta_cost,
+                  swap_moves[i].solution_fingerprint);
+        }
+//        if (best_move_delta == INT_MAX) {
+//            verbose("Tabu search can't improve further, stopping here");
+//            break;
+//        }
         // Insert the previous solution into the tabu list
 //        solution_tabu_fingerprint f = {
 //            .room_capacity_cost = room_capacity_cost,
@@ -253,11 +303,26 @@ bool tabu_search_solver_solve(tabu_search_solver *solver,
         tabu_list_insert(&tabu, s_fingerprint);
 
         // Pick a move at random among the best ones
-        int r = rand_int_range(0, best_move_count);
-        neighbourhood_swap_move best_mv = best_moves[r];
+//        int r = rand_int_range(0, best_move_count);
+//        neighbourhood_swap_move best_mv = best_moves[r];
 
+
+        int pick;
+        do {
+            pick = ABS(round(rand_normal(0, swap_move_pick_randomizer)));
+        } while (pick < 0 || pick >= swap_move_cursor);
+        debug("[%d] TS: move pick = %d", iter, pick);
+
+        int last_cost = cost;
+
+        neighbourhood_swap_move_result the_move = swap_moves[pick]; //...
+        debug("[%d] TS: picked move [%d] (c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)) -> {%llu}, "
+                  "delta = %d", iter, pick,
+                  the_move.move.c1, the_move.move.r1, the_move.move.d1, the_move.move.s1,
+                  the_move.move.r2, the_move.move.d2, the_move.move.s2, the_move.solution_fingerprint,
+                  the_move.result.delta_cost);
         // Actually compute the new best solution and move to it
-        neighbourhood_swap(&s, &best_mv,
+        neighbourhood_swap(&s, &the_move.move,
                            NEIGHBOURHOOD_PREDICT_NEVER,
                            NEIGHBOURHOOD_PREDICT_ALWAYS,
                            NEIGHBOURHOOD_PERFORM_ALWAYS,
@@ -268,6 +333,17 @@ bool tabu_search_solver_solve(tabu_search_solver *solver,
         min_working_days_cost = min_working_days_cost + swap_result.delta_cost_min_working_days;
         curriculum_compactness_cost = curriculum_compactness_cost + swap_result.delta_cost_curriculum_compactness;
         room_stability_cost = room_stability_cost + swap_result.delta_cost_room_stability;
+#if DEBUG
+        if (cost + swap_result.delta_cost != room_capacity_cost + min_working_days_cost +
+                curriculum_compactness_cost + room_stability_cost) {
+            eprint("Expected same cost, found %d != %d", cost, cost + swap_result.delta_cost);
+            exit(14);
+        }
+        if (swap_result.delta_cost != the_move.result.delta_cost) {
+            eprint("Expected same cost, found %d != %d", swap_result.delta_cost, the_move.result.delta_cost);
+            exit(14);
+        }
+#endif
         cost = room_capacity_cost + min_working_days_cost +
                 curriculum_compactness_cost + room_stability_cost;
 
@@ -278,27 +354,20 @@ bool tabu_search_solver_solve(tabu_search_solver *solver,
 //        }
 //#endif
 
-        debug("Moved to solution {%llu} (rc=%d, mwd=%d, cc=%d, rs=%d) of cost = %d",
-              solution_fingerprint(&s),
+        debug("Moved to solution (rc=%d, mwd=%d, cc=%d, rs=%d) of cost = %d (best is %d)",
               room_capacity_cost, min_working_days_cost,
-              curriculum_compactness_cost, room_stability_cost, cost);
+              curriculum_compactness_cost, room_stability_cost, cost, best_sol_cost);
 
-        debug("Best move candidates = %d", best_move_count);
-        if (cost == 437) {
-//            char tmp[64];
-//            snprintf(tmp, 64, "/tmp/437/%d.txt", iter);
-//            write_solution(&s, tmp);
-//
-//            snprintf(tmp, 64, "/tmp/439/%d.png", iter);
-//            render_solution_overview(&s, tmp);
-        }
 
-        if (best_move_delta > 0) {
-            verbose("[%d] Accepting worsening solution, delta = %d", iter, best_move_delta);
+        if (cost == last_cost) {
+            swap_move_pick_randomizer = swap_move_pick_randomizer == 0 ? 0.5 : swap_move_pick_randomizer * 2;
+            debug("Detected same cost, swap_move_pick_randomizer = %g", swap_move_pick_randomizer);
         }
-        else if(best_move_delta == 0) {
-            debug("Move -> (c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)) ",
-                  best_mv.c1, best_mv.r1, best_mv.d1, best_mv.s1, best_mv.r2, best_mv.d2, best_mv.s2);
+        else {
+            if (swap_move_pick_randomizer > 0)
+                swap_move_pick_randomizer *= 0.5;
+            else
+                swap_move_pick_randomizer = 0;
         }
 
         if (cost < best_sol_cost) {

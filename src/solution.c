@@ -639,8 +639,6 @@ int solution_cost(const solution *sol) {
             solution_room_stability_cost(sol);
 }
 
-
-
 static int solution_room_capacity_cost_dump(const solution *sol, char **strout, size_t *strsize) {
     CRDSQT(sol->model)
 
@@ -965,9 +963,9 @@ unsigned long long solution_fingerprint(const solution *sol) {
     unsigned long long fingerprint = 0;
     for (int i = 0; i < sol->model->n_courses * sol->model->n_rooms * sol->model->n_days * sol->model->n_slots; i++) {
         if (sol->timetable[i])
-//            fingerprint++;
-            fingerprint += i;
-        fingerprint *= 23;
+            fingerprint++;
+//            fingerprint += i;
+        fingerprint *= 13;
     }
     return fingerprint;
 }
@@ -1032,4 +1030,12 @@ void print_solution_full(const solution *sol, FILE *stream) {
 
     free(sol_str);
     free(sol_quality_str);
+}
+
+int solution_assignment_count(const solution *sol) {
+    CRDSQT(sol->model);
+    int count = 0;
+    for (int i = 0; i < C * R * D * S; i++)
+        count += sol->timetable[i];
+    return count;
 }

@@ -39,8 +39,8 @@ int course_assignment_compare(const void *_1, const void *_2) {
     const course_assignment * ca1 = (const course_assignment *) _1;
     const course_assignment * ca2 = (const course_assignment *) _2;
     return
-        (ca1->difficulty * ca1->difficulty_ranking_factor) <
-        (ca2->difficulty * ca2->difficulty_ranking_factor);
+        (int)((ca2->difficulty * ca2->difficulty_ranking_factor) -
+        (ca1->difficulty * ca1->difficulty_ranking_factor));
 }
 
 bool feasible_solution_finder_try_find(feasible_solution_finder *finder,

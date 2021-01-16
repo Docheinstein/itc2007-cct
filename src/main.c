@@ -93,8 +93,15 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <sys/time.h>   /* for setitimer */
 #include <unistd.h>     /* for pause */
 #include <signal.h>     /* for signal */
+#include <math.h>
 
 int main (int argc, char **argv) {
+//    for (int i = 0; i < 10000; i++) {
+//        double r = rand_normal(0, 0.3);
+//        print("%d,", (int)ABS(round(r)));
+//    }
+//    exit(0);
+
     args args;
     args_init(&args);
     args_parse(&args, argc, argv);
