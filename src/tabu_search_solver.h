@@ -7,7 +7,10 @@
 
 typedef struct tabu_search_solver_config {
     int time_limit;
+    int iter_limit;
     double difficulty_ranking_randomness;
+    const solution *starting_solution;
+    size_t tabu_size;
 } tabu_search_solver_config;
 
 typedef struct tabu_search_solver {

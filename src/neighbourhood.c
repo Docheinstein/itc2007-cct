@@ -8,6 +8,13 @@
 #include "config.h"
 
 
+bool neighbourhood_swap_move_is_effective(const neighbourhood_swap_move *mv) {
+    return
+        mv->r1 != mv->r2 &&
+        mv->d1 != mv->d2 &&
+        mv->s1 != mv->s2;
+}
+
 void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
                                   const neighbourhood_swap_move *src) {
     dest->c1 = src->c1;
@@ -25,6 +32,11 @@ void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol) 
     iter->rds_index = -1;
     iter->current.c1 = iter->current.r1 = iter->current.d1 = iter->current.s1 = -1;
     iter->current.r2 = iter->current.d2 = iter->current.s2 = -1;
+
+#ifdef DEBUG2
+    debug2("neighbourhood_swap_iter_init for solution");
+    print_solution(sol, stdout);
+#endif
 }
 
 void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter) {}
@@ -38,33 +50,36 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter,
     const int RDS = R * D * S;
     const solution_helper *helper = solution_get_helper(iter->solution);
 
-    iter->current.s2 = (iter->current.s2 + 1) % S;
-    if (!iter->current.s2) {
-        iter->current.d2 = (iter->current.d2 + 1) % D;
-        if (!iter->current.d2) {
-            iter->current.r2 = (iter->current.r2 + 1) % R;
-            if (!iter->current.r2) {
+    do {
+        iter->current.s2 = (iter->current.s2 + 1) % S;
+        if (!iter->current.s2) {
+            iter->current.d2 = (iter->current.d2 + 1) % D;
+            if (!iter->current.d2) {
+                iter->current.r2 = (iter->current.r2 + 1) % R;
+                if (!iter->current.r2) {
 
-                // Find next assignment
-                do {
-                    iter->rds_index++;
-                } while ((helper->c_rds[iter->rds_index]) < 0 && iter->rds_index < RDS);
+                    // Find next assignment
+                    do {
+                        iter->rds_index++;
+                    } while ((helper->c_rds[iter->rds_index]) < 0 && iter->rds_index < RDS);
 
-                if (iter->rds_index < RDS) {
-                    iter->current.c1 = helper->c_rds[iter->rds_index];
-                    iter->current.r1 = RINDEX3_0(iter->rds_index, R, D, S);
-                    iter->current.d1 = RINDEX3_1(iter->rds_index, R, D, S);
-                    iter->current.s1 = RINDEX3_2(iter->rds_index, R, D, S);
-                    debug2("Found next assignment (%d %d %d %d)",
-                          iter->current.c1, iter->current.r1, iter->current.d1, iter->current.s1);
-                } else {
-                    debug2("No assignment found, iter exhausted");
-                    iter->end = true;
-                    return false;
+                    if (iter->rds_index < RDS) {
+                        iter->current.c1 = helper->c_rds[iter->rds_index];
+                        iter->current.r1 = RINDEX3_0(iter->rds_index, R, D, S);
+                        iter->current.d1 = RINDEX3_1(iter->rds_index, R, D, S);
+                        iter->current.s1 = RINDEX3_2(iter->rds_index, R, D, S);
+                        debug2("Found next assignment (%d %d %d %d)",
+                              iter->current.c1, iter->current.r1, iter->current.d1, iter->current.s1);
+                    } else {
+                        debug2("No assignment found, iter exhausted");
+                        iter->end = true;
+                        return false;
+                    }
                 }
             }
         }
-    }
+    } while (!neighbourhood_swap_move_is_effective(&iter->current));
+
 
     neighbourhood_swap_move_copy(move, &iter->current);
 

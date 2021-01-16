@@ -338,6 +338,11 @@ const solution_helper *solution_get_helper(solution *solution) {
     return solution->helper;
 }
 
+const solution_helper *solution_invalidate(solution *sol) {
+    solution_helper_compute(sol->helper, sol);
+    return solution_get_helper(sol);
+}
+
 void solution_copy(solution *solution_dest, const solution *solution_src) {
     memcpy(solution_dest->timetable, solution_src->timetable,
            solution_dest->model->n_courses * solution_dest->model->n_rooms *
@@ -815,7 +820,7 @@ int solution_room_stability_cost(const solution *sol) {
     return solution_room_stability_cost_dump(sol, NULL, NULL);
 }
 
-char *solution_quality_to_string(solution *sol, bool verbose) {
+char *solution_quality_to_string(const solution *sol, bool verbose) {
     char *str = NULL;
     size_t strsize;
 
@@ -960,7 +965,8 @@ unsigned long long solution_fingerprint(const solution *sol) {
     unsigned long long fingerprint = 0;
     for (int i = 0; i < sol->model->n_courses * sol->model->n_rooms * sol->model->n_days * sol->model->n_slots; i++) {
         if (sol->timetable[i])
-            fingerprint++;
+//            fingerprint++;
+            fingerprint += i;
         fingerprint *= 23;
     }
     return fingerprint;
@@ -972,6 +978,23 @@ void solution_set_at(solution *sol, int index, bool value) {
 
 bool solution_get_at(const solution *sol, int index) {
     return sol->timetable[index];
+}
+
+bool read_solution(solution *sol, const char *input_file) {
+    if (!input_file)
+        return false;
+
+    solution_parser sp;
+    solution_parser_init(&sp);
+    bool success = solution_parser_parse(&sp, input_file, sol);
+    if (!success) {
+        eprint("ERROR: failed to parse solution file '%s' (%s)",
+               input_file, solution_parser_get_error(&sp));
+    }
+
+    solution_parser_destroy(&sp);
+
+    return success;
 }
 
 bool write_solution(const solution *sol, const char *output_file) {
@@ -994,4 +1017,19 @@ void print_solution(const solution *sol, FILE *stream) {
     char *sol_str = solution_to_string(sol);
     fprint(stream, "%s", sol_str);
     free(sol_str);
+}
+
+void print_solution_full(const solution *sol, FILE *stream) {
+    char *sol_str = solution_to_string(sol);
+    char *sol_quality_str = solution_quality_to_string(sol, true);
+
+    fprint(stream,
+           "%s\n"
+          "----------------------\n"
+          "%s",
+          sol_str,
+          sol_quality_str);
+
+    free(sol_str);
+    free(sol_quality_str);
 }

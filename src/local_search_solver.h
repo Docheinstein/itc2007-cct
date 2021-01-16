@@ -7,6 +7,7 @@ typedef struct local_search_solver_config {
     int multistart;
     int time_limit;
     double difficulty_ranking_randomness;
+    const solution *starting_solution;
 } local_search_solver_config;
 
 typedef struct local_search_solver {

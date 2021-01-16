@@ -79,8 +79,10 @@ typedef struct solution_parser {
     char *error;
 } solution_parser;
 
+bool read_solution(solution *sol, const char *input_file);
 bool write_solution(const solution *sol, const char *output_file);
 void print_solution(const solution *sol, FILE *stream);
+void print_solution_full(const solution *sol, FILE *stream);
 
 void solution_parser_init(solution_parser *solution_parser);
 bool solution_parser_parse(solution_parser *solution_parser, const char * input,
@@ -93,6 +95,7 @@ void solution_reinit(solution *solution);
 void solution_destroy(solution *solution);
 
 const solution_helper * solution_get_helper(solution *solution);
+const solution_helper * solution_invalidate(solution *sol);
 
 void solution_copy(solution *solution_dest, const solution *solution_src);
 
@@ -103,7 +106,7 @@ void solution_set_at(solution *sol, int index, bool value);
 bool solution_get_at(const solution *sol, int index);
 
 char * solution_to_string(const solution *sol);
-char * solution_quality_to_string(solution *sol, bool verbose);
+char * solution_quality_to_string(const solution *sol, bool verbose);
 
 unsigned long long solution_fingerprint(const solution *sol);
 

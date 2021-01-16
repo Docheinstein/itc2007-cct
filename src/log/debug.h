@@ -10,6 +10,7 @@
 #endif
 
 #if DEBUG >= 2
+#define DEBUG2
 #define debug2(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #else
 #define debug2(fmt, ...)

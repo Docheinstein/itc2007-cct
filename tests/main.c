@@ -620,6 +620,51 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
     return MUNIT_OK;
 }
 
+static MunitResult test_neighbourhood_iter_next(const char *dataset_file) {
+    model m;
+    model_init(&m);
+
+    parser parser;
+    parser_init(&parser);
+    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+
+    feasible_solution_finder finder;
+    feasible_solution_finder_init(&finder);
+
+    feasible_solution_finder_config finder_config;
+    feasible_solution_finder_config_init(&finder_config);
+
+    solution sol;
+    solution_init(&sol, &m);
+
+    feasible_solution_finder_find(&finder, &finder_config, &sol);
+
+    neighbourhood_swap_result swap_result;
+    int cost = solution_cost(&sol);
+
+    bool improved;
+
+    neighbourhood_swap_iter iter;
+    neighbourhood_swap_iter_init(&iter, &sol);
+
+    neighbourhood_swap_move mv;
+
+    while (neighbourhood_swap_iter_next(&iter, &mv)) {
+        munit_assert_true(solution_get(&sol, mv.c1, mv.r1, mv.d1, mv.s1));
+    }
+
+    neighbourhood_swap_iter_destroy(&iter);
+
+    solution_destroy(&sol);
+    model_destroy(&m);
+
+    return MUNIT_OK;
+}
+
+MUNIT_TEST(test_neighbourhood_iter_next_comp01) {
+    return test_neighbourhood_iter_next("datasets/comp01.ctt");
+}
+
 static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_better(const char *dataset_file) {
 
     model m;
@@ -740,6 +785,7 @@ static MunitTest tests[] = {
     { "test_index_rindex", test_index_rindex, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_feasible_solution_finder_find_toy", test_feasible_solution_finder_find_toy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_feasible_solution_finder_find_comp01", test_feasible_solution_finder_find_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    { "test_neighbourhood_iter_next_comp01", test_neighbourhood_iter_next_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_compute_neighbourhood_swap_cost_constraints_toytoy", test_compute_neighbourhood_swap_cost_constraints_toytoy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     { "test_compute_neighbourhood_swap_perform_if_feasible_and_better_toytoy", test_compute_neighbourhood_swap_perform_if_feasible_and_better_toytoy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 //    { "test_compute_neighbourhood_swap_cost_constraints_comp01", test_compute_neighbourhood_swap_cost_constraints_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

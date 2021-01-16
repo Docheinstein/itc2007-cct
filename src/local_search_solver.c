@@ -80,10 +80,10 @@ static void do_local_search_fast_descend(solution *sol) {
         int j = 0;
         improved = false;
 
+        // TODO: probably this copy can be avoided
         solution sol_neigh;
         solution_init(&sol_neigh, sol->model);
         solution_copy(&sol_neigh, sol);
-
         neighbourhood_swap_iter iter;
         neighbourhood_swap_iter_init(&iter, &sol_neigh);
 
@@ -126,6 +126,7 @@ void local_search_solver_config_init(local_search_solver_config *config) {
     config->multistart = 0;
     config->time_limit = 0;
     config->difficulty_ranking_randomness = 0;
+    config->starting_solution = NULL;
 }
 
 void local_search_solver_config_destroy(local_search_solver_config *config) {
@@ -189,8 +190,15 @@ bool local_search_solver_solve(local_search_solver *solver,
         solution s;
         solution_init(&s, model);
 
-        debug("[%d] Finding initial feasible solution...", iter);
-        feasible_solution_finder_find(&finder, &finder_config, &s);
+        if (config->starting_solution) {
+            debug("[%d] Using provided initial solution", iter);
+            solution_copy(&s, config->starting_solution);
+        }
+        else {
+            debug("[%d] Finding initial feasible solution...", iter);
+            feasible_solution_finder_find(&finder, &finder_config, &s);
+        }
+
         debug("[%d] Initial solution found, cost = %d", iter, solution_cost(&s));
 
         // Local search starting from this feasible solution

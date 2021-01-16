@@ -141,69 +141,64 @@ int main (int argc, char **argv) {
 
     if (args.solution_input_file) {
         // Load the solution instead of computing it
-        solution_parser sp;
-        solution_parser_init(&sp);
-        if (!solution_parser_parse(&sp, args.solution_input_file, &sol)) {
-            eprint("ERROR: failed to parse solution file '%s' (%s)",
-                   args.input, solution_parser_get_error(&sp));
-            exit(EXIT_FAILURE);
-        }
-
-        solution_parser_destroy(&sp);
-        solution_loaded = true;
-    } else {
-        // Standard case, compute the solution
-        if (args.method == RESOLUTION_METHOD_EXACT) {
-            exact_solver_config conf;
-            exact_solver_config_init(&conf);
-
-            exact_solver solver;
-            exact_solver_init(&solver);
-
-            conf.grb_write_lp = args.write_lp_file;
-            conf.grb_verbose = args.verbose;
-            conf.grb_time_limit = args.time_limit;
-
-            verbose("Solving model exactly, it might take a long time...");
-            solution_loaded = exact_solver_solve(&solver, &conf, &sol);
-            if (!solution_loaded)
-                eprint("ERROR: failed to solve model (%s)", exact_solver_get_error(&solver));
-
-            exact_solver_config_destroy(&conf);
-            exact_solver_destroy(&solver);
-        } else if (args.method == RESOLUTION_METHOD_LOCAL_SEARCH) {
-            local_search_solver_config config;
-            local_search_solver_config_init(&config);
-            config.multistart = args.multistart;
-            config.time_limit = args.time_limit;
-            config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-
-            local_search_solver solver;
-            local_search_solver_init(&solver);
-
-            solution_loaded = local_search_solver_solve(&solver, &config, &sol);
-            if (!solution_loaded)
-                eprint("ERROR: failed to solve model (%s)", local_search_solver_get_error(&solver));
-
-            local_search_solver_config_destroy(&config);
-            local_search_solver_destroy(&solver);
-        } else if (args.method == RESOLUTION_METHOD_TABU_SEARCH) {
-            tabu_search_solver_config config;
-            tabu_search_solver_config_init(&config);
-            config.time_limit = args.time_limit;
-            config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-
-            tabu_search_solver solver;
-            tabu_search_solver_init(&solver);
-
-            solution_loaded = tabu_search_solver_solve(&solver, &config, &sol);
-            if (!solution_loaded)
-                eprint("ERROR: failed to solve model (%s)", tabu_search_solver_get_error(&solver));
-
-            tabu_search_solver_config_destroy(&config);
-            tabu_search_solver_destroy(&solver);
-        }
+        solution_loaded = read_solution(&sol, args.solution_input_file);
     }
+
+    // Standard case, compute the solution
+    if (args.method == RESOLUTION_METHOD_EXACT) {
+        exact_solver_config conf;
+        exact_solver_config_init(&conf);
+
+        exact_solver solver;
+        exact_solver_init(&solver);
+
+        conf.grb_write_lp = args.write_lp_file;
+        conf.grb_verbose = args.verbose;
+        conf.grb_time_limit = args.time_limit;
+
+        verbose("Solving model exactly, it might take a long time...");
+        solution_loaded = exact_solver_solve(&solver, &conf, &sol);
+        if (!solution_loaded)
+            eprint("ERROR: failed to solve model (%s)", exact_solver_get_error(&solver));
+
+        exact_solver_config_destroy(&conf);
+        exact_solver_destroy(&solver);
+    } else if (args.method == RESOLUTION_METHOD_LOCAL_SEARCH) {
+        local_search_solver_config config;
+        local_search_solver_config_init(&config);
+        config.multistart = args.multistart;
+        config.time_limit = args.time_limit;
+        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+        config.starting_solution = solution_loaded ? &sol : NULL;
+
+        local_search_solver solver;
+        local_search_solver_init(&solver);
+
+        solution_loaded = local_search_solver_solve(&solver, &config, &sol);
+        if (!solution_loaded)
+            eprint("ERROR: failed to solve model (%s)", local_search_solver_get_error(&solver));
+
+        local_search_solver_config_destroy(&config);
+        local_search_solver_destroy(&solver);
+    } else if (args.method == RESOLUTION_METHOD_TABU_SEARCH) {
+        tabu_search_solver_config config;
+        tabu_search_solver_config_init(&config);
+        config.iter_limit = args.multistart;
+        config.time_limit = args.time_limit;
+        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+        config.starting_solution = solution_loaded ? &sol : NULL;
+
+        tabu_search_solver solver;
+        tabu_search_solver_init(&solver);
+
+        solution_loaded = tabu_search_solver_solve(&solver, &config, &sol);
+        if (!solution_loaded)
+            eprint("ERROR: failed to solve model (%s)", tabu_search_solver_get_error(&solver));
+
+        tabu_search_solver_config_destroy(&config);
+        tabu_search_solver_destroy(&solver);
+    }
+
 
     if (solution_loaded || args.force_draw) {
         char *sol_str = solution_to_string(&sol);
