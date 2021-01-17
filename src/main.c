@@ -87,7 +87,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "renderer.h"
 #include "feasible_solution_finder.h"
 #include "log/debug.h"
-#include "neighbourhood.h"
+#include "neighbourhoods/neighbourhood_swap.h"
 #include "local_search_solver.h"
 #include "tabu_search_solver.h"
 #include <sys/time.h>   /* for setitimer */
@@ -97,8 +97,8 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 
 int main (int argc, char **argv) {
 //    for (int i = 0; i < 10000; i++) {
-//        double r = rand_normal(0, 0.3);
-//        print("%d,", (int)ABS(round(r)));
+//        double r = rand_triangular(0, 50, 80);
+//        print("%g,", r);
 //    }
 //    exit(0);
 
@@ -127,7 +127,7 @@ int main (int argc, char **argv) {
             buffer);
 
     verbose("Using RNG seed: %u", args.seed);
-    rand_init(args.seed);
+    rand_set_seed(args.seed);
 
     model model;
     model_init(&model);
@@ -232,5 +232,6 @@ int main (int argc, char **argv) {
     model_destroy(&model);
     args_destroy(&args);
 
+    debug("(seed was %d)", rand_get_seed());
     return 0;
 }

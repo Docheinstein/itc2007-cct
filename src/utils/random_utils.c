@@ -4,8 +4,15 @@
 #include "random_utils.h"
 #include <string.h>
 
-void rand_init(uint seed) {
+static uint g_seed;
+
+void rand_set_seed(uint seed) {
+    g_seed = seed;
     srandom(seed);
+}
+
+uint rand_get_seed() {
+    return g_seed;
 }
 
 int rand_int() {
@@ -16,9 +23,9 @@ int rand_int_range(int start, int end) {
     return start + ((int) random() % (end - start));
 }
 
-double rand_uniform(double lb, double ub) {
+double rand_uniform(double a, double b) {
     int r = rand_int();
-    return lb + ((double) r / RAND_MAX) * (ub - lb);
+    return a + ((double) r / RAND_MAX) * (b - a);
 }
 
 double rand_normal(double mean, double std) {
@@ -51,6 +58,17 @@ double rand_normal(double mean, double std) {
     z1_usable = true;
 
     return mean + z0 * std;
+}
+
+double rand_triangular(double a, double c, double b) {
+    if (a == b)
+        return a;
+
+    double F_c = (c - a) / (b - a);
+    double r = rand_uniform(0, 1);
+    if (r < F_c)
+        return a + sqrt(r * (b - a) * (c - a));
+    return b - sqrt((1 - r) * (b - a) * (b - c));
 }
 
 void shuffle(void *array, size_t n, size_t size) {

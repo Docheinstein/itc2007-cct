@@ -1,22 +1,15 @@
 #include <log/debug.h>
 #include <utils/io_utils.h>
 #include <utils/str_utils.h>
-#include "neighbourhood.h"
+#include "neighbourhood_swap.h"
 #include "utils/array_utils.h"
 #include "solution.h"
 #include "model.h"
 #include "config.h"
 
 
-bool neighbourhood_swap_move_is_effective(const neighbourhood_swap_move *mv) {
-    return
-        mv->r1 != mv->r2 &&
-        mv->d1 != mv->d2 &&
-        mv->s1 != mv->s2;
-}
-
-void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
-                                  const neighbourhood_swap_move *src) {
+static void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
+                                         const neighbourhood_swap_move *src) {
     dest->c1 = src->c1;
     dest->r1 = src->r1;
     dest->d1 = src->d1;
@@ -25,6 +18,14 @@ void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
     dest->d2 = src->d2;
     dest->s2 = src->s2;
 }
+
+static bool neighbourhood_swap_move_is_effective(const neighbourhood_swap_move *mv) {
+    return
+        mv->r1 != mv->r2 ||
+        mv->d1 != mv->d2 ||
+        mv->s1 != mv->s2;
+}
+
 
 void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol) {
     iter->solution = sol;
@@ -157,37 +158,37 @@ static bool check_neighbourhood_swap_availabilities_constraint(
 static bool check_neighbourhood_swap_hard_constraints(solution *sol,
                                                       const neighbourhood_swap_move *mv) {
     debug2("Check hard constraints of swap (%d, %d %d, %d) <-> (%d, %d, %d, %d)",
-           mv->c1, mv->r1, mv->d1, mv->s1, mv->c2, mv->r2, mv->d2, mv->s2);
+           mv->c1, mv->r1, mv->d1, mv->s1, mv->_c2, mv->r2, mv->d2, mv->s2);
 
-    if (mv->d1 == mv->d2 && mv->s1 == mv->s2 && mv->c1 == mv->c2 && mv->r1 == mv->r2)
+    if (mv->d1 == mv->d2 && mv->s1 == mv->s2 && mv->c1 == mv->_c2 && mv->r1 == mv->r2)
         return true; // nothing to do
 
     // Lectures
     if (!check_neighbourhood_swap_lectures_constraint(
-            sol, mv->c1, mv->d1, mv->s1, mv->c2, mv->d2, mv->s2))
+            sol, mv->c1, mv->d1, mv->s1, mv->_c2, mv->d2, mv->s2))
         return false;
     if (!check_neighbourhood_swap_lectures_constraint(
-            sol, mv->c2, mv->d2, mv->s2, mv->c1, mv->d1, mv->s1))
+            sol, mv->_c2, mv->d2, mv->s2, mv->c1, mv->d1, mv->s1))
         return false;
 
     // RoomOccupancy: no need to check since the swap replaces the room by design
 
     // Conflicts: curriculum
     if (!check_neighbourhood_swap_conflicts_curriculum_constraint(
-            sol, mv->c1, mv->d1, mv->s1, mv->c2, mv->d2, mv->s2))
+            sol, mv->c1, mv->d1, mv->s1, mv->_c2, mv->d2, mv->s2))
         return false;
 
     if (!check_neighbourhood_swap_conflicts_curriculum_constraint(
-            sol, mv->c2, mv->d2, mv->s2, mv->c1, mv->d1, mv->s1))
+            sol, mv->_c2, mv->d2, mv->s2, mv->c1, mv->d1, mv->s1))
         return false;
 
     // Conflicts: teacher
     if (!check_neighbourhood_swap_conflicts_teacher_constraint(
-            sol, mv->c1, mv->d1, mv->s1, mv->c2, mv->d2, mv->s2))
+            sol, mv->c1, mv->d1, mv->s1, mv->_c2, mv->d2, mv->s2))
         return false;
 
     if (!check_neighbourhood_swap_conflicts_teacher_constraint(
-            sol, mv->c2, mv->d2, mv->s2, mv->c1, mv->d1, mv->s1))
+            sol, mv->_c2, mv->d2, mv->s2, mv->c1, mv->d1, mv->s1))
         return false;
 
     // Availabilities
@@ -196,7 +197,7 @@ static bool check_neighbourhood_swap_hard_constraints(solution *sol,
         return false;
 
     if (!check_neighbourhood_swap_availabilities_constraint(
-            sol, mv->c2, mv->d1, mv->s1))
+            sol, mv->_c2, mv->d1, mv->s1))
         return false;
 
     return true;
@@ -384,6 +385,11 @@ static void compute_neighbourhood_swap_cost(
         neighbourhood_swap_result *result) {
     CRDSQT(sol->model)
 
+    debug("compute_neighbourhood_swap_cost (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d))",
+            mv->c1, sol->model->courses[mv->c1].id,
+            mv->r1, sol->model->rooms[mv->r1].id, mv->d1, mv->s1,
+            mv->r2, sol->model->rooms[mv->r2].id, mv->d2, mv->s2);
+
     result->delta_cost_room_capacity = 0;
     result->delta_cost_min_working_days = 0;
     result->delta_cost_curriculum_compactness = 0;
@@ -394,28 +400,28 @@ static void compute_neighbourhood_swap_cost(
         compute_neighbourhood_swap_room_capacity_cost(
                 sol, mv->c1, mv->r1, mv->r2) +
         compute_neighbourhood_swap_room_capacity_cost(
-                sol, mv->c2, mv->r2, mv->r1);
+                sol, mv->_c2, mv->r2, mv->r1);
 
     // MinWorkingDays
     result->delta_cost_min_working_days +=
-        compute_neighbourhood_swap_min_working_days_cost(
-                sol, mv->c1, mv->d1, mv->c2, mv->d2) +
-        compute_neighbourhood_swap_min_working_days_cost(
-                sol, mv->c2, mv->d2, mv->c1, mv->d1);
+            compute_neighbourhood_swap_min_working_days_cost(
+                    sol, mv->c1, mv->d1, mv->_c2, mv->d2) +
+            compute_neighbourhood_swap_min_working_days_cost(
+                    sol, mv->_c2, mv->d2, mv->c1, mv->d1);
 
     // CurriculumCompactness
     result->delta_cost_curriculum_compactness +=
-        compute_neighbourhood_swap_curriculum_compactness_cost(
-                sol, mv->c1, mv->d1, mv->s1, mv->c2, mv->d2, mv->s2) +
-        compute_neighbourhood_swap_curriculum_compactness_cost(
-                sol, mv->c2, mv->d2, mv->s2, mv->c1, mv->d1, mv->s1);
+            compute_neighbourhood_swap_curriculum_compactness_cost(
+                    sol, mv->c1, mv->d1, mv->s1, mv->_c2, mv->d2, mv->s2) +
+            compute_neighbourhood_swap_curriculum_compactness_cost(
+                    sol, mv->_c2, mv->d2, mv->s2, mv->c1, mv->d1, mv->s1);
 
     // RoomStability
     result->delta_cost_room_stability +=
-        compute_neighbourhood_swap_room_stability_cost(
-                sol, mv->c1, mv->r1, mv->c2, mv->r2) +
-        compute_neighbourhood_swap_room_stability_cost(
-                sol, mv->c2, mv->r2, mv->c1, mv->r1);
+            compute_neighbourhood_swap_room_stability_cost(
+                    sol, mv->c1, mv->r1, mv->_c2, mv->r2) +
+            compute_neighbourhood_swap_room_stability_cost(
+                    sol, mv->_c2, mv->r2, mv->c1, mv->r1);
 
     result->delta_cost =
             result->delta_cost_room_capacity +
@@ -423,7 +429,7 @@ static void compute_neighbourhood_swap_cost(
             result->delta_cost_curriculum_compactness +
             result->delta_cost_room_stability;
 
-    debug2("DELTA cost = %d", result->delta_cost);
+    debug("compute_neighbourhood_swap_cost cost = %d", result->delta_cost);
 }
 
 
@@ -444,7 +450,7 @@ bool neighbourhood_swap(solution *sol,
     }
 #endif
 
-    mv->c2 = solution_get_helper(sol)->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
+    mv->_c2 = solution_get_helper(sol)->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
 
     if (predict_feasibility == NEIGHBOURHOOD_PREDICT_ALWAYS)
         result->feasible = check_neighbourhood_swap_hard_constraints(sol, mv);
@@ -457,7 +463,8 @@ bool neighbourhood_swap(solution *sol,
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE && result->feasible) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_BETTER && result->delta_cost < 0) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER && result->feasible && result->delta_cost < 0)) {
-        do_neighbourhood_swap(sol, mv->c1, mv->r1, mv->d1, mv->s1, mv->c2, mv->r2, mv->d2, mv->s2);
+        do_neighbourhood_swap(sol, mv->c1, mv->r1, mv->d1, mv->s1, mv->_c2, mv->r2, mv->d2, mv->s2);
+        solution_invalidate_helper(sol);
         return true;
     }
 
@@ -466,44 +473,5 @@ bool neighbourhood_swap(solution *sol,
 
 void neighbourhood_swap_back(solution *sol,
                              const neighbourhood_swap_move *mv) {
-    do_neighbourhood_swap(sol, mv->c1, mv->r2, mv->d2, mv->s2, mv->c2, mv->r1, mv->d1, mv->s1);
-}
-
-void neighbourhood_swap_course_lectures_room_iter_init(
-        neighbourhood_swap_course_lectures_room_iter *iter,
-        const solution *sol) {
-    iter->solution = sol;
-    iter->room_index = iter->course_index = 0;
-}
-
-void neighbourhood_swap_course_lectures_room_iter_destroy(
-        neighbourhood_swap_course_lectures_room_iter *iter) {
-
-}
-
-bool neighbourhood_swap_course_lectures_room_iter_next(
-        neighbourhood_swap_course_lectures_room_iter *iter, int *c, int *r) {
-    *c = iter->course_index;
-    *r = iter->room_index;
-
-    iter->room_index = (iter->room_index + 1) % (iter->solution->model->n_rooms);
-    iter->course_index += iter->room_index == 0 ? 1 : 0;
-
-    return iter->course_index < iter->solution->model->n_courses;
-}
-
-bool neighbourhood_swap_course_lectures_room(
-        solution *sol, int c, int r) {
-    CRDSQT(sol->model)
-
-    return true;
-//    for (int d = 0; d < D; d++) {
-//        for (int s = 0; s < S; s++) {
-//            int c_room = sol_in->helper.r_cds[INDEX3(c, C, d, D, s, S)];
-//            int r_course = sol_in->helper.c_rds[INDEX3(r, R, d, D, s, S)];
-//
-//            do_neighbourhood_swap(sol_out)
-//        }
-//    }
-//    return 0;
+    do_neighbourhood_swap(sol, mv->c1, mv->r2, mv->d2, mv->s2, mv->_c2, mv->r1, mv->d1, mv->s1);
 }

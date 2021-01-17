@@ -9,7 +9,7 @@
 #include <utils/array_utils.h>
 #include <log/debug.h>
 #include <utils/random_utils.h>
-#include <neighbourhood.h>
+#include <neighbourhoods/neighbourhood_swap.h>
 #include <feasible_solution_finder.h>
 #include "utils/os_utils.h"
 

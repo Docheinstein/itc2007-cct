@@ -11,6 +11,7 @@
 
 static void solution_helper_init(solution_helper *helper, const model *model) {
     CRDSQT(model)
+    helper->valid = false;
 
     helper->c_rds = mallocx(R * D * S, sizeof(int));
     helper->r_cds = mallocx(C * D * S, sizeof(int));
@@ -32,6 +33,8 @@ static void solution_helper_init(solution_helper *helper, const model *model) {
 }
 
 static void solution_helper_destroy(solution_helper *helper) {
+    helper->valid = false;
+
     free(helper->c_rds);
     free(helper->r_cds);
 
@@ -56,6 +59,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
     const model *model = sol->model;
 
     debug2("@@ solution_helper_compute @@");
+    helper->valid = true;
 
     memset(helper->c_rds, -1, R * D * S * sizeof(int));
     memset(helper->r_cds, -1, C * D * S * sizeof(int));
@@ -333,14 +337,14 @@ const solution_helper *solution_get_helper(solution *solution) {
     if (!solution->helper) {
         solution->helper = mallocx(1, sizeof(solution_helper));
         solution_helper_init(solution->helper, solution->model);
-        solution_helper_compute(solution->helper, solution);
     }
+    if (!solution->helper->valid)
+        solution_helper_compute(solution->helper, solution);
     return solution->helper;
 }
 
-const solution_helper *solution_invalidate(solution *sol) {
-    solution_helper_compute(sol->helper, sol);
-    return solution_get_helper(sol);
+void solution_invalidate_helper(solution *sol) {
+    sol->helper->valid = false;
 }
 
 void solution_copy(solution *solution_dest, const solution *solution_src) {

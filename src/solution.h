@@ -48,6 +48,8 @@ room used for the lectures of a course_id, but the first, counts as 1 point of p
 #include <stdbool.h>
 
 typedef struct solution_helper {
+    bool valid;
+
     int *c_rds;
     int *r_cds;
 
@@ -95,7 +97,7 @@ void solution_reinit(solution *solution);
 void solution_destroy(solution *solution);
 
 const solution_helper * solution_get_helper(solution *solution);
-const solution_helper * solution_invalidate(solution *sol);
+void solution_invalidate_helper(solution *sol);
 
 void solution_copy(solution *solution_dest, const solution *solution_src);
 

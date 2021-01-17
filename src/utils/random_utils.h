@@ -3,13 +3,17 @@
 
 #include <sys/types.h>
 
-void rand_init(uint seed);
+void rand_set_seed(uint seed);
+uint rand_get_seed();
 
 int rand_int();
 int rand_int_range(int start, int end);
 
-double rand_uniform(double lb, double ub);
+double rand01();
+
+double rand_uniform(double a, double b);
 double rand_normal(double mean, double std);
+double rand_triangular(double a, double c, double b);
 
 void shuffle(void *array, size_t n, size_t size);
 

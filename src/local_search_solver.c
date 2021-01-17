@@ -4,7 +4,8 @@
 #include <utils/str_utils.h>
 #include <utils/time_utils.h>
 #include <utils/io_utils.h>
-#include "neighbourhood.h"
+#include <neighbourhoods/neighbourhood_stabilize_room.h>
+#include "neighbourhoods/neighbourhood_swap.h"
 #include "feasible_solution_finder.h"
 
 static void do_local_search_complete(solution *sol) {
@@ -70,56 +71,99 @@ static void do_local_search_complete(solution *sol) {
 }
 
 static void do_local_search_fast_descend(solution *sol) {
-    neighbourhood_swap_result swap_result;
-
     int cost = solution_cost(sol);
+
+    int swap_improvements = 0;
+    int stabilize_room_improvements = 0;
+    int stabilize_room_improvements_delta = 0;
 
     int i = 0;
     bool improved;
     do {
-        int j = 0;
-        improved = false;
+        // N1: swap: improve as much as possible
+        do {
+            int j = 0;
+            improved = false;
 
-        // TODO: probably this copy can be avoided
-        solution sol_neigh;
-        solution_init(&sol_neigh, sol->model);
-        solution_copy(&sol_neigh, sol);
-        neighbourhood_swap_iter iter;
-        neighbourhood_swap_iter_init(&iter, &sol_neigh);
+            neighbourhood_swap_iter swap_iter;
+            neighbourhood_swap_iter_init(&swap_iter, sol);
 
-        neighbourhood_swap_move mv;
+            neighbourhood_swap_move swap_mv;
+            neighbourhood_swap_result swap_result;
 
-        while (neighbourhood_swap_iter_next(&iter, &mv)) {
-            bool restart = false;
+            while (neighbourhood_swap_iter_next(&swap_iter, &swap_mv)) {
+                int jj = j++;
 
-            debug("[%d.%d] LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
-                   i, j, mv.c1, mv.r1, mv.d1, mv.s1, mv.r2, mv.d2, mv.s2);
+                debug("[%d.swap.%d] LS swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
+                      i, jj,
+                      swap_mv.c1, swap_mv.r1, swap_mv.d1,
+                      swap_mv.s1, swap_mv.r2, swap_mv.d2, swap_mv.s2);
 
-            if (neighbourhood_swap(&sol_neigh, &mv,
-                               NEIGHBOURHOOD_PREDICT_ALWAYS,
-                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
-                               NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
-                               &swap_result)) {
-                // Feasible solution after swap
-                int neigh_cost = cost + swap_result.delta_cost;
-                debug("[%d.%d] LS: solution improved, cost = %d", i, j, neigh_cost);
+                if (neighbourhood_swap(sol, &swap_mv,
+                                       NEIGHBOURHOOD_PREDICT_ALWAYS,
+                                       NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                                       NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
+                                       &swap_result)) {
+                    swap_improvements++;
+                    int neigh_cost = cost + swap_result.delta_cost;
+                    debug("[%d.swap.%d] LS: solution improved (by %d), cost = %d",
+                          i, jj, swap_result.delta_cost, neigh_cost);
 
-                cost = neigh_cost;
-                solution_copy(sol, &sol_neigh);
-                improved = true;
-                restart = true;
+                    cost = neigh_cost;
+                    improved = true;
+                    break;
+                }
             }
 
-            j++;
+            neighbourhood_swap_iter_destroy(&swap_iter);
+        } while (cost > 0 && improved);
 
-            if (restart)
+        // N2: stabilize_room, do only one improvement
+
+        int j = 0;
+
+        neighbourhood_stabilize_room_iter stabilize_room_iter;
+        neighbourhood_stabilize_room_iter_init(&stabilize_room_iter, sol);
+
+        neighbourhood_stabilize_room_move stabilize_room_mv;
+        neighbourhood_stabilize_room_result stabilize_room_result;
+
+        while (neighbourhood_stabilize_room_iter_next(&stabilize_room_iter, &stabilize_room_mv)) {
+            int jj = j++;
+
+            debug("[%d.stabilize_room.%d] LS stabilize_room(c=%d r=%d)",
+                   i, jj, stabilize_room_mv.c1, stabilize_room_mv.r2);
+
+            if (neighbourhood_stabilize_room(sol, &stabilize_room_mv,
+                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
+                               &stabilize_room_result)) {
+
+                stabilize_room_improvements++;
+                stabilize_room_improvements_delta += stabilize_room_result.delta_cost;
+                int neigh_cost = cost + stabilize_room_result.delta_cost;
+                debug("[%d.stabilize_room.%d] LS: solution improved (by %d), cost = %d",
+                      i, jj, stabilize_room_result.delta_cost, neigh_cost);
+
+                cost = neigh_cost;
+                improved = true;
+#if DEBUG
+                if (solution_cost(sol) != cost) {
+                    exit(21);
+                }
+#endif
                 break;
+            }
         }
 
-        solution_destroy(&sol_neigh);
-        neighbourhood_swap_iter_destroy(&iter);
+        neighbourhood_stabilize_room_iter_destroy(&stabilize_room_iter);
+
         i++;
     } while (cost > 0 && improved);
+
+    debug("swap_improvements = %d", swap_improvements);
+    debug("stabilize_room_improvements = %d", stabilize_room_improvements);
+    debug("stabilize_room_improvements_delta = %d", stabilize_room_improvements_delta);
 }
 
 void local_search_solver_config_init(local_search_solver_config *config) {

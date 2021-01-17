@@ -1,17 +1,15 @@
-#ifndef NEIGHBOURHOOD_H
-#define NEIGHBOURHOOD_H
+#ifndef NEIGHBOURHOOD_SWAP_H
+#define NEIGHBOURHOOD_SWAP_H
 
 #include "solution.h"
+#include "neighbourhood.h"
 
 typedef struct neighbourhood_swap_move {
     int c1, r1, d1, s1;
     int r2, d2, s2;
 
-    int c2; // implicit
+    int _c2; // implicit
 } neighbourhood_swap_move;
-
-void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
-                                  const neighbourhood_swap_move *src);
 
 typedef struct neighbourhood_swap_iter {
     solution *solution;
@@ -30,20 +28,6 @@ typedef struct neighbourhood_swap_result {
     int delta_cost_room_stability;
 } neighbourhood_swap_result;
 
-typedef enum neighbourhood_prediction_strategy {
-    NEIGHBOURHOOD_PREDICT_ALWAYS,
-    NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
-    NEIGHBOURHOOD_PREDICT_NEVER
-} neighbourhood_prediction_strategy;
-
-typedef enum neighbourhood_performing_strategy {
-    NEIGHBOURHOOD_PERFORM_ALWAYS,
-    NEIGHBOURHOOD_PERFORM_IF_FEASIBLE,
-    NEIGHBOURHOOD_PERFORM_IF_BETTER,
-    NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
-    NEIGHBOURHOOD_PERFORM_NEVER,
-} neighbourhood_performing_strategy;
-
 void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol);
 void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter);
 bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter, neighbourhood_swap_move *move);
@@ -60,23 +44,5 @@ bool neighbourhood_swap(solution *sol,
 void neighbourhood_swap_back(solution *sol,
                              const neighbourhood_swap_move *move);
 
-// -----------------------------------------------------------------------------
 
-typedef struct neighbourhood_swap_course_lectures_room_iter {
-    const solution *solution;
-    int course_index;
-    int room_index;
-} neighbourhood_swap_course_lectures_room_iter;
-
-
-void neighbourhood_swap_course_lectures_room_iter_init(
-        neighbourhood_swap_course_lectures_room_iter *iter, const solution *sol);
-void neighbourhood_swap_course_lectures_room_iter_destroy(
-        neighbourhood_swap_course_lectures_room_iter *iter);
-bool neighbourhood_swap_course_lectures_room_iter_next(
-        neighbourhood_swap_course_lectures_room_iter *iter, int *c, int *r);
-bool neighbourhood_swap_course_lectures_room(
-        solution *sol_out, int c, int r);
-
-
-#endif // NEIGHBOURHOOD_H
+#endif // NEIGHBOURHOOD_SWAP_H
