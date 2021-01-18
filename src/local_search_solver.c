@@ -38,6 +38,7 @@ static void do_local_search_complete(solution *sol) {
             neighbourhood_swap(&sol_neigh, &mv,
                                NEIGHBOURHOOD_PREDICT_ALWAYS,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PERFORM_NEVER,
                                &swap_result);
 
@@ -52,6 +53,7 @@ static void do_local_search_complete(solution *sol) {
 
         if (best_delta < 0) {
             neighbourhood_swap(&sol_neigh, &best_mv,
+                               NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PERFORM_ALWAYS,
@@ -102,6 +104,7 @@ static void do_local_search_fast_descend(solution *sol) {
                 if (neighbourhood_swap(sol, &swap_mv,
                                        NEIGHBOURHOOD_PREDICT_ALWAYS,
                                        NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                                       NEIGHBOURHOOD_PREDICT_NEVER,
                                        NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
                                        &swap_result)) {
                     swap_improvements++;
@@ -136,6 +139,7 @@ static void do_local_search_fast_descend(solution *sol) {
 
             if (neighbourhood_stabilize_room(sol, &stabilize_room_mv,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
                                &stabilize_room_result)) {
 

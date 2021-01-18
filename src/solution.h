@@ -81,6 +81,8 @@ typedef struct solution_parser {
     char *error;
 } solution_parser;
 
+typedef unsigned long long solution_fingerprint_t;
+
 bool read_solution(solution *sol, const char *input_file);
 bool write_solution(const solution *sol, const char *output_file);
 void print_solution(const solution *sol, FILE *stream);
@@ -97,7 +99,7 @@ void solution_reinit(solution *solution);
 void solution_destroy(solution *solution);
 
 const solution_helper * solution_get_helper(solution *solution);
-void solution_invalidate_helper(solution *sol);
+bool solution_invalidate_helper(solution *sol);
 
 void solution_copy(solution *solution_dest, const solution *solution_src);
 
@@ -110,7 +112,7 @@ bool solution_get_at(const solution *sol, int index);
 char * solution_to_string(const solution *sol);
 char * solution_quality_to_string(const solution *sol, bool verbose);
 
-unsigned long long solution_fingerprint(const solution *sol);
+solution_fingerprint_t solution_fingerprint(const solution *sol);
 int solution_assignment_count(const solution *sol);
 
 // Hard constraints

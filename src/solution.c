@@ -343,8 +343,11 @@ const solution_helper *solution_get_helper(solution *solution) {
     return solution->helper;
 }
 
-void solution_invalidate_helper(solution *sol) {
-    sol->helper->valid = false;
+bool solution_invalidate_helper(solution *sol) {
+    bool was_valid = sol->helper && sol->helper->valid;
+    if (was_valid)
+        sol->helper->valid = false;
+    return was_valid;
 }
 
 void solution_copy(solution *solution_dest, const solution *solution_src) {
@@ -963,13 +966,15 @@ bool solution_get(const solution *sol, int c, int r, int d, int s) {
                                  d, sol->model->n_days, s, sol->model->n_slots)];
 }
 
-unsigned long long solution_fingerprint(const solution *sol) {
-    unsigned long long fingerprint = 0;
+solution_fingerprint_t solution_fingerprint(const solution *sol) {
+    solution_fingerprint_t fingerprint = 0;
     for (int i = 0; i < sol->model->n_courses * sol->model->n_rooms * sol->model->n_days * sol->model->n_slots; i++) {
-        if (sol->timetable[i])
-            fingerprint++;
-//            fingerprint += i;
-        fingerprint *= 13;
+        if (sol->timetable[i]) {
+//            debug("solution_fingerprint(%d)=%d", i, i);
+//            fingerprint += g_int_hash(&i);
+            fingerprint += i;
+        }
+//        fingerprint *= 13;
     }
     return fingerprint;
 }

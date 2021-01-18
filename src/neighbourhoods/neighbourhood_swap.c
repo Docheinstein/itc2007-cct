@@ -1,6 +1,7 @@
 #include <log/debug.h>
 #include <utils/io_utils.h>
 #include <utils/str_utils.h>
+#include <utils/def_utils.h>
 #include "neighbourhood_swap.h"
 #include "utils/array_utils.h"
 #include "solution.h"
@@ -385,7 +386,7 @@ static void compute_neighbourhood_swap_cost(
         neighbourhood_swap_result *result) {
     CRDSQT(sol->model)
 
-    debug("compute_neighbourhood_swap_cost (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d))",
+    debug2("compute_neighbourhood_swap_cost (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d))",
             mv->c1, sol->model->courses[mv->c1].id,
             mv->r1, sol->model->rooms[mv->r1].id, mv->d1, mv->s1,
             mv->r2, sol->model->rooms[mv->r2].id, mv->d2, mv->s2);
@@ -429,14 +430,81 @@ static void compute_neighbourhood_swap_cost(
             result->delta_cost_curriculum_compactness +
             result->delta_cost_room_stability;
 
-    debug("compute_neighbourhood_swap_cost cost = %d", result->delta_cost);
+    debug2("compute_neighbourhood_swap_cost cost = %d", result->delta_cost);
 }
 
+static solution_fingerprint_t compute_neighbourhood_swap_cost_fingerprint_diff_single(
+        solution *sol, int c, int r, int d, int s, bool set) {
+    CRDSQT(sol->model);
+
+    int i = INDEX4(c, C, r, R, d, D, s, S);
+    if (set)
+        return solution_get_at(sol, i) ? i : 0;
+    return solution_get_at(sol, i) ? -i : 0;
+}
+
+static void compute_neighbourhood_swap_fingerprint_diff(
+        solution *sol,
+        const neighbourhood_swap_move *mv,
+        neighbourhood_swap_result *result) {
+    CRDSQT(sol->model);
+    debug2("compute_neighbourhood_swap_cost_fingerprint_diff (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d))",
+            mv->c1, sol->model->courses[mv->c1].id,
+            mv->r1, sol->model->rooms[mv->r1].id, mv->d1, mv->s1,
+            mv->r2, sol->model->rooms[mv->r2].id, mv->d2, mv->s2);
+
+
+#define DIFF_SET(i) (!solution_get_at(sol, (i)) ? (i) : 0)
+#define DIFF_UNSET(i) (solution_get_at(sol, (i)) ? (-(i)) : 0)
+
+    int i1 = INDEX4(mv->c1, C, mv->r1, R, mv->d1, D, mv->s1, S);
+    int i2 = INDEX4(mv->_c2, C, mv->r2, R, mv->d2, D, mv->s2, S);
+    int i3 = INDEX4(mv->c1, C, mv->r2, R, mv->d2, D, mv->s2, S);
+    int i4 = INDEX4(mv->_c2, C, mv->r1, R, mv->d1, D, mv->s1, S);
+    result->fingerprint_diff = 0;
+
+    debug2("i1=%d, i2=%d, i3=%d, i4=%d", i1, i2, i3, i4);
+    debug2("sol[i1]=%d sol[i2]=%d sol[i3]=%d sol[i4]=%d",
+          solution_get_at(sol, i1), solution_get_at(sol, i2),
+          solution_get_at(sol, i3), solution_get_at(sol, i4));
+
+    if (mv->c1 >= 0) {
+        if (i1 != i3 && i1 != i4) {
+            result->fingerprint_diff += DIFF_UNSET(i1);
+            debug2("DIFF_UNSET(i1)=%d", DIFF_UNSET(i1));
+        }
+
+        debug2("DIFF_SET(i3)=%d", DIFF_SET(i3));
+        result->fingerprint_diff += DIFF_SET(i3);
+    }
+
+    if (mv->_c2 >= 0) {
+        if (i2 != i3 && i2 != i4) {
+            result->fingerprint_diff += DIFF_UNSET(i2);
+            debug2("DIFF_UNSET(i2)=%d", DIFF_UNSET(i2));
+        }
+
+        debug2("DIFF_SET(i4)=%d", DIFF_SET(i4));
+        result->fingerprint_diff += DIFF_SET(i4);
+    }
+
+#undef DIFF_SET
+#undef DIFF_UNSET
+
+//    result->fingerprint_diff += compute_neighbourhood_swap_cost_fingerprint_diff_single(
+//            sol, mv->c1, mv->r1, mv->d1, mv->s1, false);
+//    result->fingerprint_diff += compute_neighbourhood_swap_cost_fingerprint_diff_single(
+//            sol, mv->_c2, mv->r2, mv->d2, mv->s2, false);
+//    if (mv.)
+//    result->fingerprint_diff += compute_neighbourhood_swap_cost_fingerprint_diff_single(
+//            sol, mv->_c2, mv->r2, mv->d2, mv->s2, true);
+}
 
 bool neighbourhood_swap(solution *sol,
                         neighbourhood_swap_move *mv,
                         neighbourhood_prediction_strategy predict_feasibility,
                         neighbourhood_prediction_strategy predict_cost,
+                        neighbourhood_prediction_strategy predict_fingeprint,
                         neighbourhood_performing_strategy perform,
                         neighbourhood_swap_result *result) {
     CRDSQT(sol->model)
@@ -453,18 +521,25 @@ bool neighbourhood_swap(solution *sol,
     mv->_c2 = solution_get_helper(sol)->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
 
     if (predict_feasibility == NEIGHBOURHOOD_PREDICT_ALWAYS)
-        result->feasible = check_neighbourhood_swap_hard_constraints(sol, mv);
+        if (result)
+            result->feasible = check_neighbourhood_swap_hard_constraints(sol, mv);
 
     if (predict_cost == NEIGHBOURHOOD_PREDICT_ALWAYS ||
         (predict_cost == NEIGHBOURHOOD_PREDICT_IF_FEASIBLE && result->feasible))
         compute_neighbourhood_swap_cost(sol, mv, result);
+
+    if (predict_fingeprint == NEIGHBOURHOOD_PREDICT_ALWAYS ||
+        (predict_fingeprint == NEIGHBOURHOOD_PREDICT_IF_FEASIBLE && result->feasible))
+        compute_neighbourhood_swap_fingerprint_diff(sol, mv, result);
 
     if (perform == NEIGHBOURHOOD_PERFORM_ALWAYS ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE && result->feasible) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_BETTER && result->delta_cost < 0) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER && result->feasible && result->delta_cost < 0)) {
         do_neighbourhood_swap(sol, mv->c1, mv->r1, mv->d1, mv->s1, mv->_c2, mv->r2, mv->d2, mv->s2);
-        solution_invalidate_helper(sol);
+        bool was_valid = solution_invalidate_helper(sol);
+        if (result)
+            result->_helper_was_valid = was_valid;
         return true;
     }
 
@@ -472,6 +547,9 @@ bool neighbourhood_swap(solution *sol,
 }
 
 void neighbourhood_swap_back(solution *sol,
-                             const neighbourhood_swap_move *mv) {
+                             const neighbourhood_swap_move *mv,
+                             const neighbourhood_swap_result *res) {
     do_neighbourhood_swap(sol, mv->c1, mv->r2, mv->d2, mv->s2, mv->_c2, mv->r1, mv->d1, mv->s1);
+    if (res->_helper_was_valid && sol->helper)
+        sol->helper->valid = true;
 }

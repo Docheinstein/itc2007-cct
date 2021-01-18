@@ -3,6 +3,7 @@
 #include <utils/str_utils.h>
 #include <config.h>
 #include <utils/mem_utils.h>
+#include <renderer.h>
 #include "neighbourhood_stabilize_room.h"
 #include "utils/array_utils.h"
 #include "solution.h"
@@ -163,8 +164,48 @@ static void do_neighbourhood_stabilize_room(solution *sol, int c1, int r2) {
             neighbourhood_swap(sol, &swap_move,
                NEIGHBOURHOOD_PREDICT_NEVER,
                NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PREDICT_NEVER,
                NEIGHBOURHOOD_PERFORM_ALWAYS,
                NULL);
+        }
+    }
+}
+
+static void compute_neighbourhood_stabilize_room_fingerprint_diff(
+        solution *sol, neighbourhood_stabilize_room_move *mv,
+        neighbourhood_stabilize_room_result *result) {
+    CRDSQT(sol->model)
+
+    result->fingerprint_diff = 0;
+
+    debug("neighbourhood_stabilize_room c=%d:%s r=%d:%s",
+            mv->c1, sol->model->courses[mv->c1].id,
+            mv->r2, sol->model->rooms[mv->r2].id);
+
+    neighbourhood_swap_move swap_move;
+    swap_move.c1 = mv->c1;
+    swap_move.r2 = mv->r2;
+
+    FOR_D {
+        swap_move.d1 = swap_move.d2 = d;
+        FOR_S {
+            swap_move.s1 = swap_move.s2 = s;
+
+            int r1 = solution_get_helper(sol)->r_cds[INDEX3(mv->c1, C, d, D, s, S)];
+            if (r1 < 0)
+                continue;
+
+            swap_move.r1 = r1;
+            neighbourhood_swap_result swap_result;
+
+            neighbourhood_swap(sol, &swap_move,
+               NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PREDICT_ALWAYS,
+               NEIGHBOURHOOD_PERFORM_NEVER,
+               &swap_result);
+
+            result->fingerprint_diff += swap_result.fingerprint_diff;
         }
     }
 }
@@ -172,6 +213,7 @@ static void do_neighbourhood_stabilize_room(solution *sol, int c1, int r2) {
 bool neighbourhood_stabilize_room(solution *sol,
                                   neighbourhood_stabilize_room_move *mv,
                                   neighbourhood_prediction_strategy predict_cost,
+                                  neighbourhood_prediction_strategy predict_fingerprint,
                                   neighbourhood_performing_strategy perform,
                                   neighbourhood_stabilize_room_result *result) {
     CRDSQT(sol->model)
@@ -180,11 +222,24 @@ bool neighbourhood_stabilize_room(solution *sol,
         (predict_cost == NEIGHBOURHOOD_PREDICT_IF_FEASIBLE))
         compute_neighbourhood_stabilize_room_cost(sol, mv, result);
 
+    if (predict_fingerprint == NEIGHBOURHOOD_PREDICT_ALWAYS ||
+        (predict_fingerprint == NEIGHBOURHOOD_PREDICT_IF_FEASIBLE))
+        compute_neighbourhood_stabilize_room_fingerprint_diff(sol, mv, result);
+
     if (perform == NEIGHBOURHOOD_PERFORM_ALWAYS ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_BETTER && result->delta_cost < 0) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER && result->delta_cost < 0)) {
+        int cost = solution_cost(sol);
         do_neighbourhood_stabilize_room(sol, mv->c1, mv->r2);
+#if DEBUG
+        if ((predict_cost == NEIGHBOURHOOD_PREDICT_ALWAYS ||
+        (predict_cost == NEIGHBOURHOOD_PREDICT_IF_FEASIBLE)) &&
+        cost + result->delta_cost != solution_cost(sol)) {
+            eprint("Expected cost %d, found %d", cost + result->delta_cost, solution_cost(sol));
+            exit(32);
+        }
+#endif
         return true;
     }
 

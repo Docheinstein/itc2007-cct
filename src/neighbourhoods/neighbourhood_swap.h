@@ -7,8 +7,7 @@
 typedef struct neighbourhood_swap_move {
     int c1, r1, d1, s1;
     int r2, d2, s2;
-
-    int _c2; // implicit
+    int _c2;
 } neighbourhood_swap_move;
 
 typedef struct neighbourhood_swap_iter {
@@ -19,6 +18,8 @@ typedef struct neighbourhood_swap_iter {
 } neighbourhood_swap_iter;
 
 typedef struct neighbourhood_swap_result {
+    solution_fingerprint_t fingerprint_diff;
+    bool _helper_was_valid;
     bool feasible;
     int delta_cost;
     // TODO: remove, keep just for debug
@@ -38,11 +39,13 @@ bool neighbourhood_swap(solution *sol,
                         neighbourhood_swap_move *move,
                         neighbourhood_prediction_strategy predict_feasibility,
                         neighbourhood_prediction_strategy predict_cost,
+                        neighbourhood_prediction_strategy predict_fingerprint,
                         neighbourhood_performing_strategy perform,
                         neighbourhood_swap_result *result);
 
 void neighbourhood_swap_back(solution *sol,
-                             const neighbourhood_swap_move *move);
+                             const neighbourhood_swap_move *move,
+                             const neighbourhood_swap_result *result);
 
 
 #endif // NEIGHBOURHOOD_SWAP_H

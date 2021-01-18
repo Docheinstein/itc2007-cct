@@ -18,6 +18,7 @@ typedef struct neighbourhood_stabilize_room_iter {
 
 
 typedef struct neighbourhood_stabilize_room_result {
+    solution_fingerprint_t fingerprint_diff;
     int delta_cost;
     // TODO: remove, keep just for debug
     int delta_cost_room_capacity;
@@ -37,6 +38,7 @@ bool neighbourhood_stabilize_room(
         solution *sol,
         neighbourhood_stabilize_room_move *move,
         neighbourhood_prediction_strategy predict_cost,
+        neighbourhood_prediction_strategy predict_fingerprint,
         neighbourhood_performing_strategy perform,
         neighbourhood_stabilize_room_result *result);
 
