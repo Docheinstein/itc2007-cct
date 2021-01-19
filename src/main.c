@@ -95,13 +95,9 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <signal.h>     /* for signal */
 #include <math.h>
 
-int main (int argc, char **argv) {
-//    for (int i = 0; i < 10000; i++) {
-//        double r = rand_triangular(0, 50, 80);
-//        print("%g,", r);
-//    }
-//    exit(0);
+#include "utils/assert_utils.h"
 
+int main (int argc, char **argv) {
     args args;
     args_init(&args);
     args_parse(&args, argc, argv);
@@ -116,8 +112,6 @@ int main (int argc, char **argv) {
 
     if (args.assignments_difficulty_ranking_randomness == ARG_INT_NONE)
         args.assignments_difficulty_ranking_randomness = 0.66;
-
-
 
     char buffer[1024];
     args_to_string(&args, buffer, LENGTH(buffer));

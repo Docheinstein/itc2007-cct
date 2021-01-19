@@ -2,6 +2,7 @@
 #define IO_UTILS_H
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #define print(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #define fprint(stream, fmt, ...) fprintf(stream, fmt "\n", ##__VA_ARGS__)
@@ -10,6 +11,6 @@
 
 
 char *fileread(const char *filename);
-int filewrite(const char *filename, const char *data);
+int filewrite(const char *filename, bool append, const char *data);
 
 #endif // IO_UTILS_H

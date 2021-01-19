@@ -176,7 +176,8 @@ static void compute_neighbourhood_stabilize_room_fingerprint_diff(
         neighbourhood_stabilize_room_result *result) {
     CRDSQT(sol->model)
 
-    result->fingerprint_diff = 0;
+    solution_fingerprint_init(&result->fingerprint_plus);
+    solution_fingerprint_init(&result->fingerprint_minus);
 
     debug("neighbourhood_stabilize_room c=%d:%s r=%d:%s",
             mv->c1, sol->model->courses[mv->c1].id,
@@ -205,7 +206,10 @@ static void compute_neighbourhood_stabilize_room_fingerprint_diff(
                NEIGHBOURHOOD_PERFORM_NEVER,
                &swap_result);
 
-            result->fingerprint_diff += swap_result.fingerprint_diff;
+            result->fingerprint_plus.sum += swap_result.fingerprint_plus.sum;
+            result->fingerprint_plus.xor *= swap_result.fingerprint_plus.xor;
+            result->fingerprint_minus.sum += swap_result.fingerprint_minus.sum;
+            result->fingerprint_minus.xor *= swap_result.fingerprint_minus.xor;
         }
     }
 }

@@ -20,11 +20,8 @@ char *fileread(const char *filename) {
     return content; // must be freed outside
 }
 
-int filewrite(const char *filename, const char *data) {
-    if (strempty(data))
-        return 0;
-
-    FILE *f = fopen(filename, "wb");
+int filewrite(const char *filename, bool append, const char *data) {
+    FILE *f = append ? fopen(filename, "ab") : fopen(filename, "wb");
     if (!f)
         return 0;
 

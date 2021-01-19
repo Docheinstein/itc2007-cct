@@ -25,7 +25,6 @@ MUNIT_TEST(test_strpos) {
     munit_assert_int(strpos("Hello", 'H'), ==, 0);
     munit_assert_int(strpos("Hello", 'o'), ==, 4);
     munit_assert_int(strpos("Hello", 'y'), <, 0);
-
     return MUNIT_OK;
 }
 
@@ -569,6 +568,7 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
             neighbourhood_swap(&sol_neigh, &mv,
                                NEIGHBOURHOOD_PREDICT_ALWAYS,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PERFORM_ALWAYS,
                                &swap_result);
 
@@ -597,13 +597,13 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
                     restart = true;
                 } else {
                     debug("Solution is worse, swap back");
-                    neighbourhood_swap_back(&sol_neigh, &mv);
+                    neighbourhood_swap_back(&sol_neigh, &mv, &swap_result);
                     print_solution(&sol_neigh, stdout);
                 }
             } else {
                 debug("Solution is not feasible, swap back");
                 munit_assert_false(solution_satisfy_hard_constraints(&sol_neigh));
-                neighbourhood_swap_back(&sol_neigh, &mv);
+                neighbourhood_swap_back(&sol_neigh, &mv, &swap_result);
                 print_solution(&sol_neigh, stdout);
             }
 
@@ -709,6 +709,7 @@ static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_bette
             if (neighbourhood_swap(&sol_neigh, &mv,
                                NEIGHBOURHOOD_PREDICT_ALWAYS,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
                                &swap_result)) {
                 munit_assert_true(solution_satisfy_hard_constraints(&sol_neigh));

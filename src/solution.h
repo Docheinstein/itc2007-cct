@@ -81,7 +81,10 @@ typedef struct solution_parser {
     char *error;
 } solution_parser;
 
-typedef unsigned long long solution_fingerprint_t;
+typedef struct solution_fingerprint_t {
+    unsigned long long sum;
+    unsigned long long xor;
+} solution_fingerprint_t;
 
 bool read_solution(solution *sol, const char *input_file);
 bool write_solution(const solution *sol, const char *output_file);
@@ -111,6 +114,11 @@ bool solution_get_at(const solution *sol, int index);
 
 char * solution_to_string(const solution *sol);
 char * solution_quality_to_string(const solution *sol, bool verbose);
+
+void solution_fingerprint_init(solution_fingerprint_t *f);
+bool solution_fingerprint_equal(solution_fingerprint_t f1, solution_fingerprint_t f2);
+void solution_fingerprint_add(solution_fingerprint_t *f, int i);
+void solution_fingerprint_sub(solution_fingerprint_t *f, int i);
 
 solution_fingerprint_t solution_fingerprint(const solution *sol);
 int solution_assignment_count(const solution *sol);

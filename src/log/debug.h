@@ -16,4 +16,11 @@
 #define debug2(fmt, ...)
 #endif
 
+#if DEBUG >= 3
+#define DEBUG2
+#define debug3(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#else
+#define debug3(fmt, ...)
+#endif
+
 #endif // DEBUG_H

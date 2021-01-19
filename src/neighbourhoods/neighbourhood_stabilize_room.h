@@ -18,7 +18,8 @@ typedef struct neighbourhood_stabilize_room_iter {
 
 
 typedef struct neighbourhood_stabilize_room_result {
-    solution_fingerprint_t fingerprint_diff;
+    solution_fingerprint_t fingerprint_plus;
+    solution_fingerprint_t fingerprint_minus;
     int delta_cost;
     // TODO: remove, keep just for debug
     int delta_cost_room_capacity;

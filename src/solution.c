@@ -1,5 +1,6 @@
 #include <utils/str_utils.h>
 #include <utils/io_utils.h>
+#include <utils/assert_utils.h>
 #include "solution.h"
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
@@ -86,7 +87,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                 FOR_S {
                     if (sol->timetable[INDEX4(c, C, r, R, d, D, s, S)])
                         helper->c_rds[INDEX3(r, R, d, D, s, S)] = c;
-                    debug2("helper->c_rds[INDEX3(%d, %d, %d)] = %d",
+                    debug3("helper->c_rds[INDEX3(%d, %d, %d)] = %d",
                            r, d, s, helper->c_rds[INDEX3(r, R, d, D, s, S)]);
                 }
             }
@@ -100,7 +101,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                 FOR_S {
                     if (sol->timetable[INDEX4(c, C, r, R, d, D, s, S)])
                         helper->r_cds[INDEX3(c, C, d, D, s, S)] = r;
-                    debug2("helper->r_cds[INDEX3(%d, %d, %d)] = %d",
+                    debug3("helper->r_cds[INDEX3(%d, %d, %d)] = %d",
                            c, d, s, helper->r_cds[INDEX3(c, C, d, D, s, S)]);
                 }
             }
@@ -115,7 +116,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                     helper->sum_cr[INDEX2(c, C, r, R)] +=
                             sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
                 }
-                debug2("helper->sum_cr[INDEX2(%d, %d)] = %d",
+                debug3("helper->sum_cr[INDEX2(%d, %d)] = %d",
                        c, r, helper->sum_cr[INDEX2(c, C, r, R)]);
             }
         }
@@ -128,7 +129,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                 FOR_S {
                     helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)] =
                             sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
-                    debug2("helper->timetable_cdsr[INDEX4(%d, %d, %d, %d)] = %d",
+                    debug3("helper->timetable_cdsr[INDEX4(%d, %d, %d, %d)] = %d",
                            c, d, s, r, helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)]);
                 }
             }
@@ -143,7 +144,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                     helper->sum_cds[INDEX3(c, C, d, D, s, S)] += 
                             helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)];
                 }
-                debug2("helper->sum_cds[INDEX3(%d, %d, %d)] = %d",
+                debug3("helper->sum_cds[INDEX3(%d, %d, %d)] = %d",
                        c, d, s, helper->sum_cds[INDEX3(c, C, d, D, s, S)]);
             }
         }
@@ -157,7 +158,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                     helper->sum_cd[INDEX2(c, C, d, D)] +=
                             helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)];
                 }
-                debug2("helper->sum_cd[INDEX2(%d, %d, %d)] = %d",
+                debug3("helper->sum_cd[INDEX2(%d, %d, %d)] = %d",
                        c, d, helper->sum_cds[INDEX2(c, C, d, D)]);
             }
         }
@@ -170,7 +171,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                 FOR_S {
                     helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)] =
                             sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
-                    debug2("helper->timetable_rdsc[INDEX4(%d, %d, %d, %d)] = %d",
+                    debug3("helper->timetable_rdsc[INDEX4(%d, %d, %d, %d)] = %d",
                            r, d, s, c, helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)]);
                 }
             }
@@ -184,11 +185,11 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                 FOR_C {
                     helper->sum_rds[INDEX3(r, R, d, D, s, S)] +=
                             helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)];
-                    debug2("summing helper->timetable_rdsc[INDEX4(%s, %d, %d, %s) = %d",
+                    debug3("summing helper->timetable_rdsc[INDEX4(%s, %d, %d, %s) = %d",
                            model->rooms[r].id, d, s, model->courses[c].id,
                            helper->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)]);
                 }
-                debug2("helper->sum_rds[INDEX3(%d, %d, %d)] = %d",
+                debug3("helper->sum_rds[INDEX3(%d, %d, %d)] = %d",
                        r, d, s, helper->sum_rds[INDEX3(r, R, d, D, s, S)]);
             }
         }
@@ -206,7 +207,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                     FOR_R {
                         helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)] =
                                 sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
-                        debug2("helper->timetable_qdscr[INDEX5(%s, %d, %d, %s, %s) = %d] = %d",
+                        debug3("helper->timetable_qdscr[INDEX5(%s, %d, %d, %s, %s) = %d] = %d",
                            model->curriculas[q].id, d, s, model->courses[c].id, model->rooms[r].id,
                            INDEX5(q, Q, d, D, s, S, c, C, r, R),
                            helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)]);
@@ -225,7 +226,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                 for (int qc = 0; qc < q_n_courses; qc++) {
                     int c = q_courses[qc];
                     FOR_R {
-                        debug2("DUMP timetable_qdscr[INDEX5(%s, %d, %d, %s, %s)] = %d",
+                        debug3("DUMP timetable_qdscr[INDEX5(%s, %d, %d, %s, %s)] = %d",
                            model->curriculas[q].id, d, s, model->courses[c].id, model->rooms[r].id,
                            helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)]);
                     }
@@ -244,14 +245,14 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                 for (int qc = 0; qc < q_n_courses; qc++) {
                     int c = q_courses[qc];
                     FOR_R {
-                        debug2("summing timetable_qdscr[INDEX5(%s, %d, %d, %s, %s)] = %d",
+                        debug3("summing timetable_qdscr[INDEX5(%s, %d, %d, %s, %s)] = %d",
                            model->curriculas[q].id, d, s, model->courses[c].id, model->rooms[r].id,
                            helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)]);
                         helper->sum_qds[INDEX3(q, Q, d, D, s, S)] +=
                             helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)];
                     }
                 }
-                debug2("helper->sum_qds[INDEX3(%s, %d, %d)] = %d",
+                debug3("helper->sum_qds[INDEX3(%s, %d, %d)] = %d",
                            model->curriculas[q].id, d, s, helper->sum_qds[INDEX3(q, Q, d, D, s, S)]);
             }
         }
@@ -265,7 +266,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                 FOR_S {
                     helper->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)] =
                             sol->timetable[INDEX4(c, C, r, R, d, D, s, S)];
-                    debug2("helper->timetable_tdscr[INDEX5(%s, %d, %d, %s, %d)] = %d",
+                    debug3("helper->timetable_tdscr[INDEX5(%s, %d, %d, %s, %d)] = %d",
                             model->teachers[t].id, d, s, model->courses[c].id, r, helper->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)]);
                 }
             }
@@ -281,7 +282,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
                     helper->sum_tds[INDEX3(t, T, d, D, s, S)] +=
                         helper->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)];
                 }
-                debug2("helper->sum_tds[INDEX3(%s, %d, %d)] = %d",
+                debug3("helper->sum_tds[INDEX3(%s, %d, %d)] = %d",
                        model->teachers[t].id, d, s, helper->sum_tds[INDEX3(t, T, d, D, s, S)]);
             }
         }
@@ -966,17 +967,40 @@ bool solution_get(const solution *sol, int c, int r, int d, int s) {
                                  d, sol->model->n_days, s, sol->model->n_slots)];
 }
 
+void solution_fingerprint_init(solution_fingerprint_t *f) {
+    f->sum = 0;
+    f->xor = 1;
+}
+
+bool solution_fingerprint_equal(const solution_fingerprint_t f1, const solution_fingerprint_t f2) {
+    return f1.xor == f2.xor && f1.sum == f2.sum;
+}
+
+void solution_fingerprint_sub(solution_fingerprint_t *f, int i) {
+    f->sum -= ((unsigned long long) i * i);
+    f->xor /= ((unsigned long long) i + 1);
+    f->xor = f->xor != 0 ? f->xor : 1;
+}
+
+void solution_fingerprint_add(solution_fingerprint_t *f, int i) {
+//    debug("i=%d | f->prod=%llu", i, f->xor);
+    f->sum += ((unsigned long long) i * i);
+//    f->prod *= ((unsigned long long) i + 23);
+    f->xor ^= ((unsigned long long) i);
+//    assert(f->prod != 0);
+}
+
 solution_fingerprint_t solution_fingerprint(const solution *sol) {
-    solution_fingerprint_t fingerprint = 0;
+    solution_fingerprint_t f;
+    solution_fingerprint_init(&f);
+
     for (int i = 0; i < sol->model->n_courses * sol->model->n_rooms * sol->model->n_days * sol->model->n_slots; i++) {
         if (sol->timetable[i]) {
-//            debug("solution_fingerprint(%d)=%d", i, i);
-//            fingerprint += g_int_hash(&i);
-            fingerprint += i;
+            solution_fingerprint_add(&f, i);
+//            debug("solution_fingerprint s=%llu, p=%llu", f.sum, f.xor);
         }
-//        fingerprint *= 13;
     }
-    return fingerprint;
+    return f;
 }
 
 void solution_set_at(solution *sol, int index, bool value) {
@@ -1010,7 +1034,7 @@ bool write_solution(const solution *sol, const char *output_file) {
 
     char *sol_str = solution_to_string(sol);
 
-    bool success = filewrite(output_file, sol_str);
+    bool success = filewrite(output_file, false, sol_str);
     if (!success)
         eprint("ERROR: failed to write output solution to '%s' (%s)",
                output_file, strerror(errno));

@@ -5,6 +5,7 @@
 #include <utils/time_utils.h>
 #include <utils/io_utils.h>
 #include <neighbourhoods/neighbourhood_stabilize_room.h>
+#include <utils/assert_utils.h>
 #include "neighbourhoods/neighbourhood_swap.h"
 #include "feasible_solution_finder.h"
 
@@ -122,7 +123,7 @@ static void do_local_search_fast_descend(solution *sol) {
         } while (cost > 0 && improved);
 
         // N2: stabilize_room, do only one improvement
-
+#if 0
         int j = 0;
 
         neighbourhood_stabilize_room_iter stabilize_room_iter;
@@ -151,17 +152,14 @@ static void do_local_search_fast_descend(solution *sol) {
 
                 cost = neigh_cost;
                 improved = true;
-#if DEBUG
-                if (solution_cost(sol) != cost) {
-                    exit(21);
-                }
-#endif
+
+                ASSERT_INT_EQUAL(solution_cost(sol), cost);
                 break;
             }
         }
 
         neighbourhood_stabilize_room_iter_destroy(&stabilize_room_iter);
-
+#endif
         i++;
     } while (cost > 0 && improved);
 

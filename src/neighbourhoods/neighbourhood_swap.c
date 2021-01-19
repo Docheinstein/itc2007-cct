@@ -7,14 +7,14 @@
 #include "solution.h"
 #include "model.h"
 #include "config.h"
+#include "utils/assert_utils.h"
 
-
-static void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
-                                         const neighbourhood_swap_move *src) {
+void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest, const neighbourhood_swap_move *src) {
     dest->c1 = src->c1;
     dest->r1 = src->r1;
     dest->d1 = src->d1;
     dest->s1 = src->s1;
+    dest->_c2 = src->_c2;
     dest->r2 = src->r2;
     dest->d2 = src->d2;
     dest->s2 = src->s2;
@@ -433,35 +433,25 @@ static void compute_neighbourhood_swap_cost(
     debug2("compute_neighbourhood_swap_cost cost = %d", result->delta_cost);
 }
 
-static solution_fingerprint_t compute_neighbourhood_swap_cost_fingerprint_diff_single(
-        solution *sol, int c, int r, int d, int s, bool set) {
-    CRDSQT(sol->model);
-
-    int i = INDEX4(c, C, r, R, d, D, s, S);
-    if (set)
-        return solution_get_at(sol, i) ? i : 0;
-    return solution_get_at(sol, i) ? -i : 0;
-}
-
 static void compute_neighbourhood_swap_fingerprint_diff(
         solution *sol,
         const neighbourhood_swap_move *mv,
         neighbourhood_swap_result *result) {
     CRDSQT(sol->model);
-    debug2("compute_neighbourhood_swap_cost_fingerprint_diff (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d))",
+    debug2("compute_neighbourhood_swap_cost_fingerprint_diff (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d)) [c2=%d]",
             mv->c1, sol->model->courses[mv->c1].id,
             mv->r1, sol->model->rooms[mv->r1].id, mv->d1, mv->s1,
-            mv->r2, sol->model->rooms[mv->r2].id, mv->d2, mv->s2);
+            mv->r2, sol->model->rooms[mv->r2].id, mv->d2, mv->s2, mv->_c2);
 
-
-#define DIFF_SET(i) (!solution_get_at(sol, (i)) ? (i) : 0)
-#define DIFF_UNSET(i) (solution_get_at(sol, (i)) ? (-(i)) : 0)
+#define FINGERPRINT_PLUS(i) if (!solution_get_at(sol, (i))) solution_fingerprint_add(&result->fingerprint_plus, i)
+#define FINGERPRINT_MINUS(i) if (solution_get_at(sol, (i))) solution_fingerprint_add(&result->fingerprint_minus, i)
 
     int i1 = INDEX4(mv->c1, C, mv->r1, R, mv->d1, D, mv->s1, S);
     int i2 = INDEX4(mv->_c2, C, mv->r2, R, mv->d2, D, mv->s2, S);
     int i3 = INDEX4(mv->c1, C, mv->r2, R, mv->d2, D, mv->s2, S);
     int i4 = INDEX4(mv->_c2, C, mv->r1, R, mv->d1, D, mv->s1, S);
-    result->fingerprint_diff = 0;
+    solution_fingerprint_init(&result->fingerprint_plus);
+    solution_fingerprint_init(&result->fingerprint_minus);
 
     debug2("i1=%d, i2=%d, i3=%d, i4=%d", i1, i2, i3, i4);
     debug2("sol[i1]=%d sol[i2]=%d sol[i3]=%d sol[i4]=%d",
@@ -469,35 +459,22 @@ static void compute_neighbourhood_swap_fingerprint_diff(
           solution_get_at(sol, i3), solution_get_at(sol, i4));
 
     if (mv->c1 >= 0) {
-        if (i1 != i3 && i1 != i4) {
-            result->fingerprint_diff += DIFF_UNSET(i1);
-            debug2("DIFF_UNSET(i1)=%d", DIFF_UNSET(i1));
-        }
-
-        debug2("DIFF_SET(i3)=%d", DIFF_SET(i3));
-        result->fingerprint_diff += DIFF_SET(i3);
+        if (i1 != i3 && i1 != i4)
+            FINGERPRINT_MINUS(i1);
+        FINGERPRINT_PLUS(i3);
     }
 
     if (mv->_c2 >= 0) {
-        if (i2 != i3 && i2 != i4) {
-            result->fingerprint_diff += DIFF_UNSET(i2);
-            debug2("DIFF_UNSET(i2)=%d", DIFF_UNSET(i2));
-        }
-
-        debug2("DIFF_SET(i4)=%d", DIFF_SET(i4));
-        result->fingerprint_diff += DIFF_SET(i4);
+        if (i2 != i3 && i2 != i4)
+            FINGERPRINT_MINUS(i2);
+        FINGERPRINT_PLUS(i4);
     }
 
-#undef DIFF_SET
-#undef DIFF_UNSET
+#undef FINGERPRINT_PLUS
+#undef FINGERPRINT_MINUS
 
-//    result->fingerprint_diff += compute_neighbourhood_swap_cost_fingerprint_diff_single(
-//            sol, mv->c1, mv->r1, mv->d1, mv->s1, false);
-//    result->fingerprint_diff += compute_neighbourhood_swap_cost_fingerprint_diff_single(
-//            sol, mv->_c2, mv->r2, mv->d2, mv->s2, false);
-//    if (mv.)
-//    result->fingerprint_diff += compute_neighbourhood_swap_cost_fingerprint_diff_single(
-//            sol, mv->_c2, mv->r2, mv->d2, mv->s2, true);
+    debug2("fingerprint plus = (sum=%llu, prod=%llu)", result->fingerprint_plus.sum, result->fingerprint_plus.xor);
+    debug2("fingerprint minus = (sum=%llu, prod=%llu)", result->fingerprint_minus.sum, result->fingerprint_minus.xor);
 }
 
 bool neighbourhood_swap(solution *sol,
@@ -509,16 +486,14 @@ bool neighbourhood_swap(solution *sol,
                         neighbourhood_swap_result *result) {
     CRDSQT(sol->model)
 
-#if DEBUG
-    if (!solution_get(sol, mv->c1, mv->r1, mv->d1, mv->s1)) {
-        eprint("Expected true in timetable (%d %d %d %d) -> %d",
-               mv->c1, mv->r1, mv->d1, mv->s1, INDEX4(mv->c1, C, mv->r1, R, mv->d1, D, mv->s1, S));
-        print_solution(sol, stderr);
-        exit(4);
-    }
-#endif
+    assert(solution_get(sol, mv->c1, mv->r1, mv->d1, mv->s1));
 
     mv->_c2 = solution_get_helper(sol)->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
+
+    debug2("neighbourhood_swap (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d)) [c2=%d]",
+            mv->c1, sol->model->courses[mv->c1].id,
+            mv->r1, sol->model->rooms[mv->r1].id, mv->d1, mv->s1,
+            mv->r2, sol->model->rooms[mv->r2].id, mv->d2, mv->s2, mv->_c2);
 
     if (predict_feasibility == NEIGHBOURHOOD_PREDICT_ALWAYS)
         if (result)

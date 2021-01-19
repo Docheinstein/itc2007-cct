@@ -18,7 +18,8 @@ typedef struct neighbourhood_swap_iter {
 } neighbourhood_swap_iter;
 
 typedef struct neighbourhood_swap_result {
-    solution_fingerprint_t fingerprint_diff;
+    solution_fingerprint_t fingerprint_plus;
+    solution_fingerprint_t fingerprint_minus;
     bool _helper_was_valid;
     bool feasible;
     int delta_cost;
@@ -28,6 +29,11 @@ typedef struct neighbourhood_swap_result {
     int delta_cost_curriculum_compactness;
     int delta_cost_room_stability;
 } neighbourhood_swap_result;
+
+
+void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
+                                  const neighbourhood_swap_move *src);
+
 
 void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol);
 void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter);
