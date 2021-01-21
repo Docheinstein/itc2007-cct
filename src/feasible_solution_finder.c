@@ -25,8 +25,8 @@ void feasible_solution_finder_destroy(feasible_solution_finder *finder) {
 }
 
 static void feasible_solution_finder_reinit(feasible_solution_finder *finder) {
-    feasible_solution_finder_init(finder);
     feasible_solution_finder_destroy(finder);
+    feasible_solution_finder_init(finder);
 }
 
 typedef struct course_assignment {

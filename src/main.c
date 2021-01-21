@@ -74,7 +74,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 
 #include <stdlib.h>
 #include <stdbool.h>
-#include <exact_solver.h>
+#include <solvers/exact_solver.h>
 #include <utils/io_utils.h>
 #include <utils/random_utils.h>
 #include <time.h>
@@ -88,12 +88,13 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "feasible_solution_finder.h"
 #include "log/debug.h"
 #include "neighbourhoods/neighbourhood_swap.h"
-#include "local_search_solver.h"
-#include "tabu_search_solver.h"
+#include "solvers/local_search_solver.h"
+#include "solvers/tabu_search_solver.h"
 #include <sys/time.h>   /* for setitimer */
 #include <unistd.h>     /* for pause */
 #include <signal.h>     /* for signal */
 #include <math.h>
+#include <solvers/hill_climbing_solver.h>
 
 #include "utils/assert_utils.h"
 
@@ -181,6 +182,23 @@ int main (int argc, char **argv) {
 
         local_search_solver_config_destroy(&config);
         local_search_solver_destroy(&solver);
+    } else if (args.method == RESOLUTION_METHOD_HILL_CLIMBING) {
+        hill_climbing_solver_config config;
+        hill_climbing_solver_config_init(&config);
+        config.idle_limit = args.multistart;
+        config.time_limit = args.time_limit;
+        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+        config.starting_solution = solution_loaded ? &sol : NULL;
+
+        hill_climbing_solver solver;
+        hill_climbing_solver_init(&solver);
+
+        solution_loaded = hill_climbing_solver_solve(&solver, &config, &sol);
+        if (!solution_loaded)
+            eprint("ERROR: failed to solve model (%s)", hill_climbing_solver_get_error(&solver));
+
+        hill_climbing_solver_config_destroy(&config);
+        hill_climbing_solver_destroy(&solver);
     } else if (args.method == RESOLUTION_METHOD_TABU_SEARCH) {
         tabu_search_solver_config config;
         tabu_search_solver_config_init(&config);
@@ -219,7 +237,7 @@ int main (int argc, char **argv) {
             write_solution(&sol, args.output);
 
         if (args.draw_overview_file || args.draw_directory)
-            render_solution(&sol, args.draw_overview_file, args.draw_directory);
+            render_solution_full(&sol, args.draw_overview_file, args.draw_directory);
     }
 
     solution_destroy(&sol);

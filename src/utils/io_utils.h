@@ -12,5 +12,7 @@
 
 char *fileread(const char *filename);
 int filewrite(const char *filename, bool append, const char *data);
+int fileappend(const char *filename, const char *data);
+int fileclear(const char *filename);
 
 #endif // IO_UTILS_H

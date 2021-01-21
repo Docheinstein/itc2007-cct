@@ -88,6 +88,7 @@ typedef struct solution_fingerprint_t {
 
 bool read_solution(solution *sol, const char *input_file);
 bool write_solution(const solution *sol, const char *output_file);
+bool write_solution_timetable(const solution *sol, const char *output_file);
 void print_solution(const solution *sol, FILE *stream);
 void print_solution_full(const solution *sol, FILE *stream);
 
@@ -101,8 +102,10 @@ void solution_init(solution *solution, const model *model);
 void solution_reinit(solution *solution);
 void solution_destroy(solution *solution);
 
+
 const solution_helper * solution_get_helper(solution *solution);
 bool solution_invalidate_helper(solution *sol);
+bool solution_helper_equal(solution *s1, solution *s2);
 
 void solution_copy(solution *solution_dest, const solution *solution_src);
 
@@ -115,7 +118,10 @@ bool solution_get_at(const solution *sol, int index);
 char * solution_to_string(const solution *sol);
 char * solution_quality_to_string(const solution *sol, bool verbose);
 
+char * solution_timetable_to_string(const solution *sol);
+
 void solution_fingerprint_init(solution_fingerprint_t *f);
+bool solution_equal(const solution *s1, const solution *s2);
 bool solution_fingerprint_equal(solution_fingerprint_t f1, solution_fingerprint_t f2);
 void solution_fingerprint_add(solution_fingerprint_t *f, int i);
 void solution_fingerprint_sub(solution_fingerprint_t *f, int i);
@@ -142,5 +148,10 @@ int solution_room_capacity_cost(const solution *sol);
 int solution_min_working_days_cost(const solution *sol);
 int solution_curriculum_compactness_cost(const solution *sol);
 int solution_room_stability_cost(const solution *sol);
+
+int solution_room_capacity_lecture_cost(solution *sol, int c, int r, int d, int s);
+int solution_min_working_days_course_cost(solution *sol, int c);
+int solution_curriculum_compactness_lecture_cost(solution *sol, int c, int r, int d, int s);
+int solution_room_stability_course_cost(solution *sol, int c);
 
 #endif // SOLUTION_H

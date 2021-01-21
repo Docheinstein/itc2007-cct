@@ -30,3 +30,11 @@ int filewrite(const char *filename, bool append, const char *data) {
 
     return ret;
 }
+
+int fileappend(const char *filename, const char *data) {
+    return filewrite(filename, true, data);
+}
+
+int fileclear(const char *filename) {
+    return filewrite(filename, false, "");
+}

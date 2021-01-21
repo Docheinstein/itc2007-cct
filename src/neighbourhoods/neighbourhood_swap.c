@@ -9,6 +9,63 @@
 #include "config.h"
 #include "utils/assert_utils.h"
 
+
+bool neighbourhood_swap_move_same_room(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2) {
+    return
+            (
+                    m1->r2 == m2->r2
+            ) || (
+                    m1->r2 == m2->r1
+            );
+}
+
+bool neighbourhood_swap_move_same_period(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2) {
+    return
+            (
+                    m1->d1 == m2->d1 &&
+                    m1->s1 == m2->s1 &&
+                    m1->r2 == m2->r2 &&
+                    m1->d2 == m2->d2
+            ) || (
+                    m1->d1 == m2->d2 &&
+                    m1->s1 == m2->s2 &&
+                    m1->r2 == m2->r1 &&
+                    m1->d2 == m2->d1
+            );
+}
+
+bool neighbourhood_swap_move_same_course(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2) {
+    return
+            (
+                    m1->c1 == m2->c1
+            ) || (
+                    m1->c1 == m2->_c2
+            );
+}
+
+bool neighbourhood_swap_move_equal(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2) {
+    return
+            (
+                    m1->c1 == m2->c1 &&
+                    m1->r1 == m2->r1 &&
+                    m1->d1 == m2->d1 &&
+                    m1->s1 == m2->s1 &&
+                    m1->_c2 == m2->_c2 &&
+                    m1->r2 == m2->r2 &&
+                    m1->d2 == m2->d2 &&
+                    m1->s2 == m2->s2
+            ) || (
+                    m1->c1 == m2->_c2 &&
+                    m1->r1 == m2->r2 &&
+                    m1->d1 == m2->d2 &&
+                    m1->s1 == m2->s2 &&
+                    m1->_c2 == m2->c1 &&
+                    m1->r2 == m2->r1 &&
+                    m1->d2 == m2->d1 &&
+                    m1->s2 == m2->s1
+            );
+}
+
 void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest, const neighbourhood_swap_move *src) {
     dest->c1 = src->c1;
     dest->r1 = src->r1;
@@ -63,7 +120,7 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter,
                     // Find next assignment
                     do {
                         iter->rds_index++;
-                    } while ((helper->c_rds[iter->rds_index]) < 0 && iter->rds_index < RDS);
+                    } while (iter->rds_index < RDS && (helper->c_rds[iter->rds_index]) < 0);
 
                     if (iter->rds_index < RDS) {
                         iter->current.c1 = helper->c_rds[iter->rds_index];
@@ -131,7 +188,7 @@ static bool check_neighbourhood_swap_conflicts_teacher_constraint(
     CRDSQT(sol->model);
     const solution_helper *helper = solution_get_helper(sol);
     const model *model = sol->model;
-    const bool same_teacher = c2 >= 0 && model_same_teacher(model, c1, c2);
+    const bool same_teacher = c1 >= 0 && c2 >= 0 && model_same_teacher(model, c1, c2);
     const bool same_period = d1 == d2 && s1 == s2;
 
     if (c1 >= 0) {
@@ -361,6 +418,49 @@ static int compute_neighbourhood_swap_curriculum_compactness_cost(
             (in_next_cost_after - in_next_cost_before) +
             (in_itself_cost - out_itself_cost);
 
+        debug2("compute_neighbourhood_swap_curriculum_compactness_cost q=%d:%s\n"
+                "   c_from=%d, d_from=%d, s_from=%d, c_to=%d, d_to=%d, s_to=%d\n"
+                "   (out_prev_cost_after %d   -  out_prev_cost_before %d) +\n"
+                "   (out_next_cost_after %d   -  out_next_cost_before %d) +\n"
+                "   (in_prev_cost_after  %d   -  in_prev_cost_before  %d) +\n"
+                "   (in_next_cost_after  %d   -  out_prev_cost_before %d) +\n"
+                "   (in_itself_cost      %d   -  out_itself_cost      %d) = %d",
+                q, model->curriculas[q].id,
+                c_from, d_from, s_from, c_to, d_to, s_to,
+                out_prev_cost_after, out_prev_cost_before,
+                out_next_cost_after, out_next_cost_before,
+                in_prev_cost_after, in_prev_cost_before,
+                in_next_cost_after, in_next_cost_before,
+                in_itself_cost, out_itself_cost,
+                q_cost
+        );
+
+
+        if (s_from > 0)
+            debug2("helper->sum_qds[INDEX3(q=%d, Q, d_from=%d, D, s_from - 1=%d, S)]=%d",
+                  q, d_from, s_from - 1,
+                  helper->sum_qds[INDEX3(q, Q, d_from, D, s_from - 1, S)]);
+        debug2("helper->sum_qds[INDEX3(q=%d, Q, d_from=%d, D, s_from=%d, S)]=%d",
+              q, d_from, s_from ,
+              helper->sum_qds[INDEX3(q, Q, d_from, D, s_from, S)]);
+        if (s_from < S - 1)
+            debug2("helper->sum_qds[INDEX3(q=%d, Q, d_from=%d, D, s_from+1=%d, S)]=%d",
+                  q, d_from, s_from + 1,
+                  helper->sum_qds[INDEX3(q, Q, d_from, D, s_from + 1, S)]);
+        if (s_from < S - 2)
+            debug2("helper->sum_qds[INDEX3(q=%d, Q, d_from=%d, D, s_from+2=%d, S)]=%d",
+                  q, d_from, s_from + 2,
+                  helper->sum_qds[INDEX3(q, Q, d_from, D, s_from + 2, S)]);
+
+        debug2("out_next_cost_after\n"
+              "  Z_OUT_AFTER(q, d_from, s+1)=%d && !Z_OUT_AFTER(q, d_from, s)=%d && !Z_OUT_AFTER(q, d_from, s+2)=%d -> %d"
+              ,
+              Z_OUT_AFTER(q, d_from, s_from + 1), !Z_OUT_AFTER(q, d_from, (s_from)), !Z_OUT_AFTER(q, d_from, (s_from) + 2),
+              out_next_cost_after);
+
+        debug2("((Z(q, d_from, s_from+2))))= %d", Z(q, d_from, (s_from) + 2));
+        debug2("(!((d_from) == d_from && (s_from+2) == s_from)= %d", (!((d_from) == d_from && (s_from+2) == s_from)));
+
 #undef Z
 #undef Z_OUT_AFTER
 #undef Z_IN_BEFORE
@@ -523,8 +623,24 @@ bool neighbourhood_swap(solution *sol,
 
 void neighbourhood_swap_back(solution *sol,
                              const neighbourhood_swap_move *mv,
-                             const neighbourhood_swap_result *res) {
+                             const neighbourhood_swap_result *res,
+                             bool revalidate) {
     do_neighbourhood_swap(sol, mv->c1, mv->r2, mv->d2, mv->s2, mv->_c2, mv->r1, mv->d1, mv->s1);
-    if (res->_helper_was_valid && sol->helper)
+    if (revalidate && res->_helper_was_valid && sol->helper)
         sol->helper->valid = true;
+}
+
+int neighbourhood_swap_move_cost(const neighbourhood_swap_move *move, solution *s) {
+    return
+        solution_curriculum_compactness_lecture_cost(s, move->c1, move->r1, move->d1, move->s1) * 10 +
+        solution_curriculum_compactness_lecture_cost(s, move->_c2, move->r2, move->d2, move->s2) * 10;
+    return
+            solution_room_capacity_lecture_cost(s, move->c1, move->r1, move->d1, move->s1) +
+            solution_min_working_days_course_cost(s, move->c1) +
+            solution_curriculum_compactness_lecture_cost(s, move->c1, move->r1, move->d1, move->s1) * 10 +
+            solution_room_stability_course_cost(s, move->c1) +
+            solution_room_capacity_lecture_cost(s, move->_c2, move->r2, move->d2, move->s2) +
+            solution_min_working_days_course_cost(s, move->_c2) +
+            solution_curriculum_compactness_lecture_cost(s, move->_c2, move->r2, move->d2, move->s2) * 10 +
+            solution_room_stability_course_cost(s, move->_c2);
 }

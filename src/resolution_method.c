@@ -7,7 +7,9 @@ const char * resolution_method_to_string(resolution_method method) {
     case RESOLUTION_METHOD_LOCAL_SEARCH:
         return "local search";
     case RESOLUTION_METHOD_TABU_SEARCH:
-        return "tabu";
+        return "tabu search";
+    case RESOLUTION_METHOD_HILL_CLIMBING:
+        return "hill climbing";
     default:
         return "unknown";
     }

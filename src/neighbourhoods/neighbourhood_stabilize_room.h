@@ -28,6 +28,9 @@ typedef struct neighbourhood_stabilize_room_result {
     int delta_cost_room_stability;
 } neighbourhood_stabilize_room_result;
 
+void neighbourhood_stabilize_room_move_copy(
+        neighbourhood_stabilize_room_move *dest,
+        const neighbourhood_stabilize_room_move *src);
 
 void neighbourhood_stabilize_room_iter_init(
         neighbourhood_stabilize_room_iter *iter, solution *sol);

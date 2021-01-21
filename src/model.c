@@ -61,13 +61,13 @@ void model_destroy(const model *model) {
 
     if (model->curriculas_of_course) {
         for (int c = 0; c < model->n_courses; c++)
-            g_array_free(model->curriculas_of_course[c], false);
+            g_array_free(model->curriculas_of_course[c], true);
         free(model->curriculas_of_course);
     }
 
     if (model->courses_of_teacher) {
         for (int t = 0; t < model->n_teachers; t++)
-            g_array_free(model->courses_of_teacher[t], false);
+            g_array_free(model->courses_of_teacher[t], true);
         free(model->courses_of_teacher);
     }
 

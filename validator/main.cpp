@@ -562,6 +562,8 @@ unsigned Validator::CostsOnMinWorkingDays() const
 
 unsigned Validator::CostsOnCurriculumCompactness() const
 {
+//    std::cout << std::endl;
+
   unsigned g, p, cost = 0, ppd = in.PeriodsPerDay();
 
   for (g = 0; g < in.Curricula(); g++)
@@ -569,14 +571,24 @@ unsigned Validator::CostsOnCurriculumCompactness() const
       for (p = 0; p < in.Periods(); p++)
 	if (out.CurriculumPeriodLectures(g,p) > 0)
 	  {
+	    int prev_cost = cost;
 	    if (p % ppd == 0 && out.CurriculumPeriodLectures(g,p+1) == 0)
 	      cost += out.CurriculumPeriodLectures(g,p);
 	    else if (p % ppd == ppd-1 && out.CurriculumPeriodLectures(g,p-1) == 0)
 	      cost += out.CurriculumPeriodLectures(g,p);
 	    else if (out.CurriculumPeriodLectures(g,p+1) == 0 && out.CurriculumPeriodLectures(g,p-1) == 0)
 	      cost += out.CurriculumPeriodLectures(g,p);
+//	    if (cost != prev_cost)
+//            std::cout << "[S(" << in.CURRICULUM_COMPACTNESS_COST << ")] Curriculum " << in.CurriculaVector(g).Name()
+//             << " has an isolated lecture at period " << p << " (day " << p/in.PeriodsPerDay() << ", timeslot " << p % in.PeriodsPerDay() << ")"
+//             << std::endl;
+//	    std::cout << "cost = " << cost << std::endl;
+//	    std::cout << "out.CurriculumPeriodLectures(g,p) = " << out.CurriculumPeriodLectures(g,p) << std::endl;
 	  }
     }
+
+//  std::cout << std::endl;
+
   return cost;
 }
 

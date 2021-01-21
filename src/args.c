@@ -170,9 +170,11 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
             args->method = RESOLUTION_METHOD_LOCAL_SEARCH;
         else if (streq(arg, "tabu"))
             args->method = RESOLUTION_METHOD_TABU_SEARCH;
+        else if (streq(arg, "hill"))
+            args->method = RESOLUTION_METHOD_HILL_CLIMBING;
         else {
             eprint("ERROR: unknown method '%s'.\n"
-                   "Possible values are 'exact', 'local' 'tabu'", arg);
+                   "Possible values are 'exact', 'local', 'tabu', 'hill'", arg);
             exit(EXIT_FAILURE);
         }
         break;

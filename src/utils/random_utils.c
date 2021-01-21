@@ -5,6 +5,7 @@
 #include <string.h>
 
 static uint g_seed;
+// TODO: refactor and see if end is inclusive or not...
 
 void rand_set_seed(uint seed) {
     g_seed = seed;

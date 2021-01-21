@@ -18,14 +18,14 @@
 #define LIGHT_THRESHOLD 0.95
 
 
-bool render_solution(const solution *sol, char *overview_file, char *output_dir) {
+bool render_solution_full(const solution *sol, char *output_dir, char *overview_file) {
     renderer renderer;
     renderer_init(&renderer);
 
     renderer_config config;
     renderer_config_init(&config);
-    config.output_dir = output_dir;
-    config.output_file = overview_file;
+    config.output_dir = overview_file;
+    config.output_file = output_dir;
 
     bool success = renderer_render(&renderer, &config, sol);
     if (!success)
@@ -38,17 +38,18 @@ bool render_solution(const solution *sol, char *overview_file, char *output_dir)
 }
 
 
-bool render_solution_overview(const solution *sol, char *overview_file) {
-    return render_solution(sol, overview_file, NULL);
+bool render_solution(const solution *sol, char *overview_file) {
+    return render_solution_full(sol, overview_file, NULL);
 }
 
 void renderer_config_init(renderer_config *config) {
     config->output_dir = NULL;
     config->output_file = NULL;
-    config->width = 1200;
-    config->height = 800;
-    config->font_size_medium = config->width / 70;
-    config->font_size_small = config->width / 80;
+    config->width = 1920;
+    config->height = 1080;
+    config->font_size_medium = config->width / 80;
+    config->font_size_small = config->width / 100;
+    config->font_size_very_small = config->width / 120;
 }
 
 void renderer_config_destroy(renderer_config *config) {
@@ -689,6 +690,7 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
     char *path;
     double *red, *green, *blue;
     const model *model = solution->model;
+    int font_size = config->height / (model->n_slots * model->n_rooms) * 0.6;
 
     if (!prologue(renderer, config, solution,
                   NULL, "overview",
@@ -734,7 +736,7 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
                                 col_width,
                                 H,
                                 red[c], green[c], blue[c],
-                                config->font_size_small, false, false,
+                                font_size, false, false,
                                 BLACK,
                                 "%s (%s)", model->courses[c].id, model->rooms[r].id);
                     }

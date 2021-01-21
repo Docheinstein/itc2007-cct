@@ -30,10 +30,11 @@ typedef struct neighbourhood_swap_result {
     int delta_cost_room_stability;
 } neighbourhood_swap_result;
 
+bool neighbourhood_swap_move_equal(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2);
+int neighbourhood_swap_move_cost(const neighbourhood_swap_move *move, solution *s);
 
 void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
                                   const neighbourhood_swap_move *src);
-
 
 void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol);
 void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter);
@@ -51,7 +52,12 @@ bool neighbourhood_swap(solution *sol,
 
 void neighbourhood_swap_back(solution *sol,
                              const neighbourhood_swap_move *move,
-                             const neighbourhood_swap_result *result);
+                             const neighbourhood_swap_result *result,
+                             bool revalidate);
 
+
+bool neighbourhood_swap_move_same_room(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2);
+bool neighbourhood_swap_move_same_period(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2);
+bool neighbourhood_swap_move_same_course(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2);
 
 #endif // NEIGHBOURHOOD_SWAP_H

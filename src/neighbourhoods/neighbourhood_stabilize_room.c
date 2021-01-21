@@ -10,9 +10,9 @@
 #include "model.h"
 #include "neighbourhood_swap.h"
 
-static void neighbourhood_room_stabilize_move_copy(
-        neighbourhood_stabilize_room_move *dest,
-        const neighbourhood_stabilize_room_move *src) {
+
+void neighbourhood_stabilize_room_move_copy(neighbourhood_stabilize_room_move *dest,
+                                            const neighbourhood_stabilize_room_move *src) {
     dest->c1 = src->c1;
     dest->r2 = src->r2;
 }
@@ -39,9 +39,9 @@ bool neighbourhood_stabilize_room_iter_next(neighbourhood_stabilize_room_iter *i
         iter->current.c1 = (iter->current.c1 + 1);
     }
 
-    neighbourhood_room_stabilize_move_copy(move, &iter->current);
+    neighbourhood_stabilize_room_move_copy(move, &iter->current);
 
-    debug("neighbourhood_stabilize_room_iter_next -> %d %d", move->c1, move->r2);
+    debug2("neighbourhood_stabilize_room_iter_next -> %d %d", move->c1, move->r2);
     return iter->current.c1 < C;
 }
 
@@ -51,7 +51,7 @@ static void compute_neighbourhood_stabilize_room_cost(
     CRDSQT(sol->model)
     const solution_helper *helper = solution_get_helper(sol);
 
-    debug("compute_neighbourhood_stabilize_room_cost c=%d:%s r=%d:%s",
+    debug2("compute_neighbourhood_stabilize_room_cost c=%d:%s r=%d:%s",
           mv->c1, sol->model->courses[mv->c1].id,
           mv->r2, sol->model->rooms[mv->r2].id);
 
@@ -82,7 +82,7 @@ static void compute_neighbourhood_stabilize_room_cost(
             int rc1 =
                 MIN(0, sol->model->rooms[r1].capacity - n_students) +
                 MAX(0, n_students - sol->model->rooms[mv->r2].capacity);
-            debug("move %s (%d) from %s (%d) to %s (%d) in (d=%d,s=%d) has rc_cost=%d",
+            debug2("move %s (%d) from %s (%d) to %s (%d) in (d=%d,s=%d) has rc_cost=%d",
                   sol->model->courses[mv->c1].id, sol->model->courses[mv->c1].n_students,
                   sol->model->rooms[r1].id, sol->model->rooms[r1].capacity,
                   sol->model->rooms[mv->r2].id, sol->model->rooms[mv->r2].capacity,
@@ -98,7 +98,7 @@ static void compute_neighbourhood_stabilize_room_cost(
                 int rc2 =
                     MIN(0, sol->model->rooms[mv->r2].capacity - sol->model->courses[c2].n_students) +
                     MAX(0, sol->model->courses[c2].n_students - sol->model->rooms[r1].capacity);
-                debug("move %s (%d) from %s (%d) to %s (%d) in (d=%d,s=%d) has rc_cost=%d",
+                debug2("move %s (%d) from %s (%d) to %s (%d) in (d=%d,s=%d) has rc_cost=%d",
                   sol->model->courses[c2].id, sol->model->courses[c2].n_students,
                   sol->model->rooms[mv->r2].id, sol->model->rooms[mv->r2].capacity,
                   sol->model->rooms[r1].id, sol->model->rooms[r1].capacity,
@@ -119,7 +119,7 @@ static void compute_neighbourhood_stabilize_room_cost(
 
         int rs_delta = (cur_rooms - prev_rooms);
         if (rs_delta != 0)
-            debug("rs_delta(c=%s)=%d", sol->model->courses[c].id, rs_delta);
+            debug2("rs_delta(c=%s)=%d", sol->model->courses[c].id, rs_delta);
         room_stability_cost += rs_delta;
 
     };
@@ -131,18 +131,20 @@ static void compute_neighbourhood_stabilize_room_cost(
     result->delta_cost = result->delta_cost_room_capacity + result->delta_cost_room_stability;
 
 
-    debug("compute_neighbourhood_stabilize_room_cost c=%d:%s r=%d:%s -> %d (rc=%d, rs=%d)",
+    debug2("compute_neighbourhood_stabilize_room_cost c=%d:%s r=%d:%s -> %d (rc=%d, rs=%d)",
           mv->c1, sol->model->courses[mv->c1].id,
           mv->r2, sol->model->rooms[mv->r2].id,
           result->delta_cost,
           result->delta_cost_room_capacity,
           result->delta_cost_room_stability);
+
+    free(sum_cr_future);
 }
 
 static void do_neighbourhood_stabilize_room(solution *sol, int c1, int r2) {
     CRDSQT(sol->model)
 
-    debug("neighbourhood_stabilize_room c=%d:%s r=%d:%s",
+    debug2("neighbourhood_stabilize_room c=%d:%s r=%d:%s",
           c1, sol->model->courses[c1].id,
           r2, sol->model->rooms[r2].id);
 
@@ -179,7 +181,7 @@ static void compute_neighbourhood_stabilize_room_fingerprint_diff(
     solution_fingerprint_init(&result->fingerprint_plus);
     solution_fingerprint_init(&result->fingerprint_minus);
 
-    debug("neighbourhood_stabilize_room c=%d:%s r=%d:%s",
+    debug2("neighbourhood_stabilize_room c=%d:%s r=%d:%s",
             mv->c1, sol->model->courses[mv->c1].id,
             mv->r2, sol->model->rooms[mv->r2].id);
 
@@ -207,9 +209,9 @@ static void compute_neighbourhood_stabilize_room_fingerprint_diff(
                &swap_result);
 
             result->fingerprint_plus.sum += swap_result.fingerprint_plus.sum;
-            result->fingerprint_plus.xor *= swap_result.fingerprint_plus.xor;
+            result->fingerprint_plus.xor ^= swap_result.fingerprint_plus.xor;
             result->fingerprint_minus.sum += swap_result.fingerprint_minus.sum;
-            result->fingerprint_minus.xor *= swap_result.fingerprint_minus.xor;
+            result->fingerprint_minus.xor ^= swap_result.fingerprint_minus.xor;
         }
     }
 }
@@ -236,7 +238,7 @@ bool neighbourhood_stabilize_room(solution *sol,
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER && result->delta_cost < 0)) {
         int cost = solution_cost(sol);
         do_neighbourhood_stabilize_room(sol, mv->c1, mv->r2);
-#if DEBUG
+#if debug2
         if ((predict_cost == NEIGHBOURHOOD_PREDICT_ALWAYS ||
         (predict_cost == NEIGHBOURHOOD_PREDICT_IF_FEASIBLE)) &&
         cost + result->delta_cost != solution_cost(sol)) {
