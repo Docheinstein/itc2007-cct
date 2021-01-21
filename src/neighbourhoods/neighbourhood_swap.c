@@ -71,6 +71,7 @@ void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest, const neighbour
     dest->r1 = src->r1;
     dest->d1 = src->d1;
     dest->s1 = src->s1;
+    dest->c2 = src->c2;
     dest->_c2 = src->_c2;
     dest->r2 = src->r2;
     dest->d2 = src->d2;
@@ -127,6 +128,7 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter,
                         iter->current.r1 = RINDEX3_0(iter->rds_index, R, D, S);
                         iter->current.d1 = RINDEX3_1(iter->rds_index, R, D, S);
                         iter->current.s1 = RINDEX3_2(iter->rds_index, R, D, S);
+
                         debug2("Found next assignment (%d %d %d %d)",
                               iter->current.c1, iter->current.r1, iter->current.d1, iter->current.s1);
                     } else {
@@ -137,8 +139,11 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter,
                 }
             }
         }
-    } while (!neighbourhood_swap_move_is_effective(&iter->current));
 
+        iter->current.c2 = helper->c_rds[INDEX3(iter->current.r2, R, iter->current.d2, D, iter->current.s2, S)];
+    } while (!(iter->current.c1 >= iter->current.c2) || !neighbourhood_swap_move_is_effective(&iter->current));
+
+    assert(neighbourhood_swap_move_is_effective(&iter->current));
 
     neighbourhood_swap_move_copy(move, &iter->current);
 
@@ -265,9 +270,17 @@ static void do_neighbourhood_swap(
         solution *sol,
         int c1, int r1, int d1, int s1,
         int c2, int r2, int d2, int s2) {
+    CRDSQT(sol->model);
+
     // Swap assignments
     debug2("do_neighbourhood_swap(%d, %d, %d, %d <-> %d, %d, %d, %d)",
           c1, r1, d1, s1, c2, r2, d2, s2);
+//    char tmp[92];
+//    snprintf(tmp, 92, "do_neighbourhood_swap(%d, %d, %d, %d <-> %d, %d, %d, %d)\n",
+//          c1, r1, d1, s1, c2, r2, d2, s2);
+//    fileappend("/tmp/trend.txt", tmp);
+
+    // Update timetable
     if (c1 >= 0)
         solution_set(sol, c1, r1, d1, s1, false);
     if (c2 >= 0)
@@ -588,7 +601,8 @@ bool neighbourhood_swap(solution *sol,
 
     assert(solution_get(sol, mv->c1, mv->r1, mv->d1, mv->s1));
 
-    mv->_c2 = solution_get_helper(sol)->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
+//    mv->_c2 = solution_get_helper(sol)->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
+    mv->_c2 = mv->c2;
 
     debug2("neighbourhood_swap (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d)) [c2=%d]",
             mv->c1, sol->model->courses[mv->c1].id,
@@ -643,4 +657,36 @@ int neighbourhood_swap_move_cost(const neighbourhood_swap_move *move, solution *
             solution_min_working_days_course_cost(s, move->_c2) +
             solution_curriculum_compactness_lecture_cost(s, move->_c2, move->r2, move->d2, move->s2) * 10 +
             solution_room_stability_course_cost(s, move->_c2);
+}
+
+int neighbourhood_swap_move_compare_room_capacity_cost(const neighbourhood_swap_result *res1,
+                                                       const neighbourhood_swap_result *res2) {
+    int delta = res1->delta_cost_room_capacity - res2->delta_cost_room_capacity;
+//    return delta != 0 ? delta : neighbourhood_swap_move_compare_cost(res1, res2);
+    return delta;
+}
+
+int neighbourhood_swap_move_compare_room_min_working_days_cost(const neighbourhood_swap_result *res1,
+                                                               const neighbourhood_swap_result *res2) {
+    int delta = res1->delta_cost_min_working_days - res2->delta_cost_min_working_days;
+//    return delta != 0 ? delta : neighbourhood_swap_move_compare_cost(res1, res2);
+    return delta;
+}
+
+int neighbourhood_swap_move_compare_room_curriculum_compactness_cost(const neighbourhood_swap_result *res1,
+                                                                     const neighbourhood_swap_result *res2) {
+    int delta = res1->delta_cost_curriculum_compactness - res2->delta_cost_curriculum_compactness;
+//    return delta != 0 ? delta : neighbourhood_swap_move_compare_cost(res1, res2);
+    return delta;
+}
+
+int neighbourhood_swap_move_compare_room_stability_cost(const neighbourhood_swap_result *res1,
+                                                        const neighbourhood_swap_result *res2) {
+    int delta = res1->delta_cost_room_stability - res2->delta_cost_room_stability;
+//    return delta != 0 ? delta : neighbourhood_swap_move_compare_cost(res1, res2);
+    return delta;
+}
+
+int neighbourhood_swap_move_compare_cost(const neighbourhood_swap_result *res1, const neighbourhood_swap_result *res2) {
+    return res1->delta_cost - res2->delta_cost;
 }

@@ -106,6 +106,7 @@ void solution_destroy(solution *solution);
 const solution_helper * solution_get_helper(solution *solution);
 bool solution_invalidate_helper(solution *sol);
 bool solution_helper_equal(solution *s1, solution *s2);
+bool solution_helper_equal_0(const solution_helper *s1, const solution_helper *s2, const model *model);
 
 void solution_copy(solution *solution_dest, const solution *solution_src);
 

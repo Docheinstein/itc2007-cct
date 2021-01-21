@@ -148,6 +148,7 @@ static void do_neighbourhood_stabilize_room(solution *sol, int c1, int r2) {
           c1, sol->model->courses[c1].id,
           r2, sol->model->rooms[r2].id);
 
+    const solution_helper *helper = solution_get_helper(sol);
     neighbourhood_swap_move swap_move;
     swap_move.c1 = c1;
     swap_move.r2 = r2;
@@ -162,6 +163,7 @@ static void do_neighbourhood_stabilize_room(solution *sol, int c1, int r2) {
                 continue;
 
             swap_move.r1 = r1;
+            swap_move.c2 = helper->c_rds[INDEX3(swap_move.r2, R, swap_move.d2, D, swap_move.s2, S)];
 
             neighbourhood_swap(sol, &swap_move,
                NEIGHBOURHOOD_PREDICT_NEVER,

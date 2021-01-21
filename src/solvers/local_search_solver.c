@@ -275,6 +275,8 @@ static bool do_local_search_neighbourhood_swap(solution *sol, int *cost, int ite
                    swap_mv.c1, swap_mv.r1, swap_mv.d1,
                    swap_mv.s1, swap_mv.r2, swap_mv.d2, swap_mv.s2);
 
+            assert(swap_mv.c1 >= swap_mv.c2);
+
             neighbourhood_swap(sol, &swap_mv,
                                    NEIGHBOURHOOD_PREDICT_ALWAYS,
                                    NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
@@ -282,6 +284,7 @@ static bool do_local_search_neighbourhood_swap(solution *sol, int *cost, int ite
                                    NEIGHBOURHOOD_PERFORM_NEVER,
                                    &swap_result);
             if (swap_result.feasible &&
+//                swap_result.delta_cost < best_swap_cost) {
                 swap_result.delta_cost < best_swap_cost) {
                 debug2("[%d.swap.%d.%d] New best candidate swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)) -> %d",
                        iter, i, j, swap_mv.c1, swap_mv.r1, swap_mv.d1,
@@ -293,8 +296,8 @@ static bool do_local_search_neighbourhood_swap(solution *sol, int *cost, int ite
         }
 
         if (best_swap_cost < 0) {
-            debug("[%d.swap.%d.%d] best swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)) -> %d",
-                   iter, i, j, best_swap_mv.c1, best_swap_mv.r1, best_swap_mv.d1,
+            debug("[%d.swap.%d] best swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d)) -> %d",
+                   iter, i, best_swap_mv.c1, best_swap_mv.r1, best_swap_mv.d1,
                    best_swap_mv.s1, best_swap_mv.r2, best_swap_mv.d2, best_swap_mv.s2, best_swap_cost);
 
             neighbourhood_swap(sol, &best_swap_mv,
@@ -303,14 +306,14 @@ static bool do_local_search_neighbourhood_swap(solution *sol, int *cost, int ite
                                NEIGHBOURHOOD_PREDICT_NEVER,
                                NEIGHBOURHOOD_PERFORM_ALWAYS,
                                &swap_result);
-            debug("[%d.swap.%d] LS: solution improved (by %d=%d (rc=%d mwd=%d, cc=%d, rs=%d))",
-                  iter, i, best_swap_cost, swap_result.delta_cost,
+            debug("[%d.swap.%d] LS: solution improved (by %d (rc=%d mwd=%d, cc=%d, rs=%d))",
+                  iter, i, swap_result.delta_cost,
                   swap_result.delta_cost_room_capacity,
                   swap_result.delta_cost_min_working_days,
                   swap_result.delta_cost_curriculum_compactness,
                   swap_result.delta_cost_room_stability);
             improved = true;
-            *cost += best_swap_cost;
+            *cost += swap_result.delta_cost;
         }
 
         neighbourhood_swap_iter_destroy(&swap_iter);
@@ -400,10 +403,13 @@ static void do_local_search_complete(solution *sol) {
             assert(solution_satisfy_hard_constraints(sol));
 
             debug("[%d] After N1 cost: %d", iter, cost);
-
+#if 0
             bool i2 = do_local_search_neighbourhood_stabilize_room(sol, &cost, iter);
             assert(solution_cost(sol) == cost);
             debug("[%d] After N1,N2 cost: %d", iter, cost);
+#else
+            bool i2 = false;
+#endif
 
             improved = i1 || i2;
             iter++;
@@ -416,7 +422,7 @@ static void do_local_search_complete(solution *sol) {
             write_solution(sol, "/tmp/sol-wrong");
             fail("xExpected %d, found %d", cost, solution_cost(sol));
         }
-#if 1
+#if 0
         debug("[%d] Trying with depth2-fast before giving up", iter);
         assert(solution_satisfy_hard_constraints(sol));
 

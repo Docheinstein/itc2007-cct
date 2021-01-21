@@ -95,6 +95,9 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <signal.h>     /* for signal */
 #include <math.h>
 #include <solvers/hill_climbing_solver.h>
+#include <solvers/iterated_local_search_solver.h>
+#include <solvers/simulated_annealing_solver.h>
+#include <solvers/hybrid_solver.h>
 
 #include "utils/assert_utils.h"
 
@@ -199,6 +202,40 @@ int main (int argc, char **argv) {
 
         hill_climbing_solver_config_destroy(&config);
         hill_climbing_solver_destroy(&solver);
+    } else if (args.method == RESOLUTION_METHOD_ITERATED_LOCAL_SEARCH) {
+        iterated_local_search_solver_config config;
+        iterated_local_search_solver_config_init(&config);
+        config.idle_limit = args.multistart;
+        config.time_limit = args.time_limit;
+        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+        config.starting_solution = solution_loaded ? &sol : NULL;
+
+        iterated_local_search_solver solver;
+        iterated_local_search_solver_init(&solver);
+
+        solution_loaded = iterated_local_search_solver_solve(&solver, &config, &sol);
+        if (!solution_loaded)
+            eprint("ERROR: failed to solve model (%s)", iterated_local_search_solver_get_error(&solver));
+
+        iterated_local_search_solver_config_destroy(&config);
+        iterated_local_search_solver_destroy(&solver);
+    } else if (args.method == RESOLUTION_METHOD_SIMULATED_ANNEALING) {
+        simulated_annealing_solver_config config;
+        simulated_annealing_solver_config_init(&config);
+        config.idle_limit = args.multistart;
+        config.time_limit = args.time_limit;
+        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+        config.starting_solution = solution_loaded ? &sol : NULL;
+
+        simulated_annealing_solver solver;
+        simulated_annealing_solver_init(&solver);
+
+        solution_loaded = simulated_annealing_solver_solve(&solver, &config, &sol);
+        if (!solution_loaded)
+            eprint("ERROR: failed to solve model (%s)", simulated_annealing_solver_get_error(&solver));
+
+        simulated_annealing_solver_config_destroy(&config);
+        simulated_annealing_solver_destroy(&solver);
     } else if (args.method == RESOLUTION_METHOD_TABU_SEARCH) {
         tabu_search_solver_config config;
         tabu_search_solver_config_init(&config);
@@ -216,6 +253,22 @@ int main (int argc, char **argv) {
 
         tabu_search_solver_config_destroy(&config);
         tabu_search_solver_destroy(&solver);
+    } else if (args.method == RESOLUTION_METHOD_HYBRYD) {
+        hybrid_solver_config config;
+        hybrid_solver_config_init(&config);
+        config.time_limit = args.time_limit;
+        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+        config.starting_solution = solution_loaded ? &sol : NULL;
+
+        hybrid_solver solver;
+        hybrid_solver_init(&solver);
+
+        solution_loaded = hybrid_solver_solve(&solver, &config, &sol);
+        if (!solution_loaded)
+            eprint("ERROR: failed to solve model (%s)", hybrid_solver_get_error(&solver));
+
+        hybrid_solver_config_destroy(&config);
+        hybrid_solver_destroy(&solver);
     }
 
 

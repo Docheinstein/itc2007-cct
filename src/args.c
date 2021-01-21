@@ -172,9 +172,15 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
             args->method = RESOLUTION_METHOD_TABU_SEARCH;
         else if (streq(arg, "hill"))
             args->method = RESOLUTION_METHOD_HILL_CLIMBING;
+        else if (streq(arg, "iterated"))
+            args->method = RESOLUTION_METHOD_ITERATED_LOCAL_SEARCH;
+        else if (streq(arg, "annealing"))
+            args->method = RESOLUTION_METHOD_SIMULATED_ANNEALING;
+        else if (streq(arg, "hybrid"))
+            args->method = RESOLUTION_METHOD_HYBRYD;
         else {
             eprint("ERROR: unknown method '%s'.\n"
-                   "Possible values are 'exact', 'local', 'tabu', 'hill'", arg);
+                   "Possible values are 'exact', 'local', 'tabu', 'hill', 'iterated', 'annealing', 'hybrid'", arg);
             exit(EXIT_FAILURE);
         }
         break;

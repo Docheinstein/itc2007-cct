@@ -6,7 +6,7 @@
 
 typedef struct neighbourhood_swap_move {
     int c1, r1, d1, s1;
-    int r2, d2, s2;
+    int c2, r2, d2, s2;
     int _c2;
 } neighbourhood_swap_move;
 
@@ -29,6 +29,25 @@ typedef struct neighbourhood_swap_result {
     int delta_cost_curriculum_compactness;
     int delta_cost_room_stability;
 } neighbourhood_swap_result;
+
+int neighbourhood_swap_move_compare_cost(const neighbourhood_swap_result *res1,
+                                         const neighbourhood_swap_result *res2);
+
+int neighbourhood_swap_move_compare_room_capacity_cost(
+        const neighbourhood_swap_result *res1,
+        const neighbourhood_swap_result *res2);
+
+int neighbourhood_swap_move_compare_room_min_working_days_cost(
+        const neighbourhood_swap_result *res1,
+        const neighbourhood_swap_result *res2);
+
+int neighbourhood_swap_move_compare_room_curriculum_compactness_cost(
+        const neighbourhood_swap_result *res1,
+        const neighbourhood_swap_result *res2);
+
+int neighbourhood_swap_move_compare_room_stability_cost(
+        const neighbourhood_swap_result *res1,
+        const neighbourhood_swap_result *res2);
 
 bool neighbourhood_swap_move_equal(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2);
 int neighbourhood_swap_move_cost(const neighbourhood_swap_move *move, solution *s);

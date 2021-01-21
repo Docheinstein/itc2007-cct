@@ -203,6 +203,7 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
 
         FOR_D {
             FOR_S {
+//                FOR_C {
                 for (int qc = 0; qc < q_n_courses; qc++) {
                     int c = q_courses[qc];
                     FOR_R {
@@ -218,23 +219,23 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
         }
     }
     // timetable_qdscr DUMP DEBUG
-    FOR_Q {
-        int q_n_courses;
-        int * q_courses = model_courses_of_curricula(model, q, &q_n_courses);
-
-        FOR_D {
-            FOR_S {
-                for (int qc = 0; qc < q_n_courses; qc++) {
-                    int c = q_courses[qc];
-                    FOR_R {
-                        debug3("DUMP timetable_qdscr[INDEX5(%s, %d, %d, %s, %s)] = %d",
-                           model->curriculas[q].id, d, s, model->courses[c].id, model->rooms[r].id,
-                           helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)]);
-                    }
-                }
-            }
-        }
-    }
+//    FOR_Q {
+//        int q_n_courses;
+//        int * q_courses = model_courses_of_curricula(model, q, &q_n_courses);
+//
+//        FOR_D {
+//            FOR_S {
+//                for (int qc = 0; qc < q_n_courses; qc++) {
+//                    int c = q_courses[qc];
+//                    FOR_R {
+//                        debug3("DUMP timetable_qdscr[INDEX5(%s, %d, %d, %s, %s)] = %d",
+//                           model->curriculas[q].id, d, s, model->courses[c].id, model->rooms[r].id,
+//                           helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)]);
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     // sum_qds
     FOR_Q {
@@ -994,8 +995,39 @@ const char *solution_parser_get_error(solution_parser *solution_parser) {
 }
 
 void solution_set(solution *sol, int c, int r, int d, int s, bool value) {
-    sol->timetable[INDEX4(c, sol->model->n_courses, r, sol->model->n_rooms,
-                          d, sol->model->n_days, s, sol->model->n_slots)] = value;
+    CRDSQT(sol->model);
+
+    if (sol->timetable[INDEX4(c, C, r, R, d, D, s, S)] == value)
+        return;
+
+    sol->timetable[INDEX4(c, C, r, R, d, D, s, S)] = value;
+
+    if (!sol->helper)
+        return;
+
+    int n_curriculas;
+    int *curriculas = model_curriculas_of_course(sol->model, c, &n_curriculas);
+    int t = sol->model->courses[c].teacher->index;
+
+    sol->helper->c_rds[INDEX3(r, R, d, D, s, S)] = value ? c : -1;
+    sol->helper->r_cds[INDEX3(c, C, d, D, s, S)] = value ? r : -1;
+
+    sol->helper->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)] = value;
+    sol->helper->timetable_rdsc[INDEX4(r, r, d, D, s, S, c, C)] = value;
+
+    sol->helper->sum_cr[INDEX2(c, C, r, R)] += value ? 1 : -1;
+    sol->helper->sum_cd[INDEX2(c, C, d, D)] += value ? 1 : -1;
+    sol->helper->sum_cds[INDEX3(c, C, d, D, s, S)] += value ? 1 : -1;
+    sol->helper->sum_rds[INDEX3(r, R, d, D, s, S)] += value ? 1 : -1;
+
+    for (int i = 0; i < n_curriculas; i++) {
+        int q = curriculas[i];
+        sol->helper->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)] = value;
+        sol->helper->sum_qds[INDEX3(q, Q, d, D, s, S)] += value ? 1 : -1;
+    }
+
+    sol->helper->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)] = value;
+    sol->helper->sum_tds[INDEX3(t, T, d, D, s, S)] += value ? 1 : -1;
 }
 
 bool solution_get(const solution *sol, int c, int r, int d, int s) {
@@ -1200,18 +1232,24 @@ bool solution_helper_equal(solution *s1, solution *s2) {
 
     const solution_helper *h1 = solution_get_helper(s1);
     const solution_helper *h2 = solution_get_helper(s2);
-//
-//    FOR_R {
-//        FOR_D {
-//            FOR_S {
-//                if (h1->c_rds[INDEX3(r, R, d, D, s, S)] != h2->c_rds[INDEX3(r, R, d, D, s, S)]) {
-//                    eprint("r=%d, d=%d, s=%d, "
-//                         "%d != %d", r, d, s, h1->c_rds[INDEX3(r, R, d, D, s, S)], h2->c_rds[INDEX3(r, R, d, D, s, S)]);
-//                }
-//            }
-//        }
-//    };
-//    debug("memcmp(h1->c_rds, h2->c_rds, R * D * S * sizeof(int)) == %d", memcmp(h1->c_rds, h2->c_rds, R * D * S * sizeof(int)));
+
+    return
+        memcmp(h1->c_rds, h2->c_rds, R * D * S * sizeof(int)) == 0 &&
+        memcmp(h1->r_cds, h2->r_cds, C * D * S * sizeof(int)) == 0 &&
+        memcmp(h1->sum_cr, h2->sum_cr, C * R * sizeof(int)) == 0 &&
+        memcmp(h1->timetable_cdsr, h2->timetable_cdsr, C * D * S * R * sizeof(bool)) == 0 &&
+        memcmp(h1->sum_cds, h2->sum_cds, C * D * S * sizeof(int)) == 0 &&
+        memcmp(h1->sum_cd, h2->sum_cd, C * D  * sizeof(int)) == 0&&
+        memcmp(h1->timetable_rdsc, h2->timetable_rdsc, R * D * S * C  * sizeof(bool)) == 0 &&
+        memcmp(h1->sum_rds, h2->sum_rds, R * D * S * sizeof(int)) == 0 &&
+        memcmp(h1->timetable_qdscr, h2->timetable_qdscr, Q * D * S * C * R * sizeof(bool)) == 0 &&
+        memcmp(h1->sum_qds, h2->sum_qds, Q * D * S * sizeof(int)) == 0 &&
+        memcmp(h1->timetable_tdscr, h2->timetable_tdscr, T * D * S * C * R * sizeof(bool)) == 0 &&
+        memcmp(h1->sum_tds, h2->sum_tds, T * D * S * sizeof(int)) == 0;
+}
+
+bool solution_helper_equal_0(const solution_helper *h1, const solution_helper *h2, const model *model) {
+    CRDSQT(model);
 
     return
         memcmp(h1->c_rds, h2->c_rds, R * D * S * sizeof(int)) == 0 &&
