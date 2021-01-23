@@ -8,6 +8,7 @@ typedef struct neighbourhood_swap_move {
     int c1, r1, d1, s1;
     int c2, r2, d2, s2;
     int _c2;
+    int l1, l2;
 } neighbourhood_swap_move;
 
 typedef struct neighbourhood_swap_iter {
@@ -15,6 +16,8 @@ typedef struct neighbourhood_swap_iter {
     bool end;
     int rds_index;
     neighbourhood_swap_move current;
+    int i;
+    int lecture_index;
 } neighbourhood_swap_iter;
 
 typedef struct neighbourhood_swap_result {
@@ -51,6 +54,8 @@ int neighbourhood_swap_move_compare_room_stability_cost(
 
 bool neighbourhood_swap_move_equal(const neighbourhood_swap_move *m1, const neighbourhood_swap_move *m2);
 int neighbourhood_swap_move_cost(const neighbourhood_swap_move *move, solution *s);
+
+void neighbourhood_swap_generate_random_move(solution *sol, neighbourhood_swap_move *mv);
 
 void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
                                   const neighbourhood_swap_move *src);

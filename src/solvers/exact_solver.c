@@ -571,7 +571,7 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
 
                     GRB_ADD_CONSTR(i,
                                    GRB_LESS_EQUAL, 1.0,
-                                   "C2_%s_%d_%d", itc->teachers[t], d, s);
+                                   "C2_%s_%d_%d", itc->teachers[t].id, d, s);
                 }
             }
         }
@@ -625,6 +625,7 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
 
         // Create solution from X
         GRB_GET_VARS(X_begin, X_count, values);
+        int i = 0; // TODO: lecture is useless here
         for (int c = 0; c < C; c++) {
             for (int r = 0; r < R; r++) {
                 for (int d = 0; d < D; d++) {
@@ -634,7 +635,7 @@ bool exact_solver_solve(exact_solver *solver, exact_solver_config *config,
                             debug("X[%s,%s,%d,%d]=%g",
                                   itc->courses[c].id, itc->rooms[r].id, d, s,
                                   Xval);
-                            solution_set(solution, c, r, d, s, true);
+                            solution_set(solution, c, r, d, s, true, i++);
                         }
                     }
                 }

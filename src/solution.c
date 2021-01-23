@@ -13,8 +13,6 @@
 
 static void solution_helper_init(solution_helper *helper, const model *model) {
     CRDSQT(model)
-    helper->valid = false;
-
     helper->c_rds = mallocx(R * D * S, sizeof(int));
     helper->r_cds = mallocx(C * D * S, sizeof(int));
 
@@ -32,11 +30,33 @@ static void solution_helper_init(solution_helper *helper, const model *model) {
 
     helper->timetable_tdscr = mallocx(T * D * S * C * R, sizeof(bool));
     helper->sum_tds = mallocx(T * D * S, sizeof(int));
+
+    helper->lectures = mallocx(model->n_lectures, sizeof(lecture));
+    helper->lectures_crds = mallocx(C * R * D * S, sizeof(int));
+
+    memset(helper->c_rds, -1, R * D * S * sizeof(int));
+    memset(helper->r_cds, -1, C * D * S * sizeof(int));
+
+    memset(helper->sum_cr, 0, C * R * sizeof(int));
+
+    memset(helper->timetable_cdsr, 0, C * D * S * R * sizeof(bool));
+    memset(helper->sum_cds, 0, C * D * S * sizeof(int));
+    memset(helper->sum_cd, 0, C * D * sizeof(int));
+
+    memset(helper->timetable_rdsc, 0, R * D * S * C * sizeof(bool));
+    memset(helper->sum_rds, 0, R * D * S * sizeof(int));
+
+    memset(helper->timetable_qdscr, 0, Q * D * S * C * R * sizeof(bool));
+    memset(helper->sum_qds, 0, Q * D * S * sizeof(int));
+
+    memset(helper->timetable_tdscr, 0, T * D * S * C * R * sizeof(bool));
+    memset(helper->sum_tds, 0, T * D * S * sizeof(int));
+
+    memset(helper->lectures, 0, model->n_lectures * sizeof(lecture));
+    memset(helper->lectures_crds, -1, C * R * D * S * sizeof(int));
 }
 
 static void solution_helper_destroy(solution_helper *helper) {
-    helper->valid = false;
-
     free(helper->c_rds);
     free(helper->r_cds);
 
@@ -61,7 +81,6 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
     const model *model = sol->model;
 
     debug2("@@ solution_helper_compute @@");
-    helper->valid = true;
 
     memset(helper->c_rds, -1, R * D * S * sizeof(int));
     memset(helper->r_cds, -1, C * D * S * sizeof(int));
@@ -293,35 +312,49 @@ static void solution_helper_compute(solution_helper *helper, const solution *sol
 }
 
 static void solution_helper_copy(solution_helper *helper_dest, solution_helper *helper_src,
-                                 const solution *sol) {
-    CRDSQT(sol->model)
-//
-//    memcpy(helper_dest->timetable_cdsr, helper_src->timetable_cdsr,
-//           C * D * S * R * sizeof(bool));
-//    memcpy(helper_dest->timetable_rdsc, helper_src->timetable_rdsc,
-//           R * D * S * C * sizeof(bool));
-//    memcpy(helper_dest->timetable_qdscr, helper_src->timetable_qdscr,
-//           Q * D * S * R * C * sizeof(bool));
-//    memcpy(helper_dest->timetable_tdscr, helper_src->timetable_tdscr,
-//           T * D * S * R * C * sizeof(bool));
-//
-//
-//    memcpy(helper_dest->sum_cds, helper_src->timetable_cdsr,
-//           C * D * S * sizeof(bool));
-//    memcpy(helper_dest->sum_rds, helper_src->timetable_rdsc,
-//           R * D * S * sizeof(bool));
-//    memcpy(helper_dest->sum_qds, helper_src->timetable_qdscr,
-//           Q * D * S * sizeof(bool));
-//    memcpy(helper_dest->sum_tds, helper_src->timetable_tdscr,
-//           T * D * S * sizeof(bool));
+                                 const model *model) {
+    CRDSQT(model)
 
+    memcpy(helper_dest->c_rds, helper_src->c_rds,
+           R * D * S * sizeof(int));
+    memcpy(helper_dest->r_cds, helper_src->r_cds,
+           C * D * S * sizeof(int));
+
+    memcpy(helper_dest->timetable_cdsr, helper_src->timetable_cdsr,
+           C * D * S * R * sizeof(bool));
+    memcpy(helper_dest->timetable_rdsc, helper_src->timetable_rdsc,
+           R * D * S * C * sizeof(bool));
+    memcpy(helper_dest->timetable_qdscr, helper_src->timetable_qdscr,
+           Q * D * S * R * C * sizeof(bool));
+    memcpy(helper_dest->timetable_tdscr, helper_src->timetable_tdscr,
+           T * D * S * R * C * sizeof(bool));
+
+
+    memcpy(helper_dest->sum_cds, helper_src->sum_cds,
+           C * D * S * sizeof(int));
+    memcpy(helper_dest->sum_rds, helper_src->sum_rds,
+           R * D * S * sizeof(int));
+    memcpy(helper_dest->sum_qds, helper_src->sum_qds,
+           Q * D * S * sizeof(int));
+    memcpy(helper_dest->sum_tds, helper_src->sum_tds,
+           T * D * S * sizeof(int));
+    memcpy(helper_dest->sum_cr, helper_src->sum_cr,
+           C * R * sizeof(int));
+    memcpy(helper_dest->sum_cd, helper_src->sum_cd,
+           C * D * sizeof(int));
+
+    memcpy(helper_dest->lectures, helper_src->lectures,
+           model->n_lectures * sizeof(lecture));
+    memcpy(helper_dest->lectures_crds, helper_src->lectures_crds,
+           C * R * D * S * sizeof(int));
 }
 
 void solution_init(solution *sol, const model *model) {
     CRDSQT(model)
     sol->model = model;
     sol->timetable = callocx(C * R * D * S, sizeof(bool));
-    sol->helper = NULL;
+    sol->helper = mallocx(1, sizeof(solution_helper));
+    solution_helper_init(sol->helper, model);
 }
 
 void solution_reinit(solution *sol) {
@@ -337,19 +370,19 @@ void solution_destroy(solution *sol) {
 }
 
 const solution_helper *solution_get_helper(solution *solution) {
-    if (!solution->helper) {
-        solution->helper = mallocx(1, sizeof(solution_helper));
-        solution_helper_init(solution->helper, solution->model);
-    }
-    if (!solution->helper->valid)
-        solution_helper_compute(solution->helper, solution);
+//    if (!solution->helper) {
+//        solution->helper = mallocx(1, sizeof(solution_helper));
+//        solution_helper_init(solution->helper, solution->model);
+//    }
+//    if (!solution->helper->valid)
+//        solution_helper_compute(solution->helper, solution);
     return solution->helper;
 }
 
 bool solution_invalidate_helper(solution *sol) {
-    bool was_valid = sol->helper && sol->helper->valid;
-    sol->helper->valid = false;
-    return was_valid;
+//    bool was_valid = sol->helper && sol->helper->valid;
+//    sol->helper->valid = false;
+    return true;
 }
 
 void solution_copy(solution *solution_dest, const solution *solution_src) {
@@ -358,7 +391,7 @@ void solution_copy(solution *solution_dest, const solution *solution_src) {
            solution_dest->model->n_days * solution_dest->model->n_slots * sizeof(bool));
     solution_dest->model = solution_src->model; // should already be the same
 
-//    solution_helper_copy(&solution_dest->helper, &solution_src->helper);
+    solution_helper_copy(solution_dest->helper, solution_src->helper, solution_dest->model);
 }
 
 char * solution_to_string(const solution *sol) {
@@ -945,6 +978,7 @@ bool solution_parser_parse(solution_parser *solution_parser,
         ABORT_PARSE("failed to open '%s' (%s)\n", input, strerror(errno));
 
     const model *m = sol->model;
+    int lecture_index = 0;
 
     while (fgets(line0, LENGTH(line0), file)) {
         ++line_num;
@@ -966,7 +1000,7 @@ bool solution_parser_parse(solution_parser *solution_parser,
                 model_course_by_id(m, F[0])->index,
                 model_room_by_id(m, F[1])->index,
                 strtoint(F[2], &ok),
-                strtoint(F[3], &ok), 1);
+                strtoint(F[3], &ok), true, lecture_index++);
 
         if (!ok)
             ABORT_PARSE_INT_FAIL();
@@ -994,9 +1028,8 @@ const char *solution_parser_get_error(solution_parser *solution_parser) {
     return solution_parser->error;
 }
 
-void solution_set(solution *sol, int c, int r, int d, int s, bool value) {
+void solution_set(solution *sol, int c, int r, int d, int s, bool value, int lecture) {
     CRDSQT(sol->model);
-
     if (sol->timetable[INDEX4(c, C, r, R, d, D, s, S)] == value)
         return;
 
@@ -1008,6 +1041,15 @@ void solution_set(solution *sol, int c, int r, int d, int s, bool value) {
     int n_curriculas;
     int *curriculas = model_curriculas_of_course(sol->model, c, &n_curriculas);
     int t = sol->model->courses[c].teacher->index;
+
+    if (value) {
+        sol->helper->lectures[lecture].c = c;
+        sol->helper->lectures[lecture].r = r;
+        sol->helper->lectures[lecture].d = d;
+        sol->helper->lectures[lecture].s = s;
+    }
+
+    sol->helper->lectures_crds[INDEX4(c, C, r, R, d, D, s, S)] = value ? lecture : -1;
 
     sol->helper->c_rds[INDEX3(r, R, d, D, s, S)] = value ? c : -1;
     sol->helper->r_cds[INDEX3(c, C, d, D, s, S)] = value ? r : -1;
@@ -1034,6 +1076,7 @@ bool solution_get(const solution *sol, int c, int r, int d, int s) {
     return sol->timetable[INDEX4(c, sol->model->n_courses, r, sol->model->n_rooms,
                                  d, sol->model->n_days, s, sol->model->n_slots)];
 }
+
 
 void solution_fingerprint_init(solution_fingerprint_t *f) {
     f->sum = 0;

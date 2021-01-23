@@ -164,6 +164,8 @@ static void do_neighbourhood_stabilize_room(solution *sol, int c1, int r2) {
 
             swap_move.r1 = r1;
             swap_move.c2 = helper->c_rds[INDEX3(swap_move.r2, R, swap_move.d2, D, swap_move.s2, S)];
+            swap_move.l1 = helper->lectures_crds[INDEX4(swap_move.c1, C, swap_move.r1, R, swap_move.d1, D, swap_move.s1, S)];
+            swap_move.l2 = helper->lectures_crds[INDEX4(swap_move.c2, C, swap_move.r2, R, swap_move.d2, D, swap_move.s2, S)];
 
             neighbourhood_swap(sol, &swap_move,
                NEIGHBOURHOOD_PREDICT_NEVER,

@@ -8,224 +8,63 @@
 #include <utils/assert_utils.h>
 #include <utils/mem_utils.h>
 #include <utils/random_utils.h>
+#include <math.h>
+#include <utils/math_utils.h>
+#include <utils/array_utils.h>
 #include "neighbourhoods/neighbourhood_swap.h"
 #include "feasible_solution_finder.h"
 #include "renderer.h"
 
-static bool do_hill_climbing_neighbourhood_swap(solution *sol, int *cost, int iter) {
-    CRDSQT(sol->model);
-    int prev_cost = *cost;
-
-    neighbourhood_swap_move *best_swap_moves =
-                mallocx(solution_assignment_count(sol) * R * D * S,
-                        sizeof(neighbourhood_swap_move));
-
-    int best_swap_moves_cursor = 0;
-    int best_swap_moves_cost = INT_MAX;
-
-    int j = 0;
-
-    neighbourhood_swap_iter swap_iter;
-    neighbourhood_swap_iter_init(&swap_iter, sol);
-
-    neighbourhood_swap_move swap_mv;
-    neighbourhood_swap_result swap_result;
-
-    while (neighbourhood_swap_iter_next(&swap_iter, &swap_mv)) {
-        debug2("[%d.swap.%d] HC swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
-               iter, j,
-               swap_mv.c1, swap_mv.r1, swap_mv.d1,
-               swap_mv.s1, swap_mv.r2, swap_mv.d2, swap_mv.s2);
-
-        neighbourhood_swap(sol, &swap_mv,
-                               NEIGHBOURHOOD_PREDICT_ALWAYS,
-                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
-                               NEIGHBOURHOOD_PREDICT_NEVER,
-                               NEIGHBOURHOOD_PERFORM_NEVER,
-                               &swap_result);
-        if (swap_result.feasible) {
-            if (swap_result.delta_cost <= best_swap_moves_cost) {
-                if (swap_result.delta_cost < best_swap_moves_cost) {
-                    best_swap_moves_cursor = 0;
-                    best_swap_moves_cost = swap_result.delta_cost;
-                }
-                best_swap_moves[best_swap_moves_cursor++] = swap_mv;
-            }
-        }
-        j++;
-    }
-
-    debug("[%d] HC: Picking from %d possible moves of cost %d", iter, best_swap_moves_cursor, best_swap_moves_cost);
-    int pick = rand_int_range(0, best_swap_moves_cursor);
-    neighbourhood_swap_move m = best_swap_moves[pick];
-
-    neighbourhood_swap(sol, &m,
-                       NEIGHBOURHOOD_PREDICT_NEVER,
-                       NEIGHBOURHOOD_PREDICT_NEVER,
-                       NEIGHBOURHOOD_PREDICT_NEVER,
-                       NEIGHBOURHOOD_PERFORM_ALWAYS,
-                       &swap_result);
-    *cost += best_swap_moves_cost;
-
-    neighbourhood_swap_iter_destroy(&swap_iter);
-
-    free(best_swap_moves);
-
-    return *cost < prev_cost;
-}
-
-
-static bool do_hill_climbing_neighbourhood_stabilize_room(solution *sol, int *cost, int iter) {
-    int prev_cost = *cost;
-    bool improved;
-    int i = 0;
-
-    do {
-        int j = 0;
-
-        improved = false;
-
-        neighbourhood_stabilize_room_iter stabilize_room_iter;
-        neighbourhood_stabilize_room_iter_init(&stabilize_room_iter, sol);
-
-        neighbourhood_stabilize_room_move stabilize_room_mv;
-        neighbourhood_stabilize_room_result stabilize_room_result;
-
-        neighbourhood_stabilize_room_move best_stabilize_room_mv;
-        int best_stabilize_room_cost = INT_MAX;
-
-        while (neighbourhood_stabilize_room_iter_next(&stabilize_room_iter, &stabilize_room_mv)) {
-            debug2("[%d.stabilize_room.%d.%d] HC stabilize_room(c=%d r=%d)",
-                   iter, i, j,
-                   stabilize_room_mv.c1, stabilize_room_mv.r2);
-
-            neighbourhood_stabilize_room(sol, &stabilize_room_mv,
-                                   NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
-                                   NEIGHBOURHOOD_PREDICT_NEVER,
-                                   NEIGHBOURHOOD_PERFORM_NEVER,
-                                   &stabilize_room_result);
-            if (stabilize_room_result.delta_cost < best_stabilize_room_cost) {
-                debug2("[%d.stabilize_room.%d.%d] New best candidate stabilize_room(c=%d r=%d) -> %d",
-                       iter, i, j, stabilize_room_mv.c1, stabilize_room_mv.r2, stabilize_room_result.delta_cost);
-                best_stabilize_room_cost = stabilize_room_result.delta_cost;
-                best_stabilize_room_mv = stabilize_room_mv;
-            }
-            j++;
-        }
-
-        if (best_stabilize_room_cost < 0) {
-            neighbourhood_stabilize_room(sol, &best_stabilize_room_mv,
-                               NEIGHBOURHOOD_PREDICT_NEVER,
-                               NEIGHBOURHOOD_PREDICT_NEVER,
-                               NEIGHBOURHOOD_PERFORM_ALWAYS,
-                               &stabilize_room_result);
-            debug("[%d.stabilize_room.%d] HC: solution improved (by %d)",
-                  iter, i, best_stabilize_room_cost);
-            improved = true;
-            *cost += best_stabilize_room_cost;
-        }
-
-        neighbourhood_stabilize_room_iter_destroy(&stabilize_room_iter);
-        i++;
-    } while (cost > 0 && improved);
-
-    return *cost < prev_cost;
-}
-
-static void do_hill_climbing_fast_descend(solution *sol) {
-    int cost = solution_cost(sol);
-
-    int swap_improvements = 0;
-    int stabilize_room_improvements = 0;
-    int stabilize_room_improvements_delta = 0;
-
-    int i = 0;
-    bool improved;
-    do {
-        // N1: swap: improve as much as possible
-        do {
-            int j = 0;
-            improved = false;
-
-            neighbourhood_swap_iter swap_iter;
-            neighbourhood_swap_iter_init(&swap_iter, sol);
-
-            neighbourhood_swap_move swap_mv;
-            neighbourhood_swap_result swap_result;
-
-            while (neighbourhood_swap_iter_next(&swap_iter, &swap_mv)) {
-                int jj = j++;
-
-                debug2("[%d.swap.%d] HC swap(c=%d (r=%d d=%d s=%d) (r=%d d=%d s=%d))",
-                      i, jj,
-                      swap_mv.c1, swap_mv.r1, swap_mv.d1,
-                      swap_mv.s1, swap_mv.r2, swap_mv.d2, swap_mv.s2);
-
-                if (neighbourhood_swap(sol, &swap_mv,
-                                       NEIGHBOURHOOD_PREDICT_ALWAYS,
-                                       NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
-                                       NEIGHBOURHOOD_PREDICT_NEVER,
-                                       NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
-                                       &swap_result)) {
-                    swap_improvements++;
-                    int neigh_cost = cost + swap_result.delta_cost;
-                    debug2("[%d.swap.%d] HC: solution improved (by %d), cost = %d",
-                          i, jj, swap_result.delta_cost, neigh_cost);
-
-                    cost = neigh_cost;
-                    improved = true;
-                    break;
-                }
-            }
-
-            neighbourhood_swap_iter_destroy(&swap_iter);
-        } while (cost > 0 && improved);
-
-        // N2: stabilize_room, do only one improvement
-#if 0
-        int j = 0;
-
-        neighbourhood_stabilize_room_iter stabilize_room_iter;
-        neighbourhood_stabilize_room_iter_init(&stabilize_room_iter, sol);
-
-        neighbourhood_stabilize_room_move stabilize_room_mv;
-        neighbourhood_stabilize_room_result stabilize_room_result;
-
-        while (neighbourhood_stabilize_room_iter_next(&stabilize_room_iter, &stabilize_room_mv)) {
-            int jj = j++;
-
-            debug("[%d.stabilize_room.%d] HC stabilize_room(c=%d r=%d)",
-                   i, jj, stabilize_room_mv.c1, stabilize_room_mv.r2);
-
-            if (neighbourhood_stabilize_room(sol, &stabilize_room_mv,
-                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
-                               NEIGHBOURHOOD_PREDICT_NEVER,
-                               NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER,
-                               &stabilize_room_result)) {
-
-                stabilize_room_improvements++;
-                stabilize_room_improvements_delta += stabilize_room_result.delta_cost;
-                int neigh_cost = cost + stabilize_room_result.delta_cost;
-                debug("[%d.stabilize_room.%d] HC: solution improved (by %d), cost = %d",
-                      i, jj, stabilize_room_result.delta_cost, neigh_cost);
-
-                cost = neigh_cost;
-                improved = true;
-
-                assert(solution_cost(sol) == cost);
-                break;
-            }
-        }
-
-        neighbourhood_stabilize_room_iter_destroy(&stabilize_room_iter);
+/*
+        // Phase 2
+#define PHASE2 1
+#if PHASE2
+        debug("[%d] Phase 2: hill_climbing_local_search_phase", state.cycle);
+        hill_climbing_local_search_phase(&state,
+                                         neighbourhood_swap_accept_less_cost, NULL);
+        debug("[%d] Cost after phase [hill_climbing_local_search_step] = %d      // best = %d",
+              state.cycle, state.current_cost, state.best_cost);
 #endif
-        i++;
-    } while (cost > 0 && improved);
 
-    debug("swap_improvements = %d", swap_improvements);
-    debug("stabilize_room_improvements = %d", stabilize_room_improvements);
-    debug("stabilize_room_improvements_delta = %d", stabilize_room_improvements_delta);
-}
+        // Phase 3
+#define PHASE3 0
+#if PHASE3
+        debug("[%d] Phase 3: hill_climbing_local_search_depth_2_phase", state.cycle);
+        hill_climbing_local_search_depth_2_phase(&state,
+                                                 neighbourhood_swap_accept_less_or_equal_0,
+                                                 neighbourhood_swap_accept2_less_or_equal_cost,
+                                                 NULL);
+        debug("[%d] Cost after phase [hill_climbing_local_search_depth_2_phase] = %d      // best = %d",
+              state.cycle, state.current_cost, state.best_cost);
+#endif
+
+#define PHASE4 0
+#if PHASE4
+        const double MAX_TOL = .10;
+        double tolerance = 1 + MAX_TOL - map((double) starting_time, (double) time_limit, 0, MAX_TOL, (double) ms());
+//        debug("tol =%g", tolerance);
+        hill_climbing_phase(s, &cost, best_solution_cost, neighbourhood_swap_accept_cost_tolerance, &tolerance, 100);
+        debug("[%d] Cost after phase 2: %d      // best is %d", major_cycle, cost, best_solution_cost);
+
+        if (cost < best_solution_cost) {
+            verbose("[%d] New best solution found, cost = %d", major_cycle, cost);
+            best_solution_cost = cost;
+            solution_copy(&best_solution, s);
+        }
+#endif
+
+        // Phase 1
+#define PHASE5 0
+#if PHASE5
+        debug("[%d] Phase 3: hill_climbing_local_search_depth_2_phase", state.cycle);
+        hill_climbing_local_search_depth_2_phase(&state,
+                                                 neighbourhood_swap_accept_less_or_equal_0,
+                                                 neighbourhood_swap_accept2_less_or_equal_cost,
+                                                 NULL);
+        debug("[%d] Cost after phase [hill_climbing_local_search_depth_2_phase] = %d      // best = %d",
+              state.cycle, state.current_cost, state.best_cost);
+#endif
+*/
 
 void hill_climbing_solver_config_init(hill_climbing_solver_config *config) {
     config->idle_limit = 0;
@@ -255,35 +94,334 @@ void hill_climbing_solver_reinit(hill_climbing_solver *solver) {
     hill_climbing_solver_init(solver);
 }
 
+typedef struct hill_climbing_solver_state {
+    solution *current_solution;
+    solution *best_solution;
+
+    int current_cost;
+    int best_cost;
+    int cycle;
+} hill_climbing_solver_state;
+
+typedef bool (*neighbourhood_swap_acceptor)(
+        neighbourhood_swap_result /* swap result */,
+        hill_climbing_solver_state *state,
+        void * /* arg */);
+
+typedef bool (*neighbourhood_swap_acceptor2)(
+        neighbourhood_swap_result /* swap result 1*/,
+        neighbourhood_swap_result /* swap result 2*/,
+        hill_climbing_solver_state *state,
+        void * /* arg */);
+
+
+typedef bool (*hill_climber_step)(
+        hill_climbing_solver_state *,
+        neighbourhood_swap_acceptor,
+        void *);
+
+static void eventually_update_best_solution(hill_climbing_solver_state *state) {
+    if (state->current_cost < state->best_cost) {
+        state->best_cost = state->current_cost;
+        solution_copy(state->best_solution, state->current_solution);
+        verbose("[%d] Best solution found = %d", state->cycle, state->best_cost);
+    }
+}
+
+static bool hill_climbing_local_search_depth_2_phase(
+        hill_climbing_solver_state *state,
+        neighbourhood_swap_acceptor accept1,
+        neighbourhood_swap_acceptor2 accept2,
+        void *acceptor_arg) {
+
+    bool idling;
+
+//    do {
+//        idling = true;
+
+    neighbourhood_swap_iter swap_iter1;
+    neighbourhood_swap_iter_init(&swap_iter1, state->current_solution);
+    neighbourhood_swap_move swap_mv1, swap_mv2;
+    neighbourhood_swap_result swap_res1, swap_res2;
+
+    while (neighbourhood_swap_iter_next(&swap_iter1, &swap_mv1)) {
+        neighbourhood_swap(state->current_solution, &swap_mv1,
+                           NEIGHBOURHOOD_PREDICT_ALWAYS,
+                           NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                           NEIGHBOURHOOD_PREDICT_NEVER,
+                           NEIGHBOURHOOD_PERFORM_NEVER,
+                           &swap_res1);
+
+        if (swap_res1.feasible && accept1(swap_res1, state, acceptor_arg)) {
+            neighbourhood_swap(state->current_solution, &swap_mv1,
+               NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PERFORM_ALWAYS,
+               NULL);
+            state->current_cost += swap_res1.delta_cost;
+            eventually_update_best_solution(state);
+
+            // --- swap 2 ---
+            neighbourhood_swap_iter swap_iter2;
+            neighbourhood_swap_iter_init(&swap_iter2, state->current_solution);
+
+            while (neighbourhood_swap_iter_next(&swap_iter2, &swap_mv2)) {
+                debug2("hill_climbing_local_search_depth_2_phase %d.%d", swap_iter1.i, swap_iter2.i);
+
+                neighbourhood_swap(state->current_solution, &swap_mv2,
+                                   NEIGHBOURHOOD_PREDICT_ALWAYS,
+                                   NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                                   NEIGHBOURHOOD_PREDICT_NEVER,
+                                   NEIGHBOURHOOD_PERFORM_NEVER,
+                                   &swap_res2);
+                if (swap_res2.feasible && accept2(swap_res1, swap_res2, state, acceptor_arg)) {
+                    debug("Performing a double move of cost %d", swap_res1.delta_cost + swap_res2.delta_cost);
+                    neighbourhood_swap(state->current_solution, &swap_mv2,
+                                       NEIGHBOURHOOD_PREDICT_NEVER,
+                                       NEIGHBOURHOOD_PREDICT_NEVER,
+                                       NEIGHBOURHOOD_PREDICT_NEVER,
+                                       NEIGHBOURHOOD_PERFORM_ALWAYS,
+                                       &swap_res2);
+                    state->current_cost += swap_res1.delta_cost + swap_res2.delta_cost;
+                    eventually_update_best_solution(state);
+                    idling = false;
+                }
+            }
+
+            neighbourhood_swap_iter_destroy(&swap_iter2);
+
+            // --------------
+            if (!idling)
+                break;
+
+            neighbourhood_swap_back(state->current_solution, &swap_mv1, &swap_res1, false);
+        }
+    }
+    neighbourhood_swap_iter_destroy(&swap_iter1);
+//    } while (!idling);
+}
+
+static bool hill_climbing_local_search_phase(
+        hill_climbing_solver_state *state,
+        neighbourhood_swap_acceptor accept,
+        void *acceptor_arg) {
+    bool idling;
+    do {
+        idling = true;
+
+        neighbourhood_swap_iter swap_iter;
+        neighbourhood_swap_iter_init(&swap_iter, state->current_solution);
+
+        neighbourhood_swap_move swap_mv;
+        neighbourhood_swap_result swap_result;
+
+        while (neighbourhood_swap_iter_next(&swap_iter, &swap_mv)) {
+            neighbourhood_swap(state->current_solution, &swap_mv,
+                               NEIGHBOURHOOD_PREDICT_ALWAYS,
+                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PREDICT_NEVER,
+                               NEIGHBOURHOOD_PERFORM_NEVER,
+                               &swap_result);
+
+            if (swap_result.feasible && accept(swap_result, state, acceptor_arg)) {
+                neighbourhood_swap(state->current_solution, &swap_mv,
+                   NEIGHBOURHOOD_PREDICT_NEVER,
+                   NEIGHBOURHOOD_PREDICT_NEVER,
+                   NEIGHBOURHOOD_PREDICT_NEVER,
+                   NEIGHBOURHOOD_PERFORM_ALWAYS,
+                   NULL);
+                state->current_cost += swap_result.delta_cost;
+                eventually_update_best_solution(state);
+                idling = false;
+                break;
+            }
+        }
+
+        neighbourhood_swap_iter_destroy(&swap_iter);
+    } while (!idling);
+}
+
+static bool hill_climbing_neighbourhood_stabilize_room_phase(hill_climbing_solver_state *state) {
+    bool idling;
+    do {
+        idling = true;
+
+        neighbourhood_stabilize_room_iter stabilize_room_iter;
+        neighbourhood_stabilize_room_iter_init(&stabilize_room_iter, state->current_solution);
+
+        neighbourhood_stabilize_room_move stabilize_room_mv;
+        neighbourhood_stabilize_room_result stabilize_room_result;
+
+        while (neighbourhood_stabilize_room_iter_next(&stabilize_room_iter, &stabilize_room_mv)) {
+            neighbourhood_stabilize_room(state->current_solution, &stabilize_room_mv,
+                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                               NEIGHBOURHOOD_PREDICT_NEVER,
+                               NEIGHBOURHOOD_PERFORM_NEVER,
+                               &stabilize_room_result);
+
+            if (stabilize_room_result.delta_cost < 0) {
+                neighbourhood_stabilize_room(state->current_solution, &stabilize_room_mv,
+                   NEIGHBOURHOOD_PREDICT_NEVER,
+                   NEIGHBOURHOOD_PREDICT_NEVER,
+                   NEIGHBOURHOOD_PERFORM_ALWAYS,
+                   NULL);
+                state->current_cost += stabilize_room_result.delta_cost;
+                eventually_update_best_solution(state);
+                idling = false;
+                break;
+            }
+        }
+
+        neighbourhood_stabilize_room_iter_destroy(&stabilize_room_iter);
+    } while (!idling);
+}
+
+bool hill_climbing_try_random_step(hill_climbing_solver_state *state,
+                                   neighbourhood_swap_acceptor accept,
+                                   void *acceptor_arg) {
+    CRDSQT(state->current_solution->model);
+
+    neighbourhood_swap_move swap_mv;
+    neighbourhood_swap_result swap_result;
+
+    neighbourhood_swap_generate_random_move(state->current_solution, &swap_mv);
+    neighbourhood_swap(state->current_solution, &swap_mv,
+                       NEIGHBOURHOOD_PREDICT_ALWAYS,
+                       NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                       NEIGHBOURHOOD_PREDICT_NEVER,
+                       NEIGHBOURHOOD_PERFORM_NEVER,
+                       &swap_result);
+    if (!swap_result.feasible || !accept(swap_result, state, acceptor_arg))
+        return false; // doing nothing
+
+    neighbourhood_swap(state->current_solution, &swap_mv,
+               NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PREDICT_NEVER,
+               NEIGHBOURHOOD_PERFORM_ALWAYS,
+               NULL);
+
+    state->current_cost += swap_result.delta_cost;
+    eventually_update_best_solution(state);
+
+    return true;
+}
+
+void hill_climbing_random_phase(hill_climbing_solver_state *state,
+                                hill_climber_step step,
+                                int max_performed_step, int max_step_idle,
+                                neighbourhood_swap_acceptor accept,
+                                void * acceptor_arg) {
+    int performed = 0;
+    int idle = 0;
+    while (idle <= max_step_idle && performed <= max_performed_step) {
+        int prev_cost = state->current_cost;
+        performed += step(state, accept, acceptor_arg);
+        idle = state->current_cost < prev_cost ? 0 : idle + 1;
+    }
+}
+
+static bool neighbourhood_swap_accept_less_cost(neighbourhood_swap_result result, hill_climbing_solver_state *state, void *arg) {
+    return state->current_cost + result.delta_cost < state->best_cost;
+}
+
+static bool neighbourhood_swap_accept_always(neighbourhood_swap_result result, hill_climbing_solver_state *state, void *arg) {
+    return true;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_0(neighbourhood_swap_result result, hill_climbing_solver_state *state, void *arg) {
+    return result.delta_cost <= 0;
+}
+
+static bool neighbourhood_swap_accept2_less_or_equal_cost(neighbourhood_swap_result result1, neighbourhood_swap_result result2,
+                                                 hill_climbing_solver_state *state, void *arg) {
+    return state->current_cost + result1.delta_cost + result2.delta_cost < state->best_cost;
+}
+
+static bool neighbourhood_swap_accept_cost_tolerance(neighbourhood_swap_result result, hill_climbing_solver_state *state, void *arg) {
+    double tolerance = *((double *) arg);
+    return state->current_cost + result.delta_cost <= state->best_cost * tolerance;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_cost(neighbourhood_swap_result result,
+                                                         hill_climbing_solver_state *state, void *arg) {
+    return result.delta_cost <= 0;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_rc_cost(neighbourhood_swap_result result,
+                                                            hill_climbing_solver_state *state, void *arg) {
+    return result.delta_cost_room_capacity <= 0;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_cc_cost(neighbourhood_swap_result result,
+                                                            hill_climbing_solver_state *state, void *arg) {
+    return result.delta_cost_curriculum_compactness <= 0;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_mwd_cost(neighbourhood_swap_result result,
+                                                            hill_climbing_solver_state *state, void *arg) {
+    return result.delta_cost_min_working_days <= 0;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_rs_cost(neighbourhood_swap_result result,
+                                                            hill_climbing_solver_state *state, void *arg) {
+    return result.delta_cost_room_stability <= 0;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_rc_cost_bounded(neighbourhood_swap_result result,
+                                                            hill_climbing_solver_state *state, void *arg) {
+    int max_allowed = *((int *) arg);
+    return result.delta_cost_room_capacity <= 0 && state->current_cost + result.delta_cost < max_allowed;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_cc_cost_bounded(neighbourhood_swap_result result,
+                                                            hill_climbing_solver_state *state, void *arg) {
+    int max_allowed = *((int *) arg);
+    return result.delta_cost_curriculum_compactness <= 0 && state->current_cost + result.delta_cost < max_allowed;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_mwd_cost_bounded(neighbourhood_swap_result result,
+                                                            hill_climbing_solver_state *state, void *arg) {
+    int max_allowed = *((int *) arg);
+    return result.delta_cost_min_working_days <= 0 && state->current_cost + result.delta_cost < max_allowed;
+}
+
+static bool neighbourhood_swap_accept_less_or_equal_rs_cost_bounded(neighbourhood_swap_result result,
+                                                            hill_climbing_solver_state *state, void *arg) {
+    int max_allowed = *((int *) arg);
+    return result.delta_cost_room_stability <= 0 && state->current_cost + result.delta_cost < max_allowed;
+}
+
+static neighbourhood_swap_acceptor random_acceptor() {
+    static neighbourhood_swap_acceptor acceptors[] = {
+        neighbourhood_swap_accept_less_or_equal_cost,
+        neighbourhood_swap_accept_less_or_equal_rc_cost_bounded,
+        neighbourhood_swap_accept_less_or_equal_rs_cost_bounded,
+        neighbourhood_swap_accept_less_or_equal_cc_cost_bounded,
+        neighbourhood_swap_accept_less_or_equal_cc_cost_bounded,
+        neighbourhood_swap_accept_less_or_equal_mwd_cost_bounded,
+        neighbourhood_swap_accept_less_or_equal_mwd_cost_bounded,
+    };
+
+    return acceptors[rand_int_range(0, LENGTH(acceptors))];
+}
+
 bool hill_climbing_solver_solve(hill_climbing_solver *solver,
                                hill_climbing_solver_config *config,
                                solution *s) {
-    const model *model = s->model;
     hill_climbing_solver_reinit(solver);
 
     long starting_time = ms();
     long time_limit = config->time_limit > 0 ? (starting_time + config->time_limit * 1000) : 0;
     int idle_limit = config->idle_limit;
 
-    if (!(time_limit > 0) && !(idle_limit > 0)) {
-        print("WARN: you should probably use either "
-              "time limit (-t) or idle_limit (-n) for hill climbing method.\n"
-              "Will do a single run...");
-        idle_limit = 1;
-    }
-
-    int best_solution_cost = INT_MAX;
-
-    int idle_iter = 0;
-    int iter = 0;
-
-
     if (config->starting_solution) {
-        debug("[%d] Using provided initial solution", iter);
+        debug("Using provided initial solution");
         solution_copy(s, config->starting_solution);
     }
     else {
-        debug("[%d] Finding initial feasible solution...", iter);
+        debug("Finding initial feasible solution...");
         feasible_solution_finder finder;
         feasible_solution_finder_init(&finder);
 
@@ -294,46 +432,80 @@ bool hill_climbing_solver_solve(hill_climbing_solver *solver,
         feasible_solution_finder_find(&finder, &finder_config, s);
     }
 
-    int cost = solution_cost(s);
+    solution best_solution;
+    solution_init(&best_solution, s->model);
+    solution_copy(&best_solution, s);
 
-    while (best_solution_cost > 0) {
-        if (idle_limit > 0 && !(idle_iter < idle_limit)) {
-            verbose("Idle limit reached (%d), stopping here", idle_iter);
-            break;
-        }
+    int initial_cost = solution_cost(s);
+
+    hill_climbing_solver_state state = {
+        .current_solution = s,
+        .current_cost = initial_cost,
+        .best_solution = &best_solution,
+        .best_cost = initial_cost,
+    };
+
+    state.cycle = 0;
+
+    while (true) {
         if (time_limit > 0 && !(ms() < time_limit)) {
             verbose("Time limit reached (%ds), stopping here", config->time_limit);
             break;
         }
+//        assert(state.current_cost == solution_cost(state.current_solution));
 
-        debug("[%d] Initial solution found, cost = %d", iter, solution_cost(s));
+        debug("[%d] -------- MAJOR CYCLE BEGIN --------", state.cycle);
+        debug("[%d] Cost = %d                   // best = %d",
+              state.cycle, state.current_cost, state.best_cost);
 
-        // Local search starting from this feasible solution
-        bool i1 = do_hill_climbing_neighbourhood_swap(s, &cost, iter);
-//        bool i2 = do_hill_climbing_neighbourhood_stabilize_room(s, &cost, iter);
-        bool i2 = false;
-        if (i1 || i2) {
-            idle_iter = 0;
+        // Phase 1
+        debug("[%d] PHASE 1 - HC - Swap move", state.cycle);
+        hill_climbing_random_phase(&state,
+                            hill_climbing_try_random_step, INT_MAX, idle_limit,
+                            neighbourhood_swap_accept_less_or_equal_cost, NULL);
+        debug("[%d] PHASE 1 END, cost = %d      // best = %d",
+              state.cycle, state.current_cost, state.best_cost);
+
+        // Phase 1.5
+        double r = rand_uniform(0, 1);
+        if (r < 0.1) {
+#define PHASE1_5 1
+#if PHASE1_5
+            debug("[%d] Phase 1.5: hill_climbing_neighbourhood_stabilize_room_phase", state.cycle);
+            hill_climbing_neighbourhood_stabilize_room_phase(&state);
+            debug("[%d] Cost after phase [hill_climbing_neighbourhood_stabilize_room_phase] = %d      // best = %d",
+                  state.cycle, state.current_cost, state.best_cost);
+#endif
         } else {
-        }
+            // Phase 2
+            neighbourhood_swap_acceptor acceptor = random_acceptor();
 
-        // Check if the solution found is better than the best known
-//        cost = solution_cost(s);
-        if (cost < best_solution_cost) {
-            verbose("[%d] HC: new best solution found, cost = %d", iter, cost);
-            best_solution_cost = cost;
-            idle_iter = 0;
-        } else {
-            idle_iter++;
-        }
+            static const int UNCHECKED_MOVES_UB = 30;
+            static const int UNCHECKED_MOVES_LB = 5;
 
-        iter++;
+            double max_allowed_cost_factor =
+                    map((double) starting_time, (double) time_limit, 2, 1.3, (double) ms());
+            int max_allowed_cost = (int) (state.current_cost * max_allowed_cost_factor);
+
+            int n_moves = (int) map((double) starting_time, (double) time_limit, UNCHECKED_MOVES_UB, UNCHECKED_MOVES_LB,
+                                    (double) ms());
+            debug("[%d] PHASE 2 - HC - %s move (n_moves=%d, max_allowed_cost=%d)", state.cycle,
+                  (acceptor == neighbourhood_swap_accept_less_or_equal_rc_cost_bounded ? "RoomCapacity" :
+                   (acceptor == neighbourhood_swap_accept_less_or_equal_mwd_cost_bounded ? "MinWorkingDays" :
+                    (acceptor == neighbourhood_swap_accept_less_or_equal_cc_cost_bounded ? "CurriculumCompactness" :
+                     (acceptor == neighbourhood_swap_accept_less_or_equal_rs_cost_bounded ? "RoomStability" :
+                      (acceptor == neighbourhood_swap_accept_less_or_equal_cost ? "Swap" : "Unknown"))))),
+                  n_moves, max_allowed_cost);
+            hill_climbing_random_phase(&state,
+                                       hill_climbing_try_random_step, n_moves, n_moves * 10,
+                                       acceptor, &max_allowed_cost);
+            debug("[%d] PHASE 2 END, cost = %d      // best = %d",
+                  state.cycle, state.current_cost, state.best_cost);
+        }
+        state.cycle++;
     }
 
-//    solution_destroy(s);
-
-    if (best_solution_cost == INT_MAX)
-        solver->error = strmake("unable to find a feasible solution");
+    solution_copy(s, &best_solution);
 
     return strempty(solver->error);
 }

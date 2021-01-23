@@ -123,6 +123,7 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
     qsort(courses_assignment_difficulty, C, sizeof(course_assignment),
           course_assignment_compare);
 
+    int lecture_index = 0;
     for (int i = 0; i < C; i++) {
         const course *course = courses_assignment_difficulty[i].course;
         const int c = course->index;
@@ -184,7 +185,8 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
                                     course_curriculas[cq], Q, d, D, s, S)] =  true;
                         }
 
-                        solution_set(sol, c, r, d, s, true);
+                        solution_set(sol, c, r, d, s, true, lecture_index);
+                        lecture_index++;
                         lectures_to_assign--;
                         iter_assignments++;
                         n_assignments++;

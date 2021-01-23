@@ -11,4 +11,6 @@
 
 #define RANGIFY(lb, x, ub) (MAX((lb), MIN((ub), (x))))
 
+double map(double lb1, double ub1, double lb2, double ub2, double x);
+
 #endif // MATH_UTILS_H

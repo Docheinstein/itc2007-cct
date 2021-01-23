@@ -11,7 +11,8 @@
     const int D = (model)->n_days;   \
     const int S = (model)->n_slots;   \
     const int T = (model)->n_teachers; \
-    const int Q = (model)->n_curriculas;
+    const int Q = (model)->n_curriculas; \
+    const int L = (model)->n_lectures;
 
 #define FOR_C for (int c = 0; c < C; c++)
 #define FOR_R for (int r = 0; r < R; r++)
@@ -80,6 +81,7 @@ typedef struct model {
     unavailability_constraint *unavailability_constraints;
 
     // Redundant data (for faster access)
+    int n_lectures;
     int n_teachers;
     teacher *teachers;                       // T
 

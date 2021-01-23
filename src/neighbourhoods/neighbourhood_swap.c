@@ -2,6 +2,7 @@
 #include <utils/io_utils.h>
 #include <utils/str_utils.h>
 #include <utils/def_utils.h>
+#include <utils/random_utils.h>
 #include "neighbourhood_swap.h"
 #include "utils/array_utils.h"
 #include "solution.h"
@@ -76,6 +77,8 @@ void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest, const neighbour
     dest->r2 = src->r2;
     dest->d2 = src->d2;
     dest->s2 = src->s2;
+    dest->l1 = src->l1;
+    dest->l2 = src->l2;
 }
 
 static bool neighbourhood_swap_move_is_effective(const neighbourhood_swap_move *mv) {
@@ -92,7 +95,8 @@ void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol) 
     iter->rds_index = -1;
     iter->current.c1 = iter->current.r1 = iter->current.d1 = iter->current.s1 = -1;
     iter->current.r2 = iter->current.d2 = iter->current.s2 = -1;
-
+    iter->i = 0;
+    iter->lecture_index = -1;
 #ifdef DEBUG2
     debug2("neighbourhood_swap_iter_init for solution");
     print_solution(sol, stdout);
@@ -100,6 +104,29 @@ void neighbourhood_swap_iter_init(neighbourhood_swap_iter *iter, solution *sol) 
 }
 
 void neighbourhood_swap_iter_destroy(neighbourhood_swap_iter *iter) {}
+
+
+void neighbourhood_swap_generate_random_move(solution *sol, neighbourhood_swap_move *mv) {
+    CRDSQT(sol->model);
+    int rnd = rand_int_range(0, L);
+    const solution_helper *helper = solution_get_helper(sol);
+    const lecture *l = &helper->lectures[rnd];
+
+    do {
+        mv->c1 = l->c;
+        mv->r1 = l->r;
+        mv->d1 = l->d;
+        mv->s1 = l->s;
+        mv->l1 = rnd;
+
+        mv->r2 = rand_int_range(0, R);
+        mv->d2 = rand_int_range(0, D);
+        mv->s2 = rand_int_range(0, S);
+        mv->c2 = helper->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
+        if (mv->c2 >= 0)
+            mv->l2 = helper->lectures_crds[INDEX4(mv->c2, C, mv->r2, R, mv->d2, D, mv->s2, S)];
+    } while (!neighbourhood_swap_move_is_effective(mv));
+}
 
 bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter,
                                   neighbourhood_swap_move *move) {
@@ -119,6 +146,7 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter,
                 if (!iter->current.r2) {
 
                     // Find next assignment
+#if 0
                     do {
                         iter->rds_index++;
                     } while (iter->rds_index < RDS && (helper->c_rds[iter->rds_index]) < 0);
@@ -132,17 +160,37 @@ bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter,
                         debug2("Found next assignment (%d %d %d %d)",
                               iter->current.c1, iter->current.r1, iter->current.d1, iter->current.s1);
                     } else {
-                        debug2("No assignment found, iter exhausted");
+                        debug("No assignment found, iter exhausted after %d iters", iter->i);
                         iter->end = true;
                         return false;
                     }
+#else
+                    if (iter->lecture_index + 1 < iter->solution->model->n_lectures) {
+                        iter->lecture_index++;
+                        const lecture *l = &helper->lectures[iter->lecture_index];
+                        iter->current.c1 = l->c;
+                        iter->current.r1 = l->r;
+                        iter->current.d1 = l->d;
+                        iter->current.s1 = l->s;
+                        iter->current.l1 = iter->lecture_index;
+                    } else {
+                        debug2("Iter exhausted after %d iters", iter->i);
+                        iter->end = true;
+                        return false;
+                    }
+#endif
                 }
             }
         }
 
         iter->current.c2 = helper->c_rds[INDEX3(iter->current.r2, R, iter->current.d2, D, iter->current.s2, S)];
+        if (iter->current.c2 >= 0) {
+            iter->current.l2 = helper->lectures_crds[INDEX4(iter->current.c2, C, iter->current.r2, R, iter->current.d2,
+                                                            D, iter->current.s2, S)];
+        }
     } while (!(iter->current.c1 >= iter->current.c2) || !neighbourhood_swap_move_is_effective(&iter->current));
 
+    iter->i++;
     assert(neighbourhood_swap_move_is_effective(&iter->current));
 
     neighbourhood_swap_move_copy(move, &iter->current);
@@ -268,8 +316,8 @@ static bool check_neighbourhood_swap_hard_constraints(solution *sol,
 
 static void do_neighbourhood_swap(
         solution *sol,
-        int c1, int r1, int d1, int s1,
-        int c2, int r2, int d2, int s2) {
+        int c1, int r1, int d1, int s1, int l1,
+        int c2, int r2, int d2, int s2, int l2) {
     CRDSQT(sol->model);
 
     // Swap assignments
@@ -282,13 +330,13 @@ static void do_neighbourhood_swap(
 
     // Update timetable
     if (c1 >= 0)
-        solution_set(sol, c1, r1, d1, s1, false);
+        solution_set(sol, c1, r1, d1, s1, false, l1);
     if (c2 >= 0)
-        solution_set(sol, c2, r2, d2, s2, false);
+        solution_set(sol, c2, r2, d2, s2, false, l2);
     if (c1 >= 0)
-        solution_set(sol, c1, r2, d2, s2, true);
+        solution_set(sol, c1, r2, d2, s2, true, l1);
     if (c2 >= 0)
-        solution_set(sol, c2, r1, d1, s1, true);
+        solution_set(sol, c2, r1, d1, s1, true, l2);
 }
 
 static int compute_neighbourhood_swap_room_capacity_cost(
@@ -599,8 +647,12 @@ bool neighbourhood_swap(solution *sol,
                         neighbourhood_swap_result *result) {
     CRDSQT(sol->model)
 
-    assert(solution_get(sol, mv->c1, mv->r1, mv->d1, mv->s1));
-
+#if ASSERT
+    if (!solution_get(sol, mv->c1, mv->r1, mv->d1, mv->s1)) {
+        print("WTF");
+        assert(solution_get(sol, mv->c1, mv->r1, mv->d1, mv->s1));
+    }
+#endif
 //    mv->_c2 = solution_get_helper(sol)->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
     mv->_c2 = mv->c2;
 
@@ -625,7 +677,7 @@ bool neighbourhood_swap(solution *sol,
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE && result->feasible) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_BETTER && result->delta_cost < 0) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER && result->feasible && result->delta_cost < 0)) {
-        do_neighbourhood_swap(sol, mv->c1, mv->r1, mv->d1, mv->s1, mv->_c2, mv->r2, mv->d2, mv->s2);
+        do_neighbourhood_swap(sol, mv->c1, mv->r1, mv->d1, mv->s1, mv->l1, mv->_c2, mv->r2, mv->d2, mv->s2, mv->l2);
         bool was_valid = solution_invalidate_helper(sol);
         if (result)
             result->_helper_was_valid = was_valid;
@@ -639,9 +691,9 @@ void neighbourhood_swap_back(solution *sol,
                              const neighbourhood_swap_move *mv,
                              const neighbourhood_swap_result *res,
                              bool revalidate) {
-    do_neighbourhood_swap(sol, mv->c1, mv->r2, mv->d2, mv->s2, mv->_c2, mv->r1, mv->d1, mv->s1);
-    if (revalidate && res->_helper_was_valid && sol->helper)
-        sol->helper->valid = true;
+    do_neighbourhood_swap(sol, mv->c1, mv->r2, mv->d2, mv->s2, mv->l1, mv->_c2, mv->r1, mv->d1, mv->s1, mv->l2);
+//    if (revalidate && res->_helper_was_valid && sol->helper)
+//        sol->helper->valid = true;
 }
 
 int neighbourhood_swap_move_cost(const neighbourhood_swap_move *move, solution *s) {

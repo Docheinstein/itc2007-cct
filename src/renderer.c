@@ -690,7 +690,9 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
     char *path;
     double *red, *green, *blue;
     const model *model = solution->model;
-    int font_size = config->height / (model->n_slots * model->n_rooms) * 0.6;
+    int font_size =MIN(
+            (double) config->height / (model->n_slots * model->n_rooms) * 0.6,
+            (double) config->width / (model->n_days * 10));
 
     if (!prologue(renderer, config, solution,
                   NULL, "overview",

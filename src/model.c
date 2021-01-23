@@ -20,6 +20,7 @@ void model_init(model *model) {
     model->rooms = NULL;
     model->curriculas = NULL;
     model->unavailability_constraints = NULL;
+    model->n_lectures = 0;
     model->n_teachers = 0;
     model->teachers = NULL;
     model->course_by_id = NULL;
@@ -218,6 +219,9 @@ void model_finalize(model *model) {
     static const int TMP_LEN = 256;
     char tmp[TMP_LEN];
 
+
+    for (int c = 0; c < model->n_courses; c++)
+        model->n_lectures += model->courses[c].n_lectures;
 
     // T
     GHashTable *teachers_set = g_hash_table_new(g_str_hash, g_str_equal);
@@ -432,4 +436,11 @@ bool model_share_curricula(const model *model, int course1_idx, int course2_idx,
 bool model_same_teacher(const model *model, int course1_idx, int course2_idx) {
     return model->courses_same_teacher[INDEX2(course1_idx, model->n_courses,
                                               course2_idx, model->n_courses)];
+}
+
+int model_lectures_count(const model *model) {
+    CRDSQT(model);
+    int count = 0;
+
+    return 0;
 }

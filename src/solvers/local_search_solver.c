@@ -382,6 +382,12 @@ static bool do_local_search_neighbourhood_stabilize_room(solution *sol, int *cos
 }
 
 static void do_local_search_complete(solution *sol) {
+//    for (int i = 0; i < sol->model->n_lectures; i++) {
+//        const lecture *l = &solution_get_helper(sol)->lectures[i];
+//        print("Lecture %d: {c=%s,r=%d,d=%d,s=%d}", i, sol->model->courses[l->c].id, l->r, l->d, l->s);
+//    }
+//    render_solution(sol, "/tmp/overview.png");
+//    exit(0);
     int cost = solution_cost(sol);
     int iter = 0;
     bool improved;
