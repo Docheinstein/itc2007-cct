@@ -324,9 +324,9 @@ static void do_neighbourhood_swap(
     debug2("do_neighbourhood_swap(%d, %d, %d, %d <-> %d, %d, %d, %d)",
           c1, r1, d1, s1, c2, r2, d2, s2);
 //    char tmp[92];
-//    snprintf(tmp, 92, "do_neighbourhood_swap(%d, %d, %d, %d <-> %d, %d, %d, %d)\n",
+//    snprintf(tmp, 92, "swap (%d, %d, %d, %d <-> %d, %d, %d, %d)\n",
 //          c1, r1, d1, s1, c2, r2, d2, s2);
-//    fileappend("/tmp/trend.txt", tmp);
+//    fileappend("/tmp/moves.txt", tmp);
 
     // Update timetable
     if (c1 >= 0)
