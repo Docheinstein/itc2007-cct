@@ -167,17 +167,22 @@ char *strjoin(char **strs, size_t size, const char *joiner) {
     const int joiner_len = (int) strlen(joiner);
     int buflen = 0;
 
-    for (int i = 0; i < size - 1; i++)
-        buflen += (int) strlen(strs[i]) + joiner_len;
-    buflen += (int) strlen(strs[size - 1]);            // last, without joiner
+    if (size) {
+        for (int i = 0; i < size - 1; i++)
+            buflen += (int) strlen(strs[i]) + joiner_len;
+        buflen += (int) strlen(strs[size - 1]);            // last, without joiner
+    }
+
     buflen += 1;                                       // '\0'
 
     char *s = mallocx(buflen, sizeof(char));
     s[0] = '\0';
 
-    for (int i = 0; i < size - 1; i++)
-        strappend(s, buflen, "%s%s", strs[i], joiner);
-    strappend(s, buflen, "%s", strs[size - 1]);       // last, without joiner
+    if (size) {
+        for (int i = 0; i < size - 1; i++)
+            strappend(s, buflen, "%s%s", strs[i], joiner);
+        strappend(s, buflen, "%s", strs[size - 1]);       // last, without joiner
+    }
 
     return s; // must be freed outside
 }

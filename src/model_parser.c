@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "model_parser.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -59,24 +59,24 @@
 #define UNAVAILABILITY_CONSTRAINTS_FIELDS   3
 
 
-void parser_init(parser *parser) {
+void model_parser_init(model_parser *parser) {
     parser->error = NULL;
 }
 
-void parser_destroy(parser *parser) {
+void model_parser_destroy(model_parser *parser) {
     free(parser->error);
 }
 
-void parser_reinit(parser *parser) {
-    parser_init(parser);
-    parser_destroy(parser);
+void model_parser_reinit(model_parser *parser) {
+    model_parser_init(parser);
+    model_parser_destroy(parser);
 }
 
-const char *parser_get_error(parser *parser) {
+const char *model_parser_get_error(model_parser *parser) {
     return parser->error;
 }
 
-bool parser_parse(parser *parser, const char *input, model *model) {
+bool model_parser_parse(model_parser *parser, const char *input, model *model) {
 
 #define ABORT_PARSE(errfmt, ...) do { \
     snprintf(error_reason, MAX_ERROR_LENGTH, errfmt, ##__VA_ARGS__); \
@@ -85,7 +85,7 @@ bool parser_parse(parser *parser, const char *input, model *model) {
 
 #define ABORT_PARSE_INT_FAIL() ABORT_PARSE("integer conversion failed")
 
-    parser_reinit(parser);
+    model_parser_reinit(parser);
 
     static const int MAX_ERROR_LENGTH = 256;
     static const int MAX_LINE_LENGTH = 256;

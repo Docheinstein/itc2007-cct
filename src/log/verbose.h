@@ -3,11 +3,12 @@
 
 #include <stdbool.h>
 
-bool is_verbose();
-void set_verbose(bool yes);
+int get_verbosity();
+void set_verbosity(int level);
 
-int verbosef(const char *fmt, ...);
+int verbose_internal(int level, const char *fmt, ...);
 
-#define verbose(format, ...) verbosef(format "\n", ##__VA_ARGS__)
+#define verbose(format, ...) verbose_internal(1, format "\n", ##__VA_ARGS__)
+#define verbose2(format, ...) verbose_internal(2, format "\n", ##__VA_ARGS__)
 
 #endif // VERBOSE_H"

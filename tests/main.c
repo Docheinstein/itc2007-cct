@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <solution.h>
-#include <parser.h>
+#include <model_parser.h>
 #include "munit/munit.h"
 #include <log/verbose.h>
 #include <utils/str_utils.h>
@@ -9,7 +9,7 @@
 #include <utils/array_utils.h>
 #include <log/debug.h>
 #include <utils/random_utils.h>
-#include <neighbourhoods/neighbourhood_swap.h>
+#include <heuristics/neighbourhoods/neighbourhood_swap.h>
 #include <feasible_solution_finder.h>
 #include <renderer.h>
 #include "utils/os_utils.h"
@@ -289,9 +289,9 @@ MUNIT_TEST(test_parser) {
     model m;
     model_init(&m);
 
-    parser parser;
-    parser_init(&parser);
-    munit_assert_true(parser_parse(&parser, "datasets/toy.ctt", &m));
+    model_parser parser;
+    model_parser_init(&parser);
+    munit_assert_true(model_parser_parse(&parser, "datasets/toy.ctt", &m));
 
     munit_assert_int(m.n_courses, ==, 4);
     munit_assert_int(m.n_rooms, ==, 2);
@@ -320,10 +320,10 @@ MUNIT_TEST(test_solution_parser) {
     model m;
     model_init(&m);
 
-    parser parser;
-    parser_init(&parser);
+    model_parser parser;
+    model_parser_init(&parser);
 
-    munit_assert_true(parser_parse(&parser, "datasets/toy.ctt", &m));
+    munit_assert_true(model_parser_parse(&parser, "datasets/toy.ctt", &m));
 
     solution sol;
     solution_init(&sol, &m);
@@ -333,7 +333,7 @@ MUNIT_TEST(test_solution_parser) {
 
     munit_assert_true(solution_parser_parse(&sol_parser, "tests/solutions/toy.ctt.sol", &sol));
 
-    parser_destroy(&parser);
+    model_parser_destroy(&parser);
     solution_parser_destroy(&sol_parser);
     model_destroy(&m);
     solution_destroy(&sol);
@@ -345,10 +345,10 @@ MUNIT_TEST(test_solution_to_string) {
     model m;
     model_init(&m);
 
-    parser parser;
-    parser_init(&parser);
+    model_parser parser;
+    model_parser_init(&parser);
 
-    munit_assert_true(parser_parse(&parser, "datasets/toy.ctt", &m));
+    munit_assert_true(model_parser_parse(&parser, "datasets/toy.ctt", &m));
 
     solution sol;
     solution_init(&sol, &m);
@@ -366,7 +366,7 @@ MUNIT_TEST(test_solution_to_string) {
     free(output);
     free(expected_solution);
 
-    parser_destroy(&parser);
+    model_parser_destroy(&parser);
     solution_parser_destroy(&sol_parser);
     model_destroy(&m);
     solution_destroy(&sol);
@@ -381,10 +381,10 @@ static MunitResult test_solution(const char *dataset_file, const char *solution_
     model m;
     model_init(&m);
 
-    parser parser;
-    parser_init(&parser);
+    model_parser parser;
+    model_parser_init(&parser);
 
-    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+    munit_assert_true(model_parser_parse(&parser, dataset_file, &m));
 
     solution sol;
     solution_init(&sol, &m);
@@ -404,7 +404,7 @@ static MunitResult test_solution(const char *dataset_file, const char *solution_
     munit_assert_int(s3, ==, solution_curriculum_compactness_cost(&sol));
     munit_assert_int(s4, ==, solution_room_stability_cost(&sol));
 
-    parser_destroy(&parser);
+    model_parser_destroy(&parser);
     solution_parser_destroy(&sol_parser);
     model_destroy(&m);
     solution_destroy(&sol);
@@ -491,9 +491,9 @@ MUNIT_TEST(test_index_rindex) {
 static void find_feasible_solution(model *m, solution *s, const char * dataset_file) {
     model_init(m);
 
-    parser parser;
-    parser_init(&parser);
-    munit_assert_true(parser_parse(&parser, dataset_file, m));
+    model_parser parser;
+    model_parser_init(&parser);
+    munit_assert_true(model_parser_parse(&parser, dataset_file, m));
 
     feasible_solution_finder finder;
     feasible_solution_finder_init(&finder);
@@ -529,9 +529,9 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
     model m;
     model_init(&m);
 
-    parser parser;
-    parser_init(&parser);
-    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+    model_parser parser;
+    model_parser_init(&parser);
+    munit_assert_true(model_parser_parse(&parser, dataset_file, &m));
 
     feasible_solution_finder finder;
     feasible_solution_finder_init(&finder);
@@ -613,9 +613,9 @@ static MunitResult test_neighbourhood_iter_next(const char *dataset_file) {
     model m;
     model_init(&m);
 
-    parser parser;
-    parser_init(&parser);
-    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+    model_parser parser;
+    model_parser_init(&parser);
+    munit_assert_true(model_parser_parse(&parser, dataset_file, &m));
 
     feasible_solution_finder finder;
     feasible_solution_finder_init(&finder);
@@ -655,9 +655,9 @@ static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_bette
     model m;
     model_init(&m);
 
-    parser parser;
-    parser_init(&parser);
-    munit_assert_true(parser_parse(&parser, dataset_file, &m));
+    model_parser parser;
+    model_parser_init(&parser);
+    munit_assert_true(model_parser_parse(&parser, dataset_file, &m));
 
     feasible_solution_finder finder;
     feasible_solution_finder_init(&finder);
@@ -854,8 +854,10 @@ static MunitTest tests[] = {
 };
 
 static MunitTest test_single[] = {
+    { "test_strsplit", test_strsplit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+
 //    { "test_neighbourhood_swap_helper_toytoy", test_neighbourhood_swap_helper_toytoy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    { "test_neighbourhood_swap_helper_comp01", test_neighbourhood_swap_helper_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+//    { "test_neighbourhood_swap_helper_comp01", test_neighbourhood_swap_helper_comp01, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     MUNIT_TESTS_END
 };
 

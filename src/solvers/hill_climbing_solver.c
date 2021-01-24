@@ -4,7 +4,7 @@
 #include <utils/str_utils.h>
 #include <utils/time_utils.h>
 #include <utils/io_utils.h>
-#include <neighbourhoods/neighbourhood_stabilize_room.h>
+#include <heuristics/neighbourhoods/neighbourhood_stabilize_room.h>
 #include <utils/assert_utils.h>
 #include <utils/mem_utils.h>
 #include <utils/random_utils.h>
@@ -12,7 +12,7 @@
 #include <utils/math_utils.h>
 #include <utils/array_utils.h>
 #include <utils/def_utils.h>
-#include "neighbourhoods/neighbourhood_swap.h"
+#include "heuristics/neighbourhoods/neighbourhood_swap.h"
 #include "feasible_solution_finder.h"
 #include "renderer.h"
 
@@ -652,19 +652,33 @@ static void hill_climbing_simulated_annealing_phase(hill_climbing_solver_state *
         T *= CR;
     }
 }
+//
+//static void hill_climbing_simulated_annealing(hill_climbing_solver_state *state, int reheat_phases) {
+//    const double REHEAT_COEFF = 1.2;
+//    const double INITIAL_T = 2;
+//
+//    for (int phase = 0; phase < reheat_phases; phase++) {
+//        double T = INITIAL_T * pow(REHEAT_COEFF, phase);
+//        debug("[SA phase %d | Temperature %g | p(+1)=%g%%, p(+10)=%g%% p(+100)=%g%%] "
+//              "Current=%d, Best=%d", phase, T,
+//              SA_ACCEPTANCE(1, T) * 100, SA_ACCEPTANCE(10, T) * 100, SA_ACCEPTANCE(100, T) * 100,
+//              state->current_cost, state->best_cost);
+//        hill_climbing_simulated_annealing_phase(state, T);
+//    }
+//}
 
-static void hill_climbing_simulated_annealing(hill_climbing_solver_state *state, int reheat_phases) {
-    const double REHEAT_COEFF = 1.2;
-    const double INITIAL_T = 2;
-
-    for (int phase = 0; phase < reheat_phases; phase++) {
-        double T = INITIAL_T * pow(REHEAT_COEFF, phase);
-        debug("[SA phase %d | Temperature %g | p(+1)=%g%%, p(+10)=%g%% p(+100)=%g%%] "
-              "Current=%d, Best=%d", phase, T,
-              SA_ACCEPTANCE(1, T) * 100, SA_ACCEPTANCE(10, T) * 100, SA_ACCEPTANCE(100, T) * 100,
-              state->current_cost, state->best_cost);
-        hill_climbing_simulated_annealing_phase(state, T);
-    }
+static void hill_climbing_simulated_annealing(hill_climbing_solver_state *state, double T) {
+//    const double REHEAT_COEFF = 1.2;
+//    const double INITIAL_T = 2;
+//
+//    for (int phase = 0; phase < reheat_phases; phase++) {
+//        double T = INITIAL_T * pow(REHEAT_COEFF, phase);
+    debug("[SA phase | Temperature %g | p(+1)=%g%%, p(+10)=%g%% p(+100)=%g%%] "
+          "Current=%d, Best=%d", T,
+          SA_ACCEPTANCE(1, T) * 100, SA_ACCEPTANCE(10, T) * 100, SA_ACCEPTANCE(100, T) * 100,
+          state->current_cost, state->best_cost);
+    hill_climbing_simulated_annealing_phase(state, T);
+//    }
 }
 
 void hill_climbing_random_phase(hill_climbing_solver_state *state,
@@ -855,6 +869,11 @@ bool hill_climbing_solver_solve(hill_climbing_solver *solver,
 
     state.cycle = 0;
 
+    int non_increasing_iters = 0;
+    int non_best_iters = 0;
+    int last_restart_iter = INT_MAX;
+    double reheat_coeff = 1.2;
+
     while (true) {
         if (time_limit > 0 && !(ms() < time_limit)) {
             verbose("Time limit reached (%ds), stopping here", config->time_limit);
@@ -864,24 +883,63 @@ bool hill_climbing_solver_solve(hill_climbing_solver *solver,
 
         verbose("[%d] -------- MAJOR CYCLE BEGIN --------", state.cycle);
         verbose("[%d] Cost = %d                   // best = %d",
-              state.cycle, state.current_cost, state.best_cost);
+                state.cycle, state.current_cost, state.best_cost);
+        verbose("[%d] Non increasing iters = %d",
+                state.cycle, non_increasing_iters);
+        verbose("[%d] Non best iters = %d",
+                state.cycle, non_best_iters);
+        verbose("[%d] Distance from best = %g%%",
+                state.cycle, (double) 100 * state.current_cost / state.best_cost);
+        verbose("[%d] SA Reheat = %g",
+                state.cycle, reheat_coeff);
 
+        int prev_best_cost = state.best_cost;
+        int prev_current_cost = state.current_cost;
+// Phase PHASE_LS
+#define PHASE_LS 0
+#if PHASE_LS
+            debug("[%d] Phase PHASE_LS", state.cycle);
+            hill_climbing_local_search_phase(&state,
+                                             neighbourhood_swap_accept_less_cost,
+                                             NULL);
+            debug("[%d] Cost PHASE_LS END = %d      // best = %d",
+                  state.cycle, state.current_cost, state.best_cost);
+#endif
 
 #define PHASE_HC_SWAP_MOVE 0
 #if PHASE_HC_SWAP_MOVE
-        verbose("[%d] PHASE PHASE_HC_SWAP_MOVE", state.cycle);
+        verbose("[%d] HILL CLIMBING:            cost = %d // best = %d",
+                state.cycle, state.current_cost, state.best_cost);
         hill_climbing_random_phase(&state,
-                            hill_climbing_try_random_step, INT_MAX, 120000,
+                            hill_climbing_try_random_step, INT_MAX, 200000,
                             neighbourhood_swap_accept_less_or_equal_cost, NULL);
-        verbose("[%d] PHASE PHASE_HC_SWAP_MOVE END, cost = %d      // best = %d",
-              state.cycle, state.current_cost, state.best_cost);
+        verbose("[%d] HILL CLIMBING END:        cost = %d // best = %d",
+                state.cycle, state.current_cost, state.best_cost);
 #endif
 
-        // Phase PHASE_TS
+// Phase PHASE_STAB_ROOM
+#define PHASE_STAB_ROOM 0
+#if PHASE_STAB_ROOM
+            debug("[%d] Phase PHASE_STAB_ROOM: hill_climbing_neighbourhood_stabilize_room_phase", state.cycle);
+            hill_climbing_neighbourhood_stabilize_room_phase(&state);
+            debug("[%d] Cost after phase [hill_climbing_neighbourhood_stabilize_room_phase] = %d      // best = %d",
+                  state.cycle, state.current_cost, state.best_cost);
+#endif
+
+// Phase PHASE_SA
+#define PHASE_SA 1
+#if PHASE_SA
+        verbose("[%d] SIMULATED ANNEALING:      cost = %d // best = %d",
+                state.cycle, state.current_cost, state.best_cost);
+        hill_climbing_simulated_annealing(&state, 1.8 * pow(reheat_coeff, non_increasing_iters));
+        verbose("[%d] SIMULATED ANNEALING END:  cost = %d // best = %d",
+                state.cycle, state.current_cost, state.best_cost);
+#endif
+// Phase PHASE_TS
 #define PHASE_TS 0
 #if PHASE_TS
-        const double TT_MAX = 140;
-        const double TT_MIN = 32;
+        const double TT_MAX = 14;
+        const double TT_MIN = 5;
         int tenure = (int) map(state.best_cost, initial_cost, TT_MIN, TT_MAX, state.current_cost);
         verbose("[%d] PHASE_TS [tenure=%d]", state.cycle, tenure);
         tabu_list_init(&state.tabu, state.current_solution->model, tenure);
@@ -892,38 +950,45 @@ bool hill_climbing_solver_solve(hill_climbing_solver *solver,
               state.cycle, state.current_cost, state.best_cost);
 #endif
 
-        // Phase PHASE_SA
-#define PHASE_SA 1
-#if PHASE_SA
-        verbose("[%d] PHASE_SA", state.cycle);
-        hill_climbing_simulated_annealing(&state, 4);
-        verbose("[%d] PHASE_SA END, cost = %d      // best = %d",
-              state.cycle, state.current_cost, state.best_cost);
-#endif
 
-        // Phase PHASE_STAB_ROOM
-#define PHASE_STAB_ROOM 0
-#if PHASE_STAB_ROOM
-            debug("[%d] Phase PHASE_STAB_ROOM: hill_climbing_neighbourhood_stabilize_room_phase", state.cycle);
-            hill_climbing_neighbourhood_stabilize_room_phase(&state);
-            debug("[%d] Cost after phase [hill_climbing_neighbourhood_stabilize_room_phase] = %d      // best = %d",
-                  state.cycle, state.current_cost, state.best_cost);
-#endif
+        if (state.current_cost < prev_current_cost) {
+            non_increasing_iters = 0;
+        }
+        else {
+            non_increasing_iters++;
+        }
+
+        if (state.best_cost < prev_best_cost) {
+            non_best_iters = 0;
+            reheat_coeff = 1.5;
+        } else {
+            const int RESTART_AFTER = 15;
+            if (non_best_iters < RESTART_AFTER) {
+                non_best_iters++;
+            } else {
+                verbose("[%d] !!! RESTART FROM BEST (%d)",
+                        state.cycle, state.best_cost);
+                non_best_iters = 0;
+                non_increasing_iters = 0;
+                solution_copy(state.current_solution, state.best_solution);
+                state.current_cost = state.best_cost;
+                reheat_coeff *= 1.5;
+            }
+        }
 
         // Phase 2
 #define PHASE_HC_RND_MOVE 1
 #if PHASE_HC_RND_MOVE
         neighbourhood_swap_acceptor acceptor = random_acceptor_bounded();
 
-        static const int UNCHECKED_MOVES_UB = 30;
+        static const int UNCHECKED_MOVES_UB = 5;
         static const int UNCHECKED_MOVES_LB = 5;
 
         double max_allowed_cost_factor =
                 map((double) starting_time, (double) time_limit, 1.5, 1.1, (double) ms());
         int max_allowed_cost = (int) (state.current_cost * max_allowed_cost_factor);
 
-        int n_moves = (int) map((double) starting_time, (double) time_limit, UNCHECKED_MOVES_UB, UNCHECKED_MOVES_LB,
-                                (double) ms());
+        int n_moves = 10;
         verbose("[%d] PHASE_HC_RND_MOVE - %s move (n_moves=%d, max_allowed_cost=%d)", state.cycle,
               (acceptor == neighbourhood_swap_accept_less_or_equal_rc_cost_bounded ? "RoomCapacity" :
                (acceptor == neighbourhood_swap_accept_less_or_equal_mwd_cost_bounded ? "MinWorkingDays" :

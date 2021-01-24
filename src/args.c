@@ -8,29 +8,31 @@
 #include <stdbool.h>
 #include "config.h"
 
-void args_to_string(const args *args, char *buffer, size_t buflen) {
-    snprintf(buffer, buflen,
+char *args_to_string(const args *args) {
+    return strmake(
         "input = %s\n"
         "output = %s\n"
-        "verbose = %s\n"
+        "verbosity = %d\n"
         "method = %s\n"
         "draw_directory = %s\n"
         "draw_overview_file = %s\n"
         "force_draw = %s\n"
         "write_lp = %s\n"
         "time_limit = %d\n"
+        "num_threads = %d\n"
         "seed = %u\n"
         "assignments_difficulty_ranking_randomness = %g\n"
         "multistart = %d",
              args->input,
              args->output,
-             BOOL_TO_STR(args->verbose),
+             args->verbosity,
              resolution_method_to_string(args->method),
              args->draw_directory,
              args->draw_overview_file,
              BOOL_TO_STR(args->force_draw),
              args->write_lp_file,
              args->time_limit,
+             args->num_threads,
              args->seed,
              args->assignments_difficulty_ranking_randomness,
              args->multistart
@@ -40,7 +42,7 @@ void args_to_string(const args *args, char *buffer, size_t buflen) {
 void args_init(args *args) {
     args->input = NULL;
     args->output = NULL;
-    args->verbose = false;
+    args->verbosity = ARG_INT_NONE;
     args->method = RESOLUTION_METHOD_DEFAULT;
     args->draw_directory = NULL;
     args->draw_overview_file = NULL;
@@ -48,6 +50,7 @@ void args_init(args *args) {
     args->write_lp_file = NULL;
     args->solution_input_file = NULL;
     args->time_limit = ARG_INT_NONE;
+    args->num_threads = ARG_INT_NONE;
     args->seed = ARG_INT_NONE;
     args->assignments_difficulty_ranking_randomness = ARG_INT_NONE;
     args->multistart = ARG_INT_NONE;
@@ -65,6 +68,7 @@ typedef enum itc2007_option {
     OPTION_VERBOSE = 'v',
     OPTION_METHOD = 'm',
     OPTION_TIME_LIMIT = 't',
+    OPTION_THREADS = 'j',
     OPTION_DRAW_DIRECTORY = 'D',
     OPTION_DRAW_OVERVIEW_FILE = 'd',
     OPTION_FORCE_DRAW = 'f',
@@ -72,6 +76,7 @@ typedef enum itc2007_option {
     OPTION_SEED = 's',
     OPTION_ASSIGNMENTS_DIFFICULTY_RANKING_RANDOMNESS = 'r',
     OPTION_MULTISTART = 'n',
+    OPTION_CONFIG = 'c',
     OPTION_WRITE_LP = 0x100,
 } itc2007_option;
 
@@ -89,6 +94,8 @@ static struct argp_option options[] = {
         "Draw even if a feasible solution can't be provided" },
   { "time", OPTION_TIME_LIMIT, "SECONDS", 0,
         "Time limit in seconds for solve the model" },
+  { "threads", OPTION_THREADS, "N", 0,
+        "Number of threads to spawn" },
   { "solution", OPTION_SOLUTION, "SOL_FILE", 0,
         "Load the solution file SOL_FILE instead of computing it"
         "(useful for see the cost/violations or with -d or -D for render the solution)" },
@@ -105,6 +112,8 @@ static struct argp_option options[] = {
   { "multistart", OPTION_MULTISTART, "N", 0,
         "Number of run for heuristics methods; "
         "the final solution will be the best among the runs" },
+  { "config", OPTION_CONFIG, "CONF_FILE", 0,
+        "Load heuristic solver configuration from file" },
   { NULL }
 };
 
@@ -143,7 +152,7 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
 
     switch (key) {
     case OPTION_VERBOSE:
-        args->verbose = true;
+        args->verbosity = args->verbosity == ARG_INT_NONE ? 1 : (args->verbosity + 1);
         break;
     case OPTION_DRAW_DIRECTORY:
         args->draw_directory = arg;
@@ -162,6 +171,9 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         break;
     case OPTION_TIME_LIMIT:
         args->time_limit = parse_int(arg);
+        break;
+    case OPTION_THREADS:
+        args->num_threads = parse_int(arg);
         break;
     case OPTION_METHOD:
         if (streq(arg, "exact"))
@@ -192,6 +204,9 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         break;
     case OPTION_MULTISTART:
         args->multistart = parse_int(arg);
+        break;
+    case OPTION_CONFIG:
+        args->config = arg;
         break;
     case ARGP_KEY_ARG:
         switch (state->arg_num) {

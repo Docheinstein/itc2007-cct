@@ -4,14 +4,14 @@
 #include <utils/str_utils.h>
 #include <utils/time_utils.h>
 #include <utils/io_utils.h>
-#include <neighbourhoods/neighbourhood_stabilize_room.h>
+#include <heuristics/neighbourhoods/neighbourhood_stabilize_room.h>
 #include <utils/assert_utils.h>
 #include <utils/mem_utils.h>
 #include <utils/random_utils.h>
 #include <utils/array_utils.h>
 #include <math.h>
 #include <utils/math_utils.h>
-#include "neighbourhoods/neighbourhood_swap.h"
+#include "heuristics/neighbourhoods/neighbourhood_swap.h"
 #include "feasible_solution_finder.h"
 #include "renderer.h"
 

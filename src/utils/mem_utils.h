@@ -4,8 +4,10 @@
 #include <stddef.h>
 
 #define freearray(ptr, nmemb) do { \
-    for (int i = 0; i < (nmemb); i++) \
+    if (ptr) {                     \
+        for (int i = 0; i < (nmemb); i++) \
         free((ptr)[i]); \
+    } \
     free(ptr); \
 } while(0)
 

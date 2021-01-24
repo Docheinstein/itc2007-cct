@@ -15,4 +15,20 @@ int filewrite(const char *filename, bool append, const char *data);
 int fileappend(const char *filename, const char *data);
 int fileclear(const char *filename);
 
+
+typedef bool (*parse_line_callback)(
+        const char *    /* in: line */,
+        void *    /* in: arg */,
+        char *    /* out: error_reason */,
+        int       /* in: error_reason_length */);
+
+typedef struct fileparse_options {
+    char comment_prefix;
+} fileparse_options;
+
+char * fileparse(const char *input_file,
+                 parse_line_callback callback, void *callback_arg,
+                 fileparse_options *options);
+
+
 #endif // IO_UTILS_H

@@ -9,7 +9,7 @@
 #include <utils/io_utils.h>
 
 void feasible_solution_finder_config_init(feasible_solution_finder_config *config) {
-    config->difficulty_ranking_randomness = 0; // deterministic
+    config->difficulty_ranking_randomness = 0.66;
 }
 
 void feasible_solution_finder_config_destroy(feasible_solution_finder_config *config) {

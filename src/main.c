@@ -81,13 +81,13 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <utils/str_utils.h>
 #include "args.h"
 #include "log/verbose.h"
-#include "parser.h"
+#include "model_parser.h"
 #include "solution.h"
 #include "utils/array_utils.h"
 #include "renderer.h"
 #include "feasible_solution_finder.h"
 #include "log/debug.h"
-#include "neighbourhoods/neighbourhood_swap.h"
+#include "heuristics/neighbourhoods/neighbourhood_swap.h"
 #include "solvers/local_search_solver.h"
 #include "solvers/tabu_search_solver.h"
 #include <sys/time.h>   /* for setitimer */
@@ -98,15 +98,20 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <solvers/iterated_local_search_solver.h>
 #include <solvers/simulated_annealing_solver.h>
 #include <solvers/hybrid_solver.h>
+#include "heuristics/heuristic_solver.h"
 
 #include "utils/assert_utils.h"
+#include <omp.h>
+#include <heuristics/methods/hill_climbing.h>
+#include <config/config_parser.h>
+#include "config/config.h"
 
 int main (int argc, char **argv) {
     args args;
     args_init(&args);
     args_parse(&args, argc, argv);
 
-    set_verbose(args.verbose);
+    set_verbosity(args.verbosity);
 
     if (args.seed == ARG_INT_NONE) {
         struct timespec ts;
@@ -117,12 +122,14 @@ int main (int argc, char **argv) {
     if (args.assignments_difficulty_ranking_randomness == ARG_INT_NONE)
         args.assignments_difficulty_ranking_randomness = 0.66;
 
-    char buffer[1024];
-    args_to_string(&args, buffer, LENGTH(buffer));
+    char *args_str = args_to_string(&args);
     verbose("====== ARGUMENTS ======\n"
             "%s\n"
             "-----------------------",
-            buffer);
+            args_str);
+    free(args_str);
+
+    omp_set_num_threads(args.num_threads != ARG_INT_NONE ? args.num_threads : 1);
 
     verbose("Using RNG seed: %u", args.seed);
     rand_set_seed(args.seed);
@@ -130,14 +137,14 @@ int main (int argc, char **argv) {
     model model;
     model_init(&model);
 
-    parser parser;
-    parser_init(&parser);
-    if (!parser_parse(&parser, args.input, &model)) {
-        eprint("ERROR: failed to parse model file '%s' (%s)", args.input, parser_get_error(&parser));
+    model_parser parser;
+    model_parser_init(&parser);
+    if (!model_parser_parse(&parser, args.input, &model)) {
+        eprint("ERROR: failed to parse model file '%s' (%s)", args.input, model_parser_get_error(&parser));
         exit(EXIT_FAILURE);
     }
 
-    parser_destroy(&parser);
+    model_parser_destroy(&parser);
 
     solution sol;
     solution_init(&sol, &model);
@@ -148,6 +155,63 @@ int main (int argc, char **argv) {
         // Load the solution instead of computing it
         solution_loaded = read_solution(&sol, args.solution_input_file);
     }
+
+    config cfg;
+    config_init(&cfg);
+
+    if (args.config) {
+        config_parser cfg_parser;
+        config_parser_init(&cfg_parser);
+
+        if (!config_parser_parse(&cfg_parser, args.config, &cfg)) {
+            eprint("ERROR: failed to parse config file '%s' (%s)",
+                   args.input, config_parser_get_error(&cfg_parser));
+            exit(EXIT_FAILURE);
+        }
+        config_parser_destroy(&cfg_parser);
+    }
+
+    char *cfg_str = config_to_string(&cfg);
+    verbose("====== CONFIG ======\n"
+            "%s\n"
+            "-----------------------",
+            cfg_str);
+    free(cfg_str);
+
+    heuristic_solver_config config;
+    heuristic_solver_config_init(&config);
+
+    config.time_limit = args.time_limit;
+    config.starting_solution = solution_loaded ? &sol : NULL;
+
+    for (int i = 0; i < cfg.n_methods; i++) {
+        resolution_method method = cfg.methods[i];
+        const char *method_name = resolution_method_to_string(method);
+
+        if (method == RESOLUTION_METHOD_LOCAL_SEARCH) {
+        }
+        else if (method == RESOLUTION_METHOD_TABU_SEARCH) {
+        }
+        else if (method == RESOLUTION_METHOD_HILL_CLIMBING) {
+            hill_climbing_params hc_params = {
+                .max_idle = cfg.hc_idle
+            };
+            heuristic_solver_config_add_method(&config, hill_climbing,
+                                               &hc_params, method_name);
+        }
+        else if (method == RESOLUTION_METHOD_SIMULATED_ANNEALING) {
+        }
+    }
+
+    heuristic_solver solver;
+    heuristic_solver_init(&solver);
+
+    solution_loaded = heuristic_solver_solve(&solver, &config, &sol);
+    if (!solution_loaded)
+        eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
+    heuristic_solver_destroy(&solver);
+    heuristic_solver_config_destroy(&config);
+#if 0
 
     // Standard case, compute the solution
     if (args.method == RESOLUTION_METHOD_EXACT) {
@@ -186,22 +250,39 @@ int main (int argc, char **argv) {
         local_search_solver_config_destroy(&config);
         local_search_solver_destroy(&solver);
     } else if (args.method == RESOLUTION_METHOD_HILL_CLIMBING) {
-        hill_climbing_solver_config config;
-        hill_climbing_solver_config_init(&config);
-        config.idle_limit = args.multistart;
-        config.time_limit = args.time_limit;
-        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-        config.starting_solution = solution_loaded ? &sol : NULL;
+        #pragma omp parallel default(none) shared(model, args, stderr, sol, best_cost, solution_loaded)
+        {
+            solution s;
+            solution_init(&s, &model);
 
-        hill_climbing_solver solver;
-        hill_climbing_solver_init(&solver);
+            hill_climbing_solver_config config;
+            hill_climbing_solver_config_init(&config);
+//            config.idle_limit = args.multistart;
+            config.time_limit = args.time_limit;
+            config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
+//            config.starting_solution = solution_loaded ? &s : NULL;
 
-        solution_loaded = hill_climbing_solver_solve(&solver, &config, &sol);
-        if (!solution_loaded)
-            eprint("ERROR: failed to solve model (%s)", hill_climbing_solver_get_error(&solver));
+            hill_climbing_solver solver;
+            hill_climbing_solver_init(&solver);
 
-        hill_climbing_solver_config_destroy(&config);
-        hill_climbing_solver_destroy(&solver);
+            bool ok = hill_climbing_solver_solve(&solver, &config, &s);
+            if (!ok)
+                eprint("ERROR: failed to solve model (%s)", hill_climbing_solver_get_error(&solver));
+
+            hill_climbing_solver_config_destroy(&config);
+            hill_climbing_solver_destroy(&solver);
+
+            verbose("Thread %d reached cost %d", omp_get_thread_num(), solution_cost(&s));
+            #pragma omp critical
+            {
+                solution_loaded = solution_loaded || ok;
+                int cost = solution_cost(&s);
+                if (cost < best_cost) {
+                    solution_copy(&sol, &s);
+                    best_cost = cost;
+                }
+            }
+        }
     } else if (args.method == RESOLUTION_METHOD_ITERATED_LOCAL_SEARCH) {
         iterated_local_search_solver_config config;
         iterated_local_search_solver_config_init(&config);
@@ -270,7 +351,7 @@ int main (int argc, char **argv) {
         hybrid_solver_config_destroy(&config);
         hybrid_solver_destroy(&solver);
     }
-
+#endif
 
     if (solution_loaded || args.force_draw) {
         char *sol_str = solution_to_string(&sol);
@@ -295,6 +376,7 @@ int main (int argc, char **argv) {
 
     solution_destroy(&sol);
     model_destroy(&model);
+    config_destroy(&cfg);
     args_destroy(&args);
 
     debug("(seed was %d)", rand_get_seed());

@@ -2,18 +2,18 @@
 #include <stdio.h>
 #include "verbose.h"
 
-static int is_verbose_;
+static int verbosity;
 
-bool is_verbose() {
-    return is_verbose_;
+int get_verbosity() {
+    return verbosity;
 }
 
-void set_verbose(bool yes) {
-    is_verbose_ = yes;
+void set_verbosity(int level) {
+    verbosity = level;
 }
 
-int verbosef(const char *fmt, ...) {
-    if (!is_verbose_)
+int verbose_internal(int level, const char *fmt, ...) {
+    if (level > verbosity)
         return 0;
 
     va_list args;

@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.6)
 project(itc2007-cct C CXX)
 
 set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
 
 message("CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 
