@@ -1,10 +1,11 @@
 #ifndef ARGS_H
 #define ARGS_H
 
+#include <glib.h>
+#include <resolution_method.h>
 #include <stdbool.h>
-#include "resolution_method.h"
 
-#define ARG_INT_NONE (-1)
+static const int ARG_INT_NONE = -1;
 
 typedef struct args {
     char *input;
@@ -22,12 +23,12 @@ typedef struct args {
     double assignments_difficulty_ranking_randomness;
     int multistart;
     char *config;
+    GArray *options;
 } args;
 
-void args_parse(args *args, int argc, char **argv);
-char *args_to_string(const args *args);
 void args_init(args *args);
 void args_destroy(args *args);
 
+char *args_to_string(const args *args);
 
 #endif // ARGS_H

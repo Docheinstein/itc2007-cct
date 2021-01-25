@@ -223,6 +223,7 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
 void feasible_solution_finder_find(feasible_solution_finder *finder,
                                    feasible_solution_finder_config *config,
                                    solution *sol) {
+    // TODO time limit
     debug("feasible_solution_finder_find");
 
     while (!feasible_solution_finder_try_find(finder, config, sol)) {

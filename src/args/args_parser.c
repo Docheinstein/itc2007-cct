@@ -1,64 +1,14 @@
 #include <stdio.h>
 #include <argp.h>
 #include <stdlib.h>
-#include "args.h"
+#include "args_parser.h"
 #include "utils/str_utils.h"
 #include "utils/io_utils.h"
 #include "utils/def_utils.h"
 #include <stdbool.h>
+#include <log/debug.h>
 #include "config.h"
 
-char *args_to_string(const args *args) {
-    return strmake(
-        "input = %s\n"
-        "output = %s\n"
-        "verbosity = %d\n"
-        "method = %s\n"
-        "draw_directory = %s\n"
-        "draw_overview_file = %s\n"
-        "force_draw = %s\n"
-        "write_lp = %s\n"
-        "time_limit = %d\n"
-        "num_threads = %d\n"
-        "seed = %u\n"
-        "assignments_difficulty_ranking_randomness = %g\n"
-        "multistart = %d",
-             args->input,
-             args->output,
-             args->verbosity,
-             resolution_method_to_string(args->method),
-             args->draw_directory,
-             args->draw_overview_file,
-             BOOL_TO_STR(args->force_draw),
-             args->write_lp_file,
-             args->time_limit,
-             args->num_threads,
-             args->seed,
-             args->assignments_difficulty_ranking_randomness,
-             args->multistart
-    );
-}
-
-void args_init(args *args) {
-    args->input = NULL;
-    args->output = NULL;
-    args->verbosity = ARG_INT_NONE;
-    args->method = RESOLUTION_METHOD_DEFAULT;
-    args->draw_directory = NULL;
-    args->draw_overview_file = NULL;
-    args->force_draw = false;
-    args->write_lp_file = NULL;
-    args->solution_input_file = NULL;
-    args->time_limit = ARG_INT_NONE;
-    args->num_threads = ARG_INT_NONE;
-    args->seed = ARG_INT_NONE;
-    args->assignments_difficulty_ranking_randomness = ARG_INT_NONE;
-    args->multistart = ARG_INT_NONE;
-}
-
-void args_destroy(args *args) {
-
-}
 
 const char *argp_program_version = "0.1";
 static const char *doc = "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007";
@@ -77,6 +27,7 @@ typedef enum itc2007_option {
     OPTION_ASSIGNMENTS_DIFFICULTY_RANKING_RANDOMNESS = 'r',
     OPTION_MULTISTART = 'n',
     OPTION_CONFIG = 'c',
+    OPTION_OPTION = 'o',
     OPTION_WRITE_LP = 0x100,
 } itc2007_option;
 
@@ -114,41 +65,46 @@ static struct argp_option options[] = {
         "the final solution will be the best among the runs" },
   { "config", OPTION_CONFIG, "CONF_FILE", 0,
         "Load heuristic solver configuration from file" },
+  { "option", OPTION_OPTION, "KEY=VALUE", 0,
+        "Set an option" },
   { NULL }
 };
 
-static int parse_int(const char *str) {
+static bool parse_int(args_parser *parser, const char *str, int *var) {
     bool ok;
-    int val = strtoint(str, &ok);
-    if (!ok) {
-        eprint("ERROR: integer conversion failed for parameter '%s'", str);
-        exit(EXIT_FAILURE);
-    }
-    return val;
+    *var = strtoint(str, &ok);
+    if (!ok)
+        parser->error = strmake("integer conversion failed for parameter '%s'", str);
+    return ok;
 }
 
-static uint parse_uint(const char *str) {
+static bool parse_uint(args_parser *parser, const char *str, uint *var) {
     bool ok;
-    uint val = strtouint(str, &ok);
+    *var = strtouint(str, &ok);
     if (!ok) {
-        eprint("ERROR: integer conversion failed for parameter '%s'", str);
-        exit(EXIT_FAILURE);
+        parser->error = strmake("integer conversion failed for parameter '%s'", str);
     }
-    return val;
+    return ok;
 }
 
-static double parse_double(const char *str) {
+static bool parse_double(args_parser *parser, const char *str, double *var) {
     bool ok;
-    double val = strtodouble(str, &ok);
+    *var = strtodouble(str, &ok);
     if (!ok) {
-        eprint("ERROR: integer conversion failed for parameter '%s'", str);
-        exit(EXIT_FAILURE);
+        parser->error = strmake("ERROR: double conversion failed for parameter '%s'", str);
     }
-    return val;
+    return ok;
 }
+
+typedef struct argp_input_arg {
+    args_parser *parser;
+    args *args;
+} argp_input_arg;
 
 static error_t parse_option(int key, char *arg, struct argp_state *state) {
-    struct args *args = state->input;
+    struct argp_input_arg *in = state->input;
+    args *args = in->args;
+    args_parser *parser = in->parser;
 
     switch (key) {
     case OPTION_VERBOSE:
@@ -170,10 +126,12 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         args->write_lp_file = arg;
         break;
     case OPTION_TIME_LIMIT:
-        args->time_limit = parse_int(arg);
+        if (!parse_int(parser, arg, &args->time_limit))
+            return EINVAL;
         break;
     case OPTION_THREADS:
-        args->num_threads = parse_int(arg);
+        if (!parse_int(parser, arg, &args->num_threads))
+            return EINVAL;
         break;
     case OPTION_METHOD:
         if (streq(arg, "exact"))
@@ -197,16 +155,22 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         }
         break;
     case OPTION_SEED:
-        args->seed = parse_uint(arg);
+        if (!parse_uint(parser, arg, &args->seed))
+            return EINVAL;
         break;
     case OPTION_ASSIGNMENTS_DIFFICULTY_RANKING_RANDOMNESS:
-        args->assignments_difficulty_ranking_randomness = parse_double(arg);
+        if (!parse_double(parser, arg, &args->assignments_difficulty_ranking_randomness))
+            return EINVAL;
         break;
     case OPTION_MULTISTART:
-        args->multistart = parse_int(arg);
+        if (!parse_int(parser, arg, &args->multistart))
+            return EINVAL;
         break;
     case OPTION_CONFIG:
         args->config = arg;
+        break;
+    case OPTION_OPTION:
+        g_array_append_val(args->options, arg);
         break;
     case ARGP_KEY_ARG:
         switch (state->arg_num) {
@@ -226,7 +190,6 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         if (state->arg_num < 1)
             argp_usage(state);
         break;
-
     default:
         return ARGP_ERR_UNKNOWN;
     }
@@ -234,7 +197,36 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
     return 0;
 }
 
-void args_parse(args *args, int argc, char **argv) {
+bool parse_args(args *args, int argc, char **argv) {
+    args_parser parser;
+    args_parser_init(&parser);
+
+    argp_input_arg in = {
+        .args = args,
+        .parser = &parser
+    };
+
     struct argp argp = {options, parse_option, args_doc, doc};
-    argp_parse(&argp, argc, argv, 0, 0, args);
+    argp_parse(&argp, argc, argv, 0, 0, &in);
+
+    bool success = strempty(parser.error);
+    if (!success) {
+        eprint("ERROR: failed to parse args (%s)", args_parser_get_error(&parser));
+    }
+
+    args_parser_destroy(&parser);
+
+    return success;
+}
+
+void args_parser_init(args_parser *parser) {
+    parser->error = NULL;
+}
+
+void args_parser_destroy(args_parser *parser) {
+    free(parser->error);
+}
+
+char *args_parser_get_error(args_parser *parser) {
+    return parser->error;
 }

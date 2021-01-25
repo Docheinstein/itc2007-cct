@@ -8,6 +8,8 @@ typedef struct model_parser {
     char *error;
 } model_parser;
 
+bool read_model(model *model, const char *input_file);
+
 void model_parser_init(model_parser *parser);
 void model_parser_destroy(model_parser *parser);
 

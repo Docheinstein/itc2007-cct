@@ -269,3 +269,16 @@ QUIT:
 
     return success;
 }
+
+bool read_model(model *model, const char *input_file) {
+    model_parser parser;
+    model_parser_init(&parser);
+    bool success = model_parser_parse(&parser, input_file, model);
+    if (!success) {
+        eprint("ERROR: failed to parse model file '%s' (%s)", input_file, model_parser_get_error(&parser));
+    }
+
+    model_parser_destroy(&parser);
+
+    return success;
+}

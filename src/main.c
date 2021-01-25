@@ -79,7 +79,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <utils/random_utils.h>
 #include <time.h>
 #include <utils/str_utils.h>
-#include "args.h"
+#include "args/args_parser.h"
 #include "log/verbose.h"
 #include "model_parser.h"
 #include "solution.h"
@@ -104,12 +104,18 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <omp.h>
 #include <heuristics/methods/hill_climbing.h>
 #include <config/config_parser.h>
+#include <heuristics/methods/local_search.h>
+#include <utils/mem_utils.h>
 #include "config/config.h"
 
 int main (int argc, char **argv) {
+    // --- PARSE ARGS ---
+
     args args;
     args_init(&args);
-    args_parse(&args, argc, argv);
+    if (!parse_args(&args, argc, argv)) {
+        exit(EXIT_FAILURE);
+    }
 
     set_verbosity(args.verbosity);
 
@@ -134,17 +140,34 @@ int main (int argc, char **argv) {
     verbose("Using RNG seed: %u", args.seed);
     rand_set_seed(args.seed);
 
-    model model;
-    model_init(&model);
+    // --- PARSE CONFIG ---
 
-    model_parser parser;
-    model_parser_init(&parser);
-    if (!model_parser_parse(&parser, args.input, &model)) {
-        eprint("ERROR: failed to parse model file '%s' (%s)", args.input, model_parser_get_error(&parser));
-        exit(EXIT_FAILURE);
+    config cfg;
+    config_init(&cfg);
+
+    if (args.config) {
+        if (!read_config_file(&cfg, args.config))
+            exit(EXIT_FAILURE);
+    }
+    if (args.options->len) {
+        if (!read_config_options(&cfg, (const char **) args.options->data, args.options->len))
+            exit(EXIT_FAILURE);
     }
 
-    model_parser_destroy(&parser);
+    char *cfg_str = config_to_string(&cfg);
+    verbose("====== CONFIG ======\n"
+            "%s\n"
+            "-----------------------",
+            cfg_str);
+    free(cfg_str);
+
+    // --- PARSE MODEL ---
+
+    model model;
+    model_init(&model);
+    if (!read_model(&model, args.input)) {
+        exit(EXIT_FAILURE);
+    }
 
     solution sol;
     solution_init(&sol, &model);
@@ -156,48 +179,33 @@ int main (int argc, char **argv) {
         solution_loaded = read_solution(&sol, args.solution_input_file);
     }
 
-    config cfg;
-    config_init(&cfg);
+    heuristic_solver_config solver_conf;
+    heuristic_solver_config_init(&solver_conf);
 
-    if (args.config) {
-        config_parser cfg_parser;
-        config_parser_init(&cfg_parser);
+    solver_conf.cycles_limit = cfg.solver_cycles_limit;
+    solver_conf.time_limit = cfg.solver_time_limit;
+    solver_conf.starting_solution = solution_loaded ? &sol : NULL;
+    solver_conf.multistart = cfg.solver_multistart;
 
-        if (!config_parser_parse(&cfg_parser, args.config, &cfg)) {
-            eprint("ERROR: failed to parse config file '%s' (%s)",
-                   args.input, config_parser_get_error(&cfg_parser));
-            exit(EXIT_FAILURE);
-        }
-        config_parser_destroy(&cfg_parser);
-    }
+    if (args.time_limit > 0)
+        solver_conf.time_limit = cfg.solver_time_limit;
 
-    char *cfg_str = config_to_string(&cfg);
-    verbose("====== CONFIG ======\n"
-            "%s\n"
-            "-----------------------",
-            cfg_str);
-    free(cfg_str);
+    hill_climbing_params *hc_params = mallocx(1, sizeof(hill_climbing_params));
+    hc_params->max_idle = cfg.hc_idle;
 
-    heuristic_solver_config config;
-    heuristic_solver_config_init(&config);
-
-    config.time_limit = args.time_limit;
-    config.starting_solution = solution_loaded ? &sol : NULL;
-
-    for (int i = 0; i < cfg.n_methods; i++) {
-        resolution_method method = cfg.methods[i];
+    for (int i = 0; i < cfg.solver_n_methods; i++) {
+        resolution_method method = cfg.solver_methods[i];
         const char *method_name = resolution_method_to_string(method);
 
         if (method == RESOLUTION_METHOD_LOCAL_SEARCH) {
+            heuristic_solver_config_add_method(&solver_conf, local_search,
+                                               NULL, method_name);
         }
         else if (method == RESOLUTION_METHOD_TABU_SEARCH) {
         }
         else if (method == RESOLUTION_METHOD_HILL_CLIMBING) {
-            hill_climbing_params hc_params = {
-                .max_idle = cfg.hc_idle
-            };
-            heuristic_solver_config_add_method(&config, hill_climbing,
-                                               &hc_params, method_name);
+            heuristic_solver_config_add_method(&solver_conf, hill_climbing,
+                                               hc_params, method_name);
         }
         else if (method == RESOLUTION_METHOD_SIMULATED_ANNEALING) {
         }
@@ -206,11 +214,15 @@ int main (int argc, char **argv) {
     heuristic_solver solver;
     heuristic_solver_init(&solver);
 
-    solution_loaded = heuristic_solver_solve(&solver, &config, &sol);
+    solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &sol);
     if (!solution_loaded)
         eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
+
     heuristic_solver_destroy(&solver);
-    heuristic_solver_config_destroy(&config);
+    heuristic_solver_config_destroy(&solver_conf);
+
+    free(hc_params);
+
 #if 0
 
     // Standard case, compute the solution

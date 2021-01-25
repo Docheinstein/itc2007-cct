@@ -26,7 +26,8 @@ typedef struct heuristic_method_parameterized {
 typedef struct heuristic_solver_config {
     solution *starting_solution;
     int time_limit;
-
+    int cycles_limit;
+    bool multistart;
     GArray *methods;
 } heuristic_solver_config;
 

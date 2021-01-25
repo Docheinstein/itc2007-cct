@@ -1,11 +1,18 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <stdbool.h>
 #include <resolution_method.h>
 
 typedef struct config {
-    resolution_method *methods;
-    int n_methods;
+    // Solver
+    int solver_cycles_limit;
+    int solver_time_limit;
+    bool solver_multistart;
+    resolution_method *solver_methods;
+    int solver_n_methods;
+
+    // Hill Climbing
     int hc_idle;
 } config;
 
