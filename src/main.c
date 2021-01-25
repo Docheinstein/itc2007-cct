@@ -106,10 +106,12 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <config/config_parser.h>
 #include <heuristics/methods/local_search.h>
 #include <utils/mem_utils.h>
+#include <heuristics/methods/tabu_search.h>
 #include "config/config.h"
 
 int main (int argc, char **argv) {
     // --- PARSE ARGS ---
+    fileclear("/tmp/moves.txt");
 
     args args;
     args_init(&args);
@@ -143,7 +145,7 @@ int main (int argc, char **argv) {
     // --- PARSE CONFIG ---
 
     config cfg;
-    config_init(&cfg);
+    config_default(&cfg);
 
     if (args.config) {
         if (!read_config_file(&cfg, args.config))
@@ -193,6 +195,13 @@ int main (int argc, char **argv) {
     hill_climbing_params *hc_params = mallocx(1, sizeof(hill_climbing_params));
     hc_params->max_idle = cfg.hc_idle;
 
+    tabu_search_params *ts_params = mallocx(1, sizeof(tabu_search_params));
+    ts_params->max_idle = cfg.ts_idle;
+    ts_params->tabu_tenure = cfg.ts_tenure;
+    ts_params->frequency_penalty_coeff = cfg.ts_frequency_penalty_coeff;
+    ts_params->steepest = cfg.ts_steepest;
+    ts_params->clear_on_new_best = cfg.ts_clear_on_new_best;
+
     for (int i = 0; i < cfg.solver_n_methods; i++) {
         resolution_method method = cfg.solver_methods[i];
         const char *method_name = resolution_method_to_string(method);
@@ -202,6 +211,8 @@ int main (int argc, char **argv) {
                                                NULL, method_name);
         }
         else if (method == RESOLUTION_METHOD_TABU_SEARCH) {
+            heuristic_solver_config_add_method(&solver_conf, tabu_search,
+                                                ts_params, method_name);
         }
         else if (method == RESOLUTION_METHOD_HILL_CLIMBING) {
             heuristic_solver_config_add_method(&solver_conf, hill_climbing,
@@ -222,6 +233,7 @@ int main (int argc, char **argv) {
     heuristic_solver_config_destroy(&solver_conf);
 
     free(hc_params);
+    free(ts_params);
 
 #if 0
 

@@ -18,6 +18,11 @@
 #define LIGHT_THRESHOLD 0.95
 
 
+static int renderer_n_colors;
+double *renderer_r;
+double *renderer_g;
+double *renderer_b;
+
 bool render_solution_full(const solution *sol, char *output_dir, char *overview_file) {
     renderer renderer;
     renderer_init(&renderer);
@@ -79,12 +84,26 @@ static void random_colors(int n_colors, double **r, double **g, double **b) {
     if (!n_colors)
         return;
 
-    *r = mallocx(n_colors, sizeof(double));
-    *g = mallocx(n_colors, sizeof(double));
-    *b = mallocx(n_colors, sizeof(double));
+    int prev_n_colors = renderer_n_colors;
+    if (!renderer_r | !renderer_g | !renderer_b) {
+        renderer_r = mallocx(n_colors, sizeof(double));
+        renderer_g = mallocx(n_colors, sizeof(double));
+        renderer_b = mallocx(n_colors, sizeof(double));
+    }
+    if (n_colors > renderer_n_colors) {
+        renderer_r = realloc(renderer_r, n_colors * sizeof(double));
+        renderer_g = realloc(renderer_g, n_colors * sizeof(double));
+        renderer_b = realloc(renderer_b, n_colors * sizeof(double));
+    }
 
-    for (int i = 0; i < n_colors; i++)
-        random_color(&((*r)[i]), &((*g)[i]), &((*b)[i]));
+    renderer_n_colors = n_colors;
+
+    for (int i = prev_n_colors; i < renderer_n_colors; i++)
+        random_color(&renderer_r[i], &renderer_g[i], &renderer_b[i]);
+
+    *r = renderer_r;
+    *g = renderer_g;
+    *b = renderer_b;
 }
 
 static void do_draw_box_text(
@@ -332,10 +351,6 @@ static bool epilogue(
 
     cairo_surface_destroy(surface);
     cairo_destroy(cr);
-
-    free(r);
-    free(g);
-    free(b);
 
     return true;
 }

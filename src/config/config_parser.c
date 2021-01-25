@@ -29,6 +29,16 @@ static bool config_parser_handle_key_value(config *cfg, char *key, char *value,
     }  \
 } while(0)
 
+#define PARSE_DOUBLE(var, str) do { \
+    bool ok; \
+    (var) = strtodouble(str, &ok); \
+    if (!ok) { \
+        snprintf(error_reason, error_reason_len, \
+                "double conversion failed ('%s')", str);\
+        return false; \
+    }  \
+} while(0)
+
 #define PARSE_BOOL(var, str) do { \
     if (streq(str, "true") || streq(str, "yes") || streq(str, "1")) \
         (var) = true;  \
@@ -80,12 +90,32 @@ static bool config_parser_handle_key_value(config *cfg, char *key, char *value,
     else if (streq(key, "hc.idle")) {
         PARSE_INT(cfg->hc_idle, value);
     }
+    else if (streq(key, "ts.idle")) {
+        PARSE_INT(cfg->ts_idle, value);
+    }
+    else if (streq(key, "ts.tenure")) {
+        PARSE_INT(cfg->ts_tenure, value);
+    }
+    else if (streq(key, "ts.frequency_penalty_coeff")) {
+        PARSE_DOUBLE(cfg->ts_frequency_penalty_coeff, value);
+    }
+    else if (streq(key, "ts.random_pick")) {
+        PARSE_BOOL(cfg->ts_random_pick, value);
+    }
+    else if (streq(key, "ts.steepest")) {
+        PARSE_BOOL(cfg->ts_steepest, value);
+    }
+    else if (streq(key, "ts.clear_on_new_best")) {
+        PARSE_BOOL(cfg->ts_clear_on_new_best, value);
+    }
     else {
         print("WARN: unexpected key, skipping '%s'", key);
     }
 
 
 #undef PARSE_INT
+#undef PARSE_BOOL
+#undef PARSE_DOUBLE
 
     return true;
 };

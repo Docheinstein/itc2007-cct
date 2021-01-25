@@ -10,7 +10,8 @@ void hill_climbing(heuristic_solver_state *state, void *arg) {
     verbose("HC.max_idle = %d", params->max_idle);
 
     int idle = 0;
-    while (idle < params->max_idle) {
+
+    while (state->current_cost > 0 && idle < params->max_idle) {
         int prev_cost = state->current_cost;
 
         neighbourhood_swap_move swap_mv;
@@ -41,7 +42,7 @@ void hill_climbing(heuristic_solver_state *state, void *arg) {
             idle++;
 
         if (idle && idle % (params->max_idle / 10) == 0)
-            verbose2("Idle progress %d/%d (%g%%)", idle, params->max_idle,
+            verbose2("HC: idle progress %d/%d (%g%%)", idle, params->max_idle,
                   (double) 100 * idle / params->max_idle);
     }
 }

@@ -4,6 +4,7 @@
 #include "solution.h"
 
 typedef struct heuristic_solver_state {
+    const model *model;
     solution *current_solution;
     solution *best_solution;
     int current_cost;

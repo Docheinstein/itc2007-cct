@@ -92,22 +92,23 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
     solution_init(&current_solution, model);
 
     heuristic_solver_state state = {
+        .model = model,
         .current_solution = &current_solution,
         .current_cost = INT_MAX,
         .best_solution = sol_out,
         .best_cost = INT_MAX
     };
 
-    generate_feasible_solution_if_needed(solver_conf, &state);
-
-    char *names[n_methods];
-    for (int i = 0; i < n_methods; i++)
-        names[i] = strdup(methods[i].name);
-    char *methods_str = strjoin(names, n_methods, ", ");
-    verbose("Starting solver with %d methods (%s)", n_methods, methods_str);
-    for (int i = 0; i < n_methods; i++)
-        free(names[i]);
-    free(methods_str);
+    if (get_verbosity()) {
+        char *names[n_methods];
+        for (int i = 0; i < n_methods; i++)
+            names[i] = strdup(methods[i].name);
+        char *methods_str = strjoin(names, n_methods, ", ");
+        verbose("Starting solver with %d methods (%s)", n_methods, methods_str);
+        for (int i = 0; i < n_methods; i++)
+            free(names[i]);
+        free(methods_str);
+    }
 
     while (state.best_cost > 0) {
         if (deadline > 0 && !(ms() < deadline)) {
@@ -120,6 +121,7 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
             break;
         }
 
+        // In case of multistart, generate a new solution each cycle
         generate_feasible_solution_if_needed(solver_conf, &state);
 
         verbose("============ CYCLE %d ============\n"
@@ -133,7 +135,6 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
 //        verbose("[%d] Non best iters = %d",
 //                state.cycle, non_best_iters);
 
-        // In case of multistart, generate a new solution each cycle
 
         for (int i = 0; i < solver_conf->methods->len; i++) {
             heuristic_method_parameterized *method = &methods[i];

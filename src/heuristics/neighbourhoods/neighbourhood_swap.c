@@ -82,10 +82,7 @@ void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest, const neighbour
 }
 
 static bool neighbourhood_swap_move_is_effective(const neighbourhood_swap_move *mv) {
-    return
-        mv->r1 != mv->r2 ||
-        mv->d1 != mv->d2 ||
-        mv->s1 != mv->s2;
+    return !(mv->c1 == mv->c2);
 }
 
 
@@ -321,11 +318,18 @@ static void do_neighbourhood_swap(
     CRDSQT(sol->model);
 
     // Swap assignments
-    debug2("do_neighbourhood_swap(%d, %d, %d, %d <-> %d, %d, %d, %d)",
-          c1, r1, d1, s1, c2, r2, d2, s2);
-//    char tmp[92];
-//    snprintf(tmp, 92, "swap (%d, %d, %d, %d <-> %d, %d, %d, %d)\n",
+//    debug("do_neighbourhood_swap(%d, %d, %d, %d <-> %d, %d, %d, %d)",
 //          c1, r1, d1, s1, c2, r2, d2, s2);
+
+    debug2("neighbourhood_swap (c=%d:%s, r=%d:%s, d=%d s=%d <-> c=%d:%s, r=%d:%s, d=%d, s=%d)",
+            c1, sol->model->courses[c1].id,
+            r1, sol->model->rooms[r1].id, d1, s1,
+            c2, c2 >= 0 ? sol->model->courses[c2].id : "O",
+            r2, sol->model->rooms[r2].id, d2, s2);
+
+//    char tmp[92];
+//    snprintf(tmp, 92, "%*d,%*d,%*d,%*d | %*d,%*d,%*d,%*d\n",
+//            2, c1, 2, r1, 2, d1, 2, s1, 2, c2, 2, r2, 2, d2, 2, s2);
 //    fileappend("/tmp/moves.txt", tmp);
 
     // Update timetable
@@ -655,11 +659,6 @@ bool neighbourhood_swap(solution *sol,
 #endif
 //    mv->_c2 = solution_get_helper(sol)->c_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
     mv->_c2 = mv->c2;
-
-    debug2("neighbourhood_swap (c=%d:%s (r=%d:%s d=%d s=%d) (r=%d:%s, d=%d, s=%d)) [c2=%d]",
-            mv->c1, sol->model->courses[mv->c1].id,
-            mv->r1, sol->model->rooms[mv->r1].id, mv->d1, mv->s1,
-            mv->r2, sol->model->rooms[mv->r2].id, mv->d2, mv->s2, mv->_c2);
 
     if (predict_feasibility == NEIGHBOURHOOD_PREDICT_ALWAYS)
         if (result)
