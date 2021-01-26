@@ -14,12 +14,12 @@ char *args_to_string(const args *args) {
         "force_draw = %s\n"
         "write_lp = %s\n"
         "time_limit = %d\n"
-        "num_threads = %d\n"
         "seed = %u\n"
         "assignments_difficulty_ranking_randomness = %g\n"
         "multistart = %d\n"
         "config = %s\n"
-        "options = %s",
+        "options = %s\n"
+        "benchmark_mode = %s",
              args->input,
              args->output,
              args->verbosity,
@@ -29,12 +29,12 @@ char *args_to_string(const args *args) {
              BOOL_TO_STR(args->force_draw),
              args->write_lp_file,
              args->time_limit,
-             args->num_threads,
              args->seed,
              args->assignments_difficulty_ranking_randomness,
              args->multistart,
              args->config,
-             options_str
+             options_str,
+             BOOL_TO_STR(args->benchmark_mode)
     );
 
     free(options_str);
@@ -53,12 +53,12 @@ void args_init(args *args) {
     args->write_lp_file = NULL;
     args->solution_input_file = NULL;
     args->time_limit = ARG_INT_NONE;
-    args->num_threads = ARG_INT_NONE;
     args->seed = ARG_INT_NONE;
     args->assignments_difficulty_ranking_randomness = ARG_INT_NONE;
     args->multistart = ARG_INT_NONE;
     args->config = NULL;
     args->options = g_array_new(false, false, sizeof(char *));
+    args->benchmark_mode = false;
 }
 
 void args_destroy(args *args) {

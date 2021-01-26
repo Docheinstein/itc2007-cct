@@ -18,7 +18,6 @@ typedef enum itc2007_option {
     OPTION_VERBOSE = 'v',
     OPTION_METHOD = 'm',
     OPTION_TIME_LIMIT = 't',
-    OPTION_THREADS = 'j',
     OPTION_DRAW_DIRECTORY = 'D',
     OPTION_DRAW_OVERVIEW_FILE = 'd',
     OPTION_FORCE_DRAW = 'f',
@@ -28,6 +27,7 @@ typedef enum itc2007_option {
     OPTION_MULTISTART = 'n',
     OPTION_CONFIG = 'c',
     OPTION_OPTION = 'o',
+    OPTION_BENCHMARK_MODE = 'b',
     OPTION_WRITE_LP = 0x100,
 } itc2007_option;
 
@@ -45,8 +45,6 @@ static struct argp_option options[] = {
         "Draw even if a feasible solution can't be provided" },
   { "time", OPTION_TIME_LIMIT, "SECONDS", 0,
         "Time limit in seconds for solve the model" },
-  { "threads", OPTION_THREADS, "N", 0,
-        "Number of threads to spawn" },
   { "solution", OPTION_SOLUTION, "SOL_FILE", 0,
         "Load the solution file SOL_FILE instead of computing it"
         "(useful for see the cost/violations or with -d or -D for render the solution)" },
@@ -67,6 +65,8 @@ static struct argp_option options[] = {
         "Load heuristic solver configuration from file" },
   { "option", OPTION_OPTION, "KEY=VALUE", 0,
         "Set an option" },
+  { "benchmark", OPTION_BENCHMARK_MODE, NULL, 0,
+        "Benchmark mode: print only the cost of the final solution" },
   { NULL }
 };
 
@@ -129,10 +129,6 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         if (!parse_int(parser, arg, &args->time_limit))
             return EINVAL;
         break;
-    case OPTION_THREADS:
-        if (!parse_int(parser, arg, &args->num_threads))
-            return EINVAL;
-        break;
     case OPTION_METHOD:
         if (streq(arg, "exact"))
             args->method = RESOLUTION_METHOD_EXACT;
@@ -186,6 +182,9 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         }
 
       break;
+    case OPTION_BENCHMARK_MODE:
+        args->benchmark_mode = true;
+        break;
     case ARGP_KEY_END:
         if (state->arg_num < 1)
             argp_usage(state);
@@ -201,18 +200,9 @@ bool parse_args(args *args, int argc, char **argv) {
     args_parser parser;
     args_parser_init(&parser);
 
-    argp_input_arg in = {
-        .args = args,
-        .parser = &parser
-    };
-
-    struct argp argp = {options, parse_option, args_doc, doc};
-    argp_parse(&argp, argc, argv, 0, 0, &in);
-
-    bool success = strempty(parser.error);
-    if (!success) {
+    bool success = args_parser_parse(&parser, argc, argv, args);
+    if (!success)
         eprint("ERROR: failed to parse args (%s)", args_parser_get_error(&parser));
-    }
 
     args_parser_destroy(&parser);
 
@@ -225,6 +215,18 @@ void args_parser_init(args_parser *parser) {
 
 void args_parser_destroy(args_parser *parser) {
     free(parser->error);
+}
+
+bool args_parser_parse(args_parser *parser, int argc, char **argv, args *args) {
+    argp_input_arg in = {
+        .args = args,
+        .parser = parser
+    };
+
+    struct argp argp = {options, parse_option, args_doc, doc};
+    argp_parse(&argp, argc, argv, 0, 0, &in);
+
+    return strempty(parser->error);
 }
 
 char *args_parser_get_error(args_parser *parser) {

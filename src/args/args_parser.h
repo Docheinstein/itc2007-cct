@@ -16,7 +16,7 @@ bool parse_args(args *args, int argc, char **argv);
 void args_parser_init(args_parser *parser);
 void args_parser_destroy(args_parser *parser);
 
-void args_parser_parse(args_parser *parser, int argc, char **argv, args *args);
+bool args_parser_parse(args_parser *parser, int argc, char **argv, args *args);
 
 char *args_parser_get_error(args_parser *parser);
 

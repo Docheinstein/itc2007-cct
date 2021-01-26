@@ -18,12 +18,12 @@ typedef struct args {
     char *draw_overview_file;
     bool force_draw;
     int time_limit;
-    int num_threads;
     uint seed;
     double assignments_difficulty_ranking_randomness;
     int multistart;
     char *config;
     GArray *options;
+    bool benchmark_mode;
 } args;
 
 void args_init(args *args);

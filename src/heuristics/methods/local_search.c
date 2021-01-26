@@ -39,5 +39,5 @@ void local_search(heuristic_solver_state *state, void *arg) {
         }
 
         neighbourhood_swap_iter_destroy(&swap_iter);
-    } while (state->current_cost > 0 && improved);
+    } while (improved);
 }

@@ -9,8 +9,6 @@ uint rand_get_seed();
 int rand_int();
 int rand_int_range(int start, int end);
 
-double rand01();
-
 double rand_uniform(double a, double b);
 double rand_normal(double mean, double std);
 double rand_triangular(double a, double c, double b);

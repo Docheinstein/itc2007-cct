@@ -6,22 +6,38 @@
 
 typedef struct config {
     // Solver
-    int solver_cycles_limit;
-    int solver_time_limit;
-    bool solver_multistart;
-    resolution_method *solver_methods;
-    int solver_n_methods;
+    struct {
+        resolution_method *methods;
+        int n_methods;
+        int cycles_limit;
+        int time_limit;
+        bool multistart;
+        int restore_best_after_cycles;
+    } solver;
 
     // Hill Climbing
-    int hc_idle;
+    struct {
+        int idle;
+    } hc;
 
     // Tabu Search
-    int ts_idle;
-    int ts_tenure;
-    double ts_frequency_penalty_coeff;
-    bool ts_random_pick;
-    bool ts_steepest;
-    bool ts_clear_on_new_best;
+    struct {
+        int idle;
+        int tenure;
+        double frequency_penalty_coeff;
+        bool random_pick;
+        bool steepest;
+        bool clear_on_best;
+    } ts;
+
+    // Simulated Annealing
+    struct {
+        int idle;
+        double temperature;
+        double min_temperature;
+        double temperature_length_coeff;
+        double cooling_rate;
+    } sa;
 } config;
 
 void config_default(config *cfg);

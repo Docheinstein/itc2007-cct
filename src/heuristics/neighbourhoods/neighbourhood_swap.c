@@ -125,6 +125,19 @@ void neighbourhood_swap_generate_random_move(solution *sol, neighbourhood_swap_m
     } while (!neighbourhood_swap_move_is_effective(mv));
 }
 
+void neighbourhood_swap_generate_random_feasible_move(solution *sol, neighbourhood_swap_move *mv) {
+    neighbourhood_swap_result result;
+    do {
+        neighbourhood_swap_generate_random_move(sol, mv);
+        neighbourhood_swap(sol, mv,
+                   NEIGHBOURHOOD_PREDICT_ALWAYS,
+                   NEIGHBOURHOOD_PREDICT_NEVER,
+                   NEIGHBOURHOOD_PREDICT_NEVER,
+                   NEIGHBOURHOOD_PERFORM_NEVER,
+                   &result);
+    } while (!result.feasible);
+}
+
 bool neighbourhood_swap_iter_next(neighbourhood_swap_iter *iter,
                                   neighbourhood_swap_move *move) {
     if (iter->end)

@@ -53,60 +53,79 @@ static bool config_parser_handle_key_value(config *cfg, char *key, char *value,
 
     debug("config_parser_handle_key_value (%s,%s)", key, value);
 
-    if (streq(key, "solver.cycles")) {
-        PARSE_INT(cfg->solver_cycles_limit, value);
-    }
-    else if (streq(key, "solver.time")) {
-        PARSE_INT(cfg->solver_time_limit, value);
-    }
-    else if (streq(key, "solver.multistart")) {
-        PARSE_BOOL(cfg->solver_multistart, value);
-    }
-    else if (streq(key, "solver.methods")) {
-        static const int MAX_METHODS = 10;
-        if (!cfg->solver_methods)
-            cfg->solver_methods = mallocx(MAX_METHODS, sizeof(resolution_method));
-        char **methods_strings = mallocx(MAX_METHODS, sizeof(char *));
-        cfg->solver_n_methods = strsplit(value, ",", methods_strings, MAX_METHODS);
 
-        for (int i = 0; i < cfg->solver_n_methods; i++) {
+    if (streq(key, "solver.methods")) {
+        static const int MAX_METHODS = 10;
+        if (!cfg->solver.methods)
+            cfg->solver.methods = mallocx(MAX_METHODS, sizeof(resolution_method));
+        char **methods_strings = mallocx(MAX_METHODS, sizeof(char *));
+        cfg->solver.n_methods = strsplit(value, ",", methods_strings, MAX_METHODS);
+
+        for (int i = 0; i < cfg->solver.n_methods; i++) {
             char *method = strtrim(methods_strings[i]);
             debug("Found method: '%s'", method);
             if (streq(method, "ls"))
-                cfg->solver_methods[i] = RESOLUTION_METHOD_LOCAL_SEARCH;
+                cfg->solver.methods[i] = RESOLUTION_METHOD_LOCAL_SEARCH;
             else if (streq(method, "ts"))
-                cfg->solver_methods[i] = RESOLUTION_METHOD_TABU_SEARCH;
+                cfg->solver.methods[i] = RESOLUTION_METHOD_TABU_SEARCH;
             else if (streq(method, "hc"))
-                cfg->solver_methods[i] = RESOLUTION_METHOD_HILL_CLIMBING;
+                cfg->solver.methods[i] = RESOLUTION_METHOD_HILL_CLIMBING;
             else if (streq(method, "sa"))
-                cfg->solver_methods[i] = RESOLUTION_METHOD_SIMULATED_ANNEALING;
+                cfg->solver.methods[i] = RESOLUTION_METHOD_SIMULATED_ANNEALING;
             else {
                 print("WARN: unexpected method, skipping '%s' (possible values are 'ls', 'ts', 'hc', 'sa'", method);
-                cfg->solver_methods[i] = RESOLUTION_METHOD_NONE;
+                cfg->solver.methods[i] = RESOLUTION_METHOD_NONE;
             }
         }
         free(methods_strings);
     }
+    else if (streq(key, "solver.cycles")) {
+        PARSE_INT(cfg->solver.cycles_limit, value);
+    }
+    else if (streq(key, "solver.time")) {
+        PARSE_INT(cfg->solver.time_limit, value);
+    }
+    else if (streq(key, "solver.multistart")) {
+        PARSE_BOOL(cfg->solver.multistart, value);
+    }
+    else if (streq(key, "solver.restore_best_after_cycles")) {
+        PARSE_INT(cfg->solver.restore_best_after_cycles, value);
+    }
     else if (streq(key, "hc.idle")) {
-        PARSE_INT(cfg->hc_idle, value);
+        PARSE_INT(cfg->hc.idle, value);
     }
     else if (streq(key, "ts.idle")) {
-        PARSE_INT(cfg->ts_idle, value);
+        PARSE_INT(cfg->ts.idle, value);
     }
     else if (streq(key, "ts.tenure")) {
-        PARSE_INT(cfg->ts_tenure, value);
+        PARSE_INT(cfg->ts.tenure, value);
     }
     else if (streq(key, "ts.frequency_penalty_coeff")) {
-        PARSE_DOUBLE(cfg->ts_frequency_penalty_coeff, value);
+        PARSE_DOUBLE(cfg->ts.frequency_penalty_coeff, value);
     }
     else if (streq(key, "ts.random_pick")) {
-        PARSE_BOOL(cfg->ts_random_pick, value);
+        PARSE_BOOL(cfg->ts.random_pick, value);
     }
     else if (streq(key, "ts.steepest")) {
-        PARSE_BOOL(cfg->ts_steepest, value);
+        PARSE_BOOL(cfg->ts.steepest, value);
     }
-    else if (streq(key, "ts.clear_on_new_best")) {
-        PARSE_BOOL(cfg->ts_clear_on_new_best, value);
+    else if (streq(key, "ts.clear_on_best")) {
+        PARSE_BOOL(cfg->ts.clear_on_best, value);
+    }
+    else if (streq(key, "sa.idle")) {
+        PARSE_INT(cfg->sa.idle, value);
+    }
+    else if (streq(key, "sa.temperature")) {
+        PARSE_DOUBLE(cfg->sa.temperature, value);
+    }
+    else if (streq(key, "sa.min_temperature")) {
+        PARSE_DOUBLE(cfg->sa.min_temperature, value);
+    }
+    else if (streq(key, "sa.temperature_length_coeff")) {
+        PARSE_DOUBLE(cfg->sa.temperature_length_coeff, value);
+    }
+    else if (streq(key, "sa.cooling_rate")) {
+        PARSE_DOUBLE(cfg->sa.cooling_rate, value);
     }
     else {
         print("WARN: unexpected key, skipping '%s'", key);
@@ -119,8 +138,6 @@ static bool config_parser_handle_key_value(config *cfg, char *key, char *value,
 
     return true;
 };
-
-
 
 static bool config_parser_line_parser(
         const char *line, void *arg,

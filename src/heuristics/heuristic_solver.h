@@ -5,11 +5,17 @@
 
 typedef struct heuristic_solver_state {
     const model *model;
+
     solution *current_solution;
     solution *best_solution;
     int current_cost;
     int best_cost;
+
     int cycle;
+
+    long starting_time;
+    long best_solution_time;
+    long ending_time;
 } heuristic_solver_state;
 
 bool heuristic_solver_state_update(heuristic_solver_state *state);
@@ -26,10 +32,11 @@ typedef struct heuristic_method_parameterized {
 
 typedef struct heuristic_solver_config {
     solution *starting_solution;
+    GArray *methods;
     int time_limit;
     int cycles_limit;
     bool multistart;
-    GArray *methods;
+    int restore_best_after_cycles;
 } heuristic_solver_config;
 
 

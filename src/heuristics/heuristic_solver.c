@@ -3,16 +3,19 @@
 #include <log/verbose.h>
 #include <utils/str_utils.h>
 #include <utils/time_utils.h>
+#include <utils/def_utils.h>
+#include <omp.h>
 #include "feasible_solution_finder.h"
 #include "utils/mem_utils.h"
 
 
 void heuristic_solver_config_init(heuristic_solver_config *config) {
+    config->methods = g_array_new(false, false, sizeof(heuristic_method_parameterized));
     config->time_limit = -1;
     config->cycles_limit = -1;
     config->starting_solution = NULL;
     config->multistart = false;
-    config->methods = g_array_new(false, false, sizeof(heuristic_method_parameterized));
+    config->restore_best_after_cycles = -1;
 }
 
 void heuristic_solver_config_add_method(heuristic_solver_config *config,
@@ -84,20 +87,27 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
         return false;
     }
 
+    verbose("solver.time_limit = %d", solver_conf->time_limit);
+    verbose("solver.cycles_limit = %d", solver_conf->cycles_limit);
+    verbose("solver.multistart = %s", BOOL_TO_STR(solver_conf->multistart));
+    verbose("solver.restore_best_after_cycles = %d", solver_conf->restore_best_after_cycles);
+
     long starting_time = ms();
     long deadline = solver_conf->time_limit > 0 ? (starting_time + solver_conf->time_limit * 1000) : 0;
     int cycles_limit = solver_conf->cycles_limit >= 0 ? solver_conf->cycles_limit : INT_MAX;
 
     solution current_solution;
     solution_init(&current_solution, model);
-
-    heuristic_solver_state state = {
-        .model = model,
-        .current_solution = &current_solution,
-        .current_cost = INT_MAX,
-        .best_solution = sol_out,
-        .best_cost = INT_MAX
-    };
+    
+    heuristic_solver_state *state = &solver->state;
+    state->model = model;
+    state->current_solution = &current_solution;
+    state->current_cost = INT_MAX;
+    state->best_solution = sol_out;
+    state->best_cost = INT_MAX;
+    state->starting_time = starting_time;
+    state->best_solution_time = LONG_MAX;
+    state->ending_time = LONG_MAX;
 
     if (get_verbosity()) {
         char *names[n_methods];
@@ -110,43 +120,69 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
         free(methods_str);
     }
 
-    while (state.best_cost > 0) {
+    int non_improving_best_cycles = 0;
+    int non_improving_current_cycles = 0;
+
+    while (state->best_cost > 0) {
         if (deadline > 0 && !(ms() < deadline)) {
             debug("Time limit reached (%ds), stopping here", solver_conf->time_limit);
             break;
         }
 
-        if (!(state.cycle < cycles_limit)) {
+        if (!(state->cycle < cycles_limit)) {
             debug("Cycles limit reached (%d), stopping here", cycles_limit);
             break;
         }
 
-        // In case of multistart, generate a new solution each cycle
-        generate_feasible_solution_if_needed(solver_conf, &state);
+        int cycle_begin_best_cost = state->best_cost;
+        int cycle_begin_current_cost = state->current_cost;
 
-        verbose("============ CYCLE %d ============\n"
+        // In case of multistart, generate a new solution each cycle
+        generate_feasible_solution_if_needed(solver_conf, state);
+
+        // Restore the best known solution after 'restore_best_after_cycles'
+        if (solver_conf->restore_best_after_cycles > 0 &&
+            non_improving_best_cycles == solver_conf->restore_best_after_cycles) {
+            verbose("==============================================\n"
+                    "Restoring best solution of cost %d after %d cycles not improving best",
+                    state->best_cost, non_improving_best_cycles);
+            solution_copy(state->current_solution, state->best_solution);
+            state->current_cost = state->best_cost;
+            non_improving_best_cycles = 0;
+            non_improving_current_cycles = 0;
+        }
+
+        verbose("================== CYCLE %d ==================\n"
                 "Current = %d\n"
                 "Best = %d\n"
-                "Cost relative to best = %g%%",
-                state.cycle, state.current_cost, state.best_cost,
-                (double) 100 * state.current_cost / state.best_cost);
-//        verbose("[%d] Non increasing iters = %d",
-//                state.cycle, non_increasing_iters);
-//        verbose("[%d] Non best iters = %d",
-//                state.cycle, non_best_iters);
+                "Cost relative to best = %g%%\n"
+                "Not improving local best since %d cycles\n"
+                "Not improving global best since %d cycles",
+                state->cycle, state->current_cost, state->best_cost,
+                (double) 100 * state->current_cost / state->best_cost,
+                non_improving_current_cycles, non_improving_best_cycles);
 
 
         for (int i = 0; i < solver_conf->methods->len; i++) {
             heuristic_method_parameterized *method = &methods[i];
-            verbose("-------- %s BEGIN --------", method->name);
-            method->method(&state, method->param);
-            verbose("-------- %s END --------", method->name);
+            verbose("------------ %s BEGIN (%d) ------------", method->name, state->current_cost);
+            method->method(state, method->param);
+            verbose("------------ %s END   (%d) --------------", method->name, state->current_cost);
         }
 
-        state.cycle++;
+        non_improving_current_cycles =
+                (state->current_cost < cycle_begin_current_cost) ?
+                0 : (non_improving_current_cycles + 1);
+        non_improving_best_cycles =
+                (state->best_cost < cycle_begin_best_cost) ?
+                0 : (non_improving_best_cycles + 1);
+
+        state->cycle++;
     }
 
-    solution_destroy(state.current_solution);
+    state->ending_time = ms();
+
+    solution_destroy(state->current_solution);
 
     return strempty(solver->error);
 }
@@ -154,6 +190,7 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
 bool heuristic_solver_state_update(heuristic_solver_state *state) {
     if (state->current_cost < state->best_cost) {
         state->best_cost = state->current_cost;
+        state->best_solution_time = ms();
         solution_copy(state->best_solution, state->current_solution);
         verbose("New best solution of cost %d", state->best_cost);
         return true;

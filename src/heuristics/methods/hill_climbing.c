@@ -9,23 +9,25 @@ void hill_climbing(heuristic_solver_state *state, void *arg) {
     hill_climbing_params *params = (hill_climbing_params *) arg;
     verbose("HC.max_idle = %d", params->max_idle);
 
+    int local_best_cost = state->current_cost;
     int idle = 0;
+    int iter = 0;
 
-    while (state->current_cost > 0 && idle < params->max_idle) {
+    while (idle < params->max_idle) {
         int prev_cost = state->current_cost;
 
         neighbourhood_swap_move swap_mv;
         neighbourhood_swap_result swap_result;
 
-        neighbourhood_swap_generate_random_move(state->current_solution, &swap_mv);
+        neighbourhood_swap_generate_random_feasible_move(state->current_solution, &swap_mv);
         neighbourhood_swap(state->current_solution, &swap_mv,
+                           NEIGHBOURHOOD_PREDICT_NEVER,
                            NEIGHBOURHOOD_PREDICT_ALWAYS,
-                           NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
                            NEIGHBOURHOOD_PREDICT_NEVER,
                            NEIGHBOURHOOD_PERFORM_NEVER,
                            &swap_result);
 
-        if (swap_result.feasible && swap_result.delta_cost <= 0) {
+        if (swap_result.delta_cost <= 0) {
             neighbourhood_swap(state->current_solution, &swap_mv,
                NEIGHBOURHOOD_PREDICT_NEVER,
                NEIGHBOURHOOD_PREDICT_NEVER,
@@ -42,7 +44,9 @@ void hill_climbing(heuristic_solver_state *state, void *arg) {
             idle++;
 
         if (idle && idle % (params->max_idle / 10) == 0)
-            verbose2("HC: idle progress %d/%d (%g%%)", idle, params->max_idle,
-                  (double) 100 * idle / params->max_idle);
+            verbose2("current = %d | local best = %d | global best = %d\n"
+                     "iter = %d | idle progress = %d/%d (%g%%)",
+                     state->current_cost, local_best_cost, state->best_cost,
+                     iter, idle, params->max_idle, (double) 100 * idle / params->max_idle);
     }
 }

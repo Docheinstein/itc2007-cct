@@ -174,7 +174,7 @@ double tabu_list_move_penalty(tabu_list *tabu, neighbourhood_swap_move *mv) {
 
 }
 
-bool tabu_list_is_allowed(tabu_list *tabu, neighbourhood_swap_move *mv, int time) {
+bool tabu_list_move_is_allowed(tabu_list *tabu, neighbourhood_swap_move *mv, int time) {
     CRDSQT(tabu->model);
     tabu_list_entry *entry = &tabu->banned[INDEX4(mv->c1, C, mv->r2, R, mv->d2, D, mv->s2, S)];
     return entry->time + tabu->tenure * pow(tabu_list_move_penalty(tabu, mv), entry->count) < time;
@@ -457,7 +457,7 @@ static void hill_climbing_tabu_search(hill_climbing_solver_state *state, int max
             if (swap_result.feasible && !solution_fingerprint_equal(f, current_fingerprint) &&
                     swap_result.delta_cost < best_swap_result.delta_cost &&
                     (state->current_cost + swap_result.delta_cost < state->best_cost ||
-                    tabu_list_is_allowed(&state->tabu, &swap_mv, iter))) {
+                            tabu_list_move_is_allowed(&state->tabu, &swap_mv, iter))) {
                 best_swap_result = swap_result;
                 best_swap_mv = swap_mv;
                 best_swap_fingerprint = f;

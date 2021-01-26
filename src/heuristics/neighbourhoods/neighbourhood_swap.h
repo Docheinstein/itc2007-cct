@@ -56,6 +56,7 @@ bool neighbourhood_swap_move_equal(const neighbourhood_swap_move *m1, const neig
 int neighbourhood_swap_move_cost(const neighbourhood_swap_move *move, solution *s);
 
 void neighbourhood_swap_generate_random_move(solution *sol, neighbourhood_swap_move *mv);
+void neighbourhood_swap_generate_random_feasible_move(solution *sol, neighbourhood_swap_move *mv);
 
 void neighbourhood_swap_move_copy(neighbourhood_swap_move *dest,
                                   const neighbourhood_swap_move *src);

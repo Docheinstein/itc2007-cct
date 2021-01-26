@@ -107,6 +107,8 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <heuristics/methods/local_search.h>
 #include <utils/mem_utils.h>
 #include <heuristics/methods/tabu_search.h>
+#include <heuristics/methods/simulated_annealing.h>
+#include <utils/time_utils.h>
 #include "config/config.h"
 
 int main (int argc, char **argv) {
@@ -136,8 +138,6 @@ int main (int argc, char **argv) {
             "-----------------------",
             args_str);
     free(args_str);
-
-    omp_set_num_threads(args.num_threads != ARG_INT_NONE ? args.num_threads : 1);
 
     verbose("Using RNG seed: %u", args.seed);
     rand_set_seed(args.seed);
@@ -184,26 +184,35 @@ int main (int argc, char **argv) {
     heuristic_solver_config solver_conf;
     heuristic_solver_config_init(&solver_conf);
 
-    solver_conf.cycles_limit = cfg.solver_cycles_limit;
-    solver_conf.time_limit = cfg.solver_time_limit;
+    solver_conf.cycles_limit = cfg.solver.cycles_limit;
+    solver_conf.time_limit = cfg.solver.time_limit;
     solver_conf.starting_solution = solution_loaded ? &sol : NULL;
-    solver_conf.multistart = cfg.solver_multistart;
+    solver_conf.multistart = cfg.solver.multistart;
+    solver_conf.restore_best_after_cycles = cfg.solver.restore_best_after_cycles;
 
     if (args.time_limit > 0)
-        solver_conf.time_limit = cfg.solver_time_limit;
+        solver_conf.time_limit = args.time_limit;
 
     hill_climbing_params *hc_params = mallocx(1, sizeof(hill_climbing_params));
-    hc_params->max_idle = cfg.hc_idle;
+    hc_params->max_idle = cfg.hc.idle;
 
     tabu_search_params *ts_params = mallocx(1, sizeof(tabu_search_params));
-    ts_params->max_idle = cfg.ts_idle;
-    ts_params->tabu_tenure = cfg.ts_tenure;
-    ts_params->frequency_penalty_coeff = cfg.ts_frequency_penalty_coeff;
-    ts_params->steepest = cfg.ts_steepest;
-    ts_params->clear_on_new_best = cfg.ts_clear_on_new_best;
+    ts_params->max_idle = cfg.ts.idle;
+    ts_params->tabu_tenure = cfg.ts.tenure;
+    ts_params->frequency_penalty_coeff = cfg.ts.frequency_penalty_coeff;
+    ts_params->random_pick = cfg.ts.random_pick;
+    ts_params->steepest = cfg.ts.steepest;
+    ts_params->clear_on_best = cfg.ts.clear_on_best;
 
-    for (int i = 0; i < cfg.solver_n_methods; i++) {
-        resolution_method method = cfg.solver_methods[i];
+    simulated_annealing_params *sa_params = mallocx(1, sizeof(simulated_annealing_params));
+    sa_params->max_idle = cfg.sa.idle;
+    sa_params->temperature = cfg.sa.temperature;
+    sa_params->min_temperature = cfg.sa.min_temperature;
+    sa_params->temperature_length_coeff = cfg.sa.temperature_length_coeff;
+    sa_params->cooling_rate = cfg.sa.cooling_rate;
+
+    for (int i = 0; i < cfg.solver.n_methods; i++) {
+        resolution_method method = cfg.solver.methods[i];
         const char *method_name = resolution_method_to_string(method);
 
         if (method == RESOLUTION_METHOD_LOCAL_SEARCH) {
@@ -219,6 +228,8 @@ int main (int argc, char **argv) {
                                                hc_params, method_name);
         }
         else if (method == RESOLUTION_METHOD_SIMULATED_ANNEALING) {
+            heuristic_solver_config_add_method(&solver_conf, simulated_annealing,
+                                               sa_params, method_name);
         }
     }
 
@@ -229,12 +240,13 @@ int main (int argc, char **argv) {
     if (!solution_loaded)
         eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
 
+
     heuristic_solver_destroy(&solver);
     heuristic_solver_config_destroy(&solver_conf);
 
     free(hc_params);
     free(ts_params);
-
+    free(sa_params);
 #if 0
 
     // Standard case, compute the solution
@@ -306,7 +318,7 @@ int main (int argc, char **argv) {
                     best_cost = cost;
                 }
             }
-        }
+
     } else if (args.method == RESOLUTION_METHOD_ITERATED_LOCAL_SEARCH) {
         iterated_local_search_solver_config config;
         iterated_local_search_solver_config_init(&config);
@@ -378,21 +390,39 @@ int main (int argc, char **argv) {
 #endif
 
     if (solution_loaded || args.force_draw) {
-        char *sol_str = solution_to_string(&sol);
-        char *sol_quality_str = solution_quality_to_string(&sol, true);
+        if (args.benchmark_mode) {
+            char benchmark_output[64];
+            int rc = solution_room_capacity_cost(&sol);
+            int mwd = solution_min_working_days_cost(&sol);
+            int cc = solution_curriculum_compactness_cost(&sol);
+            int rs = solution_room_stability_cost(&sol);
+            int cost = rc + mwd + cc + rs;
+            bool feasible = solution_satisfy_hard_constraints(&sol);
+            snprintf(benchmark_output, 64, "%u %d %d %d %d %d %d\n",
+                     rand_get_seed(), feasible, rc, mwd, cc, rs, cost);
+            printf("%s", benchmark_output);
 
-        print("====== SOLUTION ======\n"
-              "%s\n"
-              "----------------------\n"
-              "%s",
-              sol_str,
-              sol_quality_str);
+            if (args.output)
+                fileappend(args.output, benchmark_output);
+        }
+        else {
+            char *sol_str = solution_to_string(&sol);
+            char *sol_quality_str = solution_quality_to_string(&sol, true);
 
-        free(sol_str);
-        free(sol_quality_str);
+            print("====== SOLUTION ======\n"
+                  "%s\n"
+                  "----------------------\n"
+                  "%s",
+                  sol_str,
+                  sol_quality_str);
 
-        if (args.output)
-            write_solution(&sol, args.output);
+            free(sol_str);
+            free(sol_quality_str);
+
+            if (args.output)
+                write_solution(&sol, args.output);
+        }
+
 
         if (args.draw_overview_file || args.draw_directory)
             render_solution_full(&sol, args.draw_overview_file, args.draw_directory);
@@ -403,6 +433,6 @@ int main (int argc, char **argv) {
     config_destroy(&cfg);
     args_destroy(&args);
 
-    debug("(seed was %d)", rand_get_seed());
+    debug("(seed was %u)", rand_get_seed());
     return 0;
 }
