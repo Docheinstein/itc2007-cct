@@ -6,9 +6,8 @@ from pathlib import Path
 # ----------- PARAMETERS ------------
 
 executable = Path("build/itc2007-cct")
-runs_per_dataset = 1
-# seconds_per_run = 168
-seconds_per_run = 5
+runs_per_dataset = 10
+seconds_per_run = 168
 
 
 def benchmark_arg(name, method):
@@ -16,10 +15,11 @@ def benchmark_arg(name, method):
 
 
 benchmark_args = [
-    benchmark_arg("comp01", "ls"),
+    # benchmark_arg("comp01", "ls"),
+    # benchmark_arg("comp02", "ls"),
     # benchmark_arg("comp03", "ls"),
     # benchmark_arg("comp04", "ls"),
-    # benchmark_arg("comp05", "ls"),
+    benchmark_arg("comp05", "ls"),
     # benchmark_arg("comp06", "ls"),
     # benchmark_arg("comp07", "ls")
 ]
@@ -53,8 +53,7 @@ for b_i, bench_arg in enumerate(benchmark_args):
         print(f"WARN: skipping benchmark, missing config at path '{config_path}'")
         continue
 
-    print(f"[{b_i + 1}/{len(benchmark_args)}] {dataset} -c {config}",
-          end="", flush=True)
+    print(f"[{b_i + 1}/{len(benchmark_args)}] {dataset} -c {config}")
 
     output_folder = output_path.parent
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -64,7 +63,7 @@ for b_i, bench_arg in enumerate(benchmark_args):
         out.write("# ----------------------- BENCHMARK ------------------------\n")
         out.write("# ----------------------------------------------------------\n")
         out.write(f"# Dataset:          {dataset}\n")
-        out.write(f"# Datetime:         {datetime.now()}\n")
+        out.write(f"# Datetime:         {datetime.now().strftime('%H:%M:%S %m/%d/%Y')}\n")
         out.write(f"# Seconds per run:  {seconds_per_run}\n")
         out.write("# ----------------------------------------------------------\n")
         with config_path.open() as cfg:
@@ -78,8 +77,7 @@ for b_i, bench_arg in enumerate(benchmark_args):
         out.write("# ---------------------------------------------------------\n")
 
     for i in range(runs_per_dataset):
-        print(f"  {i + 1}/{runs_per_dataset}... ",
-              end="", flush=True)
+        print(f"  {i + 1}/{runs_per_dataset}... ", end="", flush=True)
         subprocess.run([
             str(executable),
             dataset,

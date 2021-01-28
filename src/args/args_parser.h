@@ -1,9 +1,6 @@
 #ifndef ARGS_PARSER_H
 #define ARGS_PARSER_H
 
-#include <stdbool.h>
-#include <glib.h>
-#include "resolution_method.h"
 #include "args.h"
 
 

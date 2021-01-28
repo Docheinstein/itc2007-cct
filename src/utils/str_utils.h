@@ -4,7 +4,6 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <sys/types.h>
 
 void strappend(char *dest, size_t size, const char *fmt, ...);
 void strappend_realloc(char **dest, size_t *size, const char *fmt, ...);
@@ -26,12 +25,13 @@ char * strrtrim_chars(char *str, const char *chars);
 char * strltrim_chars(char *str, const char *chars);
 char * strtrim_chars(char *str, const char *chars);
 
-int strtoint(const char *str, bool *ok);
-uint strtouint(const char *str, bool *ok);
-long strtolong(const char *str, bool *ok);
-ulong strtoulong(const char *str, bool *ok);
-
-double strtodouble(const char *str, bool *ok);
+bool strtoint(const char *str, int *value);
+bool strtouint(const char *str, unsigned int *value);
+bool strtolong(const char *str, long *value);
+bool strtoulong(const char *str, unsigned long *value);
+bool strtodouble(const char *str, double *value);
+bool strtobool(const char *str, bool *value);
+const char * booltostr(bool value);
 
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens);
 char * strjoin(char **strs, size_t size, const char *joiner);

@@ -74,63 +74,42 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 
 #include <stdlib.h>
 #include <stdbool.h>
-#include <solvers/exact_solver.h>
 #include <utils/io_utils.h>
 #include <utils/random_utils.h>
 #include <time.h>
-#include <utils/str_utils.h>
 #include "args/args_parser.h"
 #include "log/verbose.h"
-#include "model_parser.h"
-#include "solution.h"
-#include "utils/array_utils.h"
-#include "renderer.h"
-#include "feasible_solution_finder.h"
+#include "model/model_parser.h"
+#include "solution/solution.h"
+#include "renderer/renderer.h"
+#include "finder/feasible_solution_finder.h"
 #include "log/debug.h"
-#include "heuristics/neighbourhoods/neighbourhood_swap.h"
-#include "solvers/local_search_solver.h"
-#include "solvers/tabu_search_solver.h"
-#include <sys/time.h>   /* for setitimer */
-#include <unistd.h>     /* for pause */
-#include <signal.h>     /* for signal */
-#include <math.h>
-#include <solvers/hill_climbing_solver.h>
-#include <solvers/iterated_local_search_solver.h>
-#include <solvers/simulated_annealing_solver.h>
-#include <solvers/hybrid_solver.h>
+#include <sys/time.h>
 #include "heuristics/heuristic_solver.h"
 
-#include "utils/assert_utils.h"
-#include <omp.h>
 #include <heuristics/methods/hill_climbing.h>
 #include <config/config_parser.h>
-#include <heuristics/methods/local_search.h>
 #include <utils/mem_utils.h>
 #include <heuristics/methods/tabu_search.h>
 #include <heuristics/methods/simulated_annealing.h>
-#include <utils/time_utils.h>
-#include "config/config.h"
+#include <config/config.h>
+#include <solution/solution_parser.h>
+#include <heuristics/methods/local_search.h>
 
 int main (int argc, char **argv) {
-    // --- PARSE ARGS ---
-    fileclear("/tmp/moves.txt");
-
+    // Parse command line arguments
     args args;
     args_init(&args);
-    if (!parse_args(&args, argc, argv)) {
+    if (!parse_args(&args, argc, argv))
         exit(EXIT_FAILURE);
-    }
 
     set_verbosity(args.verbosity);
 
-    if (args.seed == ARG_INT_NONE) {
+    if (!args.seed) {
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
         args.seed = ts.tv_nsec ^ ts.tv_sec;
     }
-
-    if (args.assignments_difficulty_ranking_randomness == ARG_INT_NONE)
-        args.assignments_difficulty_ranking_randomness = 0.66;
 
     char *args_str = args_to_string(&args);
     verbose("====== ARGUMENTS ======\n"
@@ -139,22 +118,17 @@ int main (int argc, char **argv) {
             args_str);
     free(args_str);
 
-    verbose("Using RNG seed: %u", args.seed);
-    rand_set_seed(args.seed);
-
-    // --- PARSE CONFIG ---
-
+    // Parse config specified with -c (eventually)
     config cfg;
-    config_default(&cfg);
+    config_init(&cfg);
 
-    if (args.config) {
-        if (!read_config_file(&cfg, args.config))
+    if (args.config_file)
+        if (!parse_config_file(&cfg, args.config_file))
             exit(EXIT_FAILURE);
-    }
-    if (args.options->len) {
-        if (!read_config_options(&cfg, (const char **) args.options->data, args.options->len))
+
+    if (args.options->len)
+        if (!parse_config_options(&cfg, (const char **) args.options->data, args.options->len))
             exit(EXIT_FAILURE);
-    }
 
     char *cfg_str = config_to_string(&cfg);
     verbose("====== CONFIG ======\n"
@@ -163,13 +137,12 @@ int main (int argc, char **argv) {
             cfg_str);
     free(cfg_str);
 
-    // --- PARSE MODEL ---
-
+    // Parse input dataset
     model model;
     model_init(&model);
-    if (!read_model(&model, args.input)) {
+
+    if (!parse_model(&model, args.input_file))
         exit(EXIT_FAILURE);
-    }
 
     solution sol;
     solution_init(&sol, &model);
@@ -177,220 +150,104 @@ int main (int argc, char **argv) {
     bool solution_loaded = false;
 
     if (args.solution_input_file) {
-        // Load the solution instead of computing it
-        solution_loaded = read_solution(&sol, args.solution_input_file);
+        // Load the solution from file (eventually)
+        solution_loaded = parse_solution(&sol, args.solution_input_file);
+        if (!solution_loaded)
+            exit(EXIT_FAILURE);
     }
 
-    heuristic_solver_config solver_conf;
-    heuristic_solver_config_init(&solver_conf);
+    if (!args.dont_solve) {
+        // Setup solver
+        feasible_solution_finder_config finder_config;
+        feasible_solution_finder_config_init(&finder_config);
+        finder_config.ranking_randomness = cfg.finder.ranking_randomness;
 
-    solver_conf.cycles_limit = cfg.solver.cycles_limit;
-    solver_conf.time_limit = cfg.solver.time_limit;
-    solver_conf.starting_solution = solution_loaded ? &sol : NULL;
-    solver_conf.multistart = cfg.solver.multistart;
-    solver_conf.restore_best_after_cycles = cfg.solver.restore_best_after_cycles;
+        heuristic_solver_config solver_conf;
+        heuristic_solver_config_init(&solver_conf);
 
-    if (args.time_limit > 0)
-        solver_conf.time_limit = args.time_limit;
+        solver_conf.max_cycles = cfg.solver.max_cycles;
+        solver_conf.max_time = cfg.solver.max_time;
+        solver_conf.starting_solution = solution_loaded ? &sol : NULL;
+        solver_conf.multistart = cfg.solver.multistart;
+        solver_conf.restore_best_after_cycles = cfg.solver.restore_best_after_cycles;
 
-    hill_climbing_params *hc_params = mallocx(1, sizeof(hill_climbing_params));
-    hc_params->max_idle = cfg.hc.idle;
+        if (args.max_time)
+            solver_conf.max_time = args.max_time;
 
-    tabu_search_params *ts_params = mallocx(1, sizeof(tabu_search_params));
-    ts_params->max_idle = cfg.ts.idle;
-    ts_params->tabu_tenure = cfg.ts.tenure;
-    ts_params->frequency_penalty_coeff = cfg.ts.frequency_penalty_coeff;
-    ts_params->random_pick = cfg.ts.random_pick;
-    ts_params->steepest = cfg.ts.steepest;
-    ts_params->clear_on_best = cfg.ts.clear_on_best;
+        // Add methods (solver.methods) to solver
+        local_search_params *ls_params = NULL;
+        hill_climbing_params *hc_params = NULL;
+        tabu_search_params *ts_params = NULL;
+        simulated_annealing_params *sa_params = NULL;
 
-    simulated_annealing_params *sa_params = mallocx(1, sizeof(simulated_annealing_params));
-    sa_params->max_idle = cfg.sa.idle;
-    sa_params->temperature = cfg.sa.temperature;
-    sa_params->min_temperature = cfg.sa.min_temperature;
-    sa_params->temperature_length_coeff = cfg.sa.temperature_length_coeff;
-    sa_params->cooling_rate = cfg.sa.cooling_rate;
+        for (int i = 0; i < cfg.solver.methods.len; i++) {
+            heuristic_method method = cfg.solver.methods.data[i];
+            const char *method_name = heuristic_method_to_string(method);
 
-    for (int i = 0; i < cfg.solver.n_methods; i++) {
-        resolution_method method = cfg.solver.methods[i];
-        const char *method_name = resolution_method_to_string(method);
-
-        if (method == RESOLUTION_METHOD_LOCAL_SEARCH) {
-            heuristic_solver_config_add_method(&solver_conf, local_search,
-                                               NULL, method_name);
-        }
-        else if (method == RESOLUTION_METHOD_TABU_SEARCH) {
-            heuristic_solver_config_add_method(&solver_conf, tabu_search,
-                                                ts_params, method_name);
-        }
-        else if (method == RESOLUTION_METHOD_HILL_CLIMBING) {
-            heuristic_solver_config_add_method(&solver_conf, hill_climbing,
-                                               hc_params, method_name);
-        }
-        else if (method == RESOLUTION_METHOD_SIMULATED_ANNEALING) {
-            heuristic_solver_config_add_method(&solver_conf, simulated_annealing,
-                                               sa_params, method_name);
-        }
-    }
-
-    heuristic_solver solver;
-    heuristic_solver_init(&solver);
-
-    solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &sol);
-    if (!solution_loaded)
-        eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
-
-
-    heuristic_solver_destroy(&solver);
-    heuristic_solver_config_destroy(&solver_conf);
-
-    free(hc_params);
-    free(ts_params);
-    free(sa_params);
-#if 0
-
-    // Standard case, compute the solution
-    if (args.method == RESOLUTION_METHOD_EXACT) {
-        exact_solver_config conf;
-        exact_solver_config_init(&conf);
-
-        exact_solver solver;
-        exact_solver_init(&solver);
-
-        conf.grb_write_lp = args.write_lp_file;
-        conf.grb_verbose = args.verbose;
-        conf.grb_time_limit = args.time_limit;
-
-        verbose("Solving model exactly, it might take a long time...");
-        solution_loaded = exact_solver_solve(&solver, &conf, &sol);
-        if (!solution_loaded)
-            eprint("ERROR: failed to solve model (%s)", exact_solver_get_error(&solver));
-
-        exact_solver_config_destroy(&conf);
-        exact_solver_destroy(&solver);
-    } else if (args.method == RESOLUTION_METHOD_LOCAL_SEARCH) {
-        local_search_solver_config config;
-        local_search_solver_config_init(&config);
-        config.multistart = args.multistart;
-        config.time_limit = args.time_limit;
-        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-        config.starting_solution = solution_loaded ? &sol : NULL;
-
-        local_search_solver solver;
-        local_search_solver_init(&solver);
-
-        solution_loaded = local_search_solver_solve(&solver, &config, &sol);
-        if (!solution_loaded)
-            eprint("ERROR: failed to solve model (%s)", local_search_solver_get_error(&solver));
-
-        local_search_solver_config_destroy(&config);
-        local_search_solver_destroy(&solver);
-    } else if (args.method == RESOLUTION_METHOD_HILL_CLIMBING) {
-        #pragma omp parallel default(none) shared(model, args, stderr, sol, best_cost, solution_loaded)
-        {
-            solution s;
-            solution_init(&s, &model);
-
-            hill_climbing_solver_config config;
-            hill_climbing_solver_config_init(&config);
-//            config.idle_limit = args.multistart;
-            config.time_limit = args.time_limit;
-            config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-//            config.starting_solution = solution_loaded ? &s : NULL;
-
-            hill_climbing_solver solver;
-            hill_climbing_solver_init(&solver);
-
-            bool ok = hill_climbing_solver_solve(&solver, &config, &s);
-            if (!ok)
-                eprint("ERROR: failed to solve model (%s)", hill_climbing_solver_get_error(&solver));
-
-            hill_climbing_solver_config_destroy(&config);
-            hill_climbing_solver_destroy(&solver);
-
-            verbose("Thread %d reached cost %d", omp_get_thread_num(), solution_cost(&s));
-            #pragma omp critical
-            {
-                solution_loaded = solution_loaded || ok;
-                int cost = solution_cost(&s);
-                if (cost < best_cost) {
-                    solution_copy(&sol, &s);
-                    best_cost = cost;
+            if (method == HEURISTIC_METHOD_LOCAL_SEARCH) {
+                if (!ls_params) {
+                    ls_params = mallocx(1, sizeof(local_search_params));
+                    ls_params->steepest = cfg.ls.steepest;
                 }
+                heuristic_solver_config_add_method(&solver_conf, local_search,
+                                                   NULL, method_name);
             }
+            else if (method == HEURISTIC_METHOD_TABU_SEARCH) {
+                if (!ts_params) {
+                    ts_params = mallocx(1, sizeof(tabu_search_params));
+                    ts_params->max_idle = cfg.ts.max_idle;
+                    ts_params->tabu_tenure = cfg.ts.tabu_tenure;
+                    ts_params->frequency_penalty_coeff = cfg.ts.frequency_penalty_coeff;
+                    ts_params->random_pick = cfg.ts.random_pick;
+                    ts_params->steepest = cfg.ts.steepest;
+                    ts_params->clear_on_best = cfg.ts.clear_on_best;
+                }
+                heuristic_solver_config_add_method(&solver_conf, tabu_search,
+                                                   ts_params, method_name);
+            }
+            else if (method == HEURISTIC_METHOD_HILL_CLIMBING) {
+                if (!hc_params) {
+                    hc_params = mallocx(1, sizeof(hill_climbing_params));
+                    hc_params->max_idle = cfg.hc.max_idle;
+                }
+                heuristic_solver_config_add_method(&solver_conf, hill_climbing,
+                                                   hc_params, method_name);
+            }
+            else if (method == HEURISTIC_METHOD_SIMULATED_ANNEALING) {
+                if (!sa_params) {
+                    sa_params = mallocx(1, sizeof(simulated_annealing_params));
+                    sa_params->max_idle = cfg.sa.max_idle;
+                    sa_params->initial_temperature = cfg.sa.initial_temperature;
+                    sa_params->cooling_rate = cfg.sa.cooling_rate;
+                    sa_params->min_temperature = cfg.sa.min_temperature;
+                    sa_params->temperature_length_coeff = cfg.sa.temperature_length_coeff;
+                }
+                heuristic_solver_config_add_method(&solver_conf, simulated_annealing,
+                                                   sa_params, method_name);
+            }
+        }
 
-    } else if (args.method == RESOLUTION_METHOD_ITERATED_LOCAL_SEARCH) {
-        iterated_local_search_solver_config config;
-        iterated_local_search_solver_config_init(&config);
-        config.idle_limit = args.multistart;
-        config.time_limit = args.time_limit;
-        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-        config.starting_solution = solution_loaded ? &sol : NULL;
+        heuristic_solver solver;
+        heuristic_solver_init(&solver);
 
-        iterated_local_search_solver solver;
-        iterated_local_search_solver_init(&solver);
-
-        solution_loaded = iterated_local_search_solver_solve(&solver, &config, &sol);
+        solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &finder_config, &sol);
         if (!solution_loaded)
-            eprint("ERROR: failed to solve model (%s)", iterated_local_search_solver_get_error(&solver));
+            eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
 
-        iterated_local_search_solver_config_destroy(&config);
-        iterated_local_search_solver_destroy(&solver);
-    } else if (args.method == RESOLUTION_METHOD_SIMULATED_ANNEALING) {
-        simulated_annealing_solver_config config;
-        simulated_annealing_solver_config_init(&config);
-        config.idle_limit = args.multistart;
-        config.time_limit = args.time_limit;
-        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-        config.starting_solution = solution_loaded ? &sol : NULL;
 
-        simulated_annealing_solver solver;
-        simulated_annealing_solver_init(&solver);
+        heuristic_solver_destroy(&solver);
+        heuristic_solver_config_destroy(&solver_conf);
 
-        solution_loaded = simulated_annealing_solver_solve(&solver, &config, &sol);
-        if (!solution_loaded)
-            eprint("ERROR: failed to solve model (%s)", simulated_annealing_solver_get_error(&solver));
-
-        simulated_annealing_solver_config_destroy(&config);
-        simulated_annealing_solver_destroy(&solver);
-    } else if (args.method == RESOLUTION_METHOD_TABU_SEARCH) {
-        tabu_search_solver_config config;
-        tabu_search_solver_config_init(&config);
-        config.iter_limit = args.multistart;
-        config.time_limit = args.time_limit;
-        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-        config.starting_solution = solution_loaded ? &sol : NULL;
-
-        tabu_search_solver solver;
-        tabu_search_solver_init(&solver);
-
-        solution_loaded = tabu_search_solver_solve(&solver, &config, &sol);
-        if (!solution_loaded)
-            eprint("ERROR: failed to solve model (%s)", tabu_search_solver_get_error(&solver));
-
-        tabu_search_solver_config_destroy(&config);
-        tabu_search_solver_destroy(&solver);
-    } else if (args.method == RESOLUTION_METHOD_HYBRYD) {
-        hybrid_solver_config config;
-        hybrid_solver_config_init(&config);
-        config.time_limit = args.time_limit;
-        config.difficulty_ranking_randomness = args.assignments_difficulty_ranking_randomness;
-        config.starting_solution = solution_loaded ? &sol : NULL;
-
-        hybrid_solver solver;
-        hybrid_solver_init(&solver);
-
-        solution_loaded = hybrid_solver_solve(&solver, &config, &sol);
-        if (!solution_loaded)
-            eprint("ERROR: failed to solve model (%s)", hybrid_solver_get_error(&solver));
-
-        hybrid_solver_config_destroy(&config);
-        hybrid_solver_destroy(&solver);
+        free(ls_params);
+        free(hc_params);
+        free(ts_params);
+        free(sa_params);
     }
-#endif
 
-    if (solution_loaded || args.force_draw) {
+    if (solution_loaded) {
         if (args.benchmark_mode) {
+            // Just print a line with the format:
+            // <seed> <feasible> <rc> <mwd> <cc> <rs> <cost>
             char benchmark_output[64];
             int rc = solution_room_capacity_cost(&sol);
             int mwd = solution_min_working_days_cost(&sol);
@@ -400,12 +257,14 @@ int main (int argc, char **argv) {
             bool feasible = solution_satisfy_hard_constraints(&sol);
             snprintf(benchmark_output, 64, "%u %d %d %d %d %d %d\n",
                      rand_get_seed(), feasible, rc, mwd, cc, rs, cost);
+
             printf("%s", benchmark_output);
 
-            if (args.output)
-                fileappend(args.output, benchmark_output);
+            if (args.output_file)
+                fileappend(args.output_file, benchmark_output);
         }
         else {
+            // Print the solution and the violations/costs
             char *sol_str = solution_to_string(&sol);
             char *sol_quality_str = solution_quality_to_string(&sol, true);
 
@@ -419,14 +278,17 @@ int main (int argc, char **argv) {
             free(sol_str);
             free(sol_quality_str);
 
-            if (args.output)
-                write_solution(&sol, args.output);
+            if (args.output_file)
+                write_solution(&sol, args.output_file);
         }
-
-
-        if (args.draw_overview_file || args.draw_directory)
-            render_solution_full(&sol, args.draw_overview_file, args.draw_directory);
     }
+
+
+    // Render the solution (eventually)
+    if (args.draw_all_directory)
+        render_solution_overview(&sol, args.draw_all_directory);
+    else if (args.draw_overview_file)
+        render_solution_overview(&sol, args.draw_overview_file);
 
     solution_destroy(&sol);
     model_destroy(&model);

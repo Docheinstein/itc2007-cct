@@ -5,14 +5,15 @@
 #include <stdbool.h>
 #include <glib.h>
 
-#define CRDSQT(model) \
-    const int C = (model)->n_courses; \
-    const int R = (model)->n_rooms;   \
-    const int D = (model)->n_days;   \
-    const int S = (model)->n_slots;   \
-    const int T = (model)->n_teachers; \
-    const int Q = (model)->n_curriculas; \
-    const int L = (model)->n_lectures;
+#define MODEL(m) \
+    const int C = (m)->n_courses; \
+    const int R = (m)->n_rooms;   \
+    const int D = (m)->n_days;   \
+    const int S = (m)->n_slots;   \
+    const int T = (m)->n_teachers; \
+    const int Q = (m)->n_curriculas; \
+    const int L = (m)->n_lectures; \
+    const model *model = (m)
 
 #define FOR_C for (int c = 0; c < C; c++)
 #define FOR_R for (int r = 0; r < R; r++)
@@ -20,13 +21,12 @@
 #define FOR_S for (int s = 0; s < S; s++)
 #define FOR_Q for (int q = 0; q < Q; q++)
 #define FOR_T for (int t = 0; t < T; t++)
-
+#define FOR_L for (int l = 0; l < L; l++)
 
 typedef struct teacher {
-    char *id;
     int index;
+    char *id;
 } teacher;
-
 
 // <course> := <CourseID> <Teacher> <# Lectures> <MinWorkingDays> <# Students>
 // e.g.     :=   c0001       t000         6            4               130
@@ -38,7 +38,7 @@ typedef struct course {
     int min_working_days;
     int n_students;
 
-    teacher *teacher; // redundant, for faster access
+    const teacher *teacher; // redundant, for faster access
 } course;
 
 // <room> := <RoomID> <Capacity>
@@ -66,6 +66,10 @@ typedef struct unavailability_constraint {
     int slot;
 } unavailability_constraint;
 
+typedef struct lecture {
+    int index;
+    const course *course;
+} lecture;
 
 typedef struct model {
     char *name;
@@ -82,8 +86,10 @@ typedef struct model {
 
     // Redundant data (for faster access)
     int n_lectures;
+    lecture *lectures;
+
     int n_teachers;
-    teacher *teachers;                       // T
+    teacher *teachers;
 
     GHashTable *course_by_id;
     GHashTable *room_by_id;
@@ -94,9 +100,9 @@ typedef struct model {
     GArray **courses_of_teacher;
     int **courses_of_curricula;
 
-    bool *course_belongs_to_curricula;     // b_cq
-    bool *course_taught_by_teacher;        // e_ct
-    bool *course_availabilities;           // e_cds
+    bool *course_belongs_to_curricula;
+    bool *course_taught_by_teacher;
+    bool *course_availabilities;
 
     bool *courses_share_curricula;
     bool *courses_same_teacher;
@@ -104,20 +110,6 @@ typedef struct model {
 
 void model_init(model *model);
 void model_destroy(const model *model);
-
-void course_destroy(const course *c);
-void room_destroy(const room *r);
-void curricula_destroy(const curricula *q);
-void unavailability_constraint_destroy(const unavailability_constraint *uc);
-void teacher_destroy(const teacher *t);
-
-void course_to_string(const course *c, char *buffer, size_t buflen);
-void room_to_string(const room *r, char *buffer, size_t buflen);
-void curricula_to_string(const curricula *q, char *buffer, size_t buflen);
-void unavailability_constraint_to_string(const unavailability_constraint *uc,
-                                         char *buffer, size_t buflen);
-
-char *model_to_string(const model *model);
 
 void model_finalize(model *model);
 

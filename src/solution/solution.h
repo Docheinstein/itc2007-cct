@@ -2,7 +2,7 @@
 #define SOLUTION_H
 
 #include <glib.h>
-#include "model.h"
+#include "model/model.h"
 #include <stdio.h>
 
 /*
@@ -43,99 +43,55 @@ Each isolated lecture in a curriculum counts as 2 points of penalty.
 RoomStability: All lectures of a course_id should be given in the same room. Each distinct
 room used for the lectures of a course_id, but the first, counts as 1 point of penalty.
 
- */
+*/
 
 #include <stdbool.h>
 
-typedef struct lecture {
-    int c;
-    int c_i;
-    int r;
-    int d;
-    int s;
-} lecture;
-typedef struct solution_helper {
-    int *c_rds;
-    int *r_cds;
+extern const int ROOM_CAPACITY_COST_FACTOR;
+extern const int MIN_WORKING_DAYS_COST_FACTOR;
+extern const int CURRICULUM_COMPACTNESS_COST_FACTOR;
+extern const int ROOM_STABILITY_COST_FACTOR;
 
-    int *sum_cr;
-
-    bool *timetable_cdsr;
-    int *sum_cds;
-    int *sum_cd;
-
-    bool *timetable_rdsc;
-    int *sum_rds;
-
-    bool *timetable_qdscr;
-    int *sum_qds;
-
-    bool *timetable_tdscr;
-    int *sum_tds;
-
-    lecture *lectures;
-    int *lectures_crds;
-} solution_helper;
+typedef struct assignment {
+    int r, d, s;
+} assignment;
 
 typedef struct solution {
-    bool *timetable;
     const model *model;
-    solution_helper *helper;
+
+    bool *timetable_crds;
+    bool *timetable_cdsr;
+    bool *timetable_rdsc;
+    bool *timetable_qdscr;
+    bool *timetable_tdscr;
+
+    int *c_rds;
+    int *r_cds;
+    int *l_rds;
+
+    int *sum_cr;
+    int *sum_cds;
+    int *sum_cd;
+    int *sum_rds;
+    int *sum_qds;
+    int *sum_tds;
+
+    assignment *assignments;
 } solution;
 
 
-typedef struct solution_parser {
-    char *error;
-} solution_parser;
-
-typedef struct solution_fingerprint_t {
-    unsigned long long sum;
-    unsigned long long xor;
-} solution_fingerprint_t;
-
-bool read_solution(solution *sol, const char *input_file);
-bool write_solution(const solution *sol, const char *output_file);
-bool write_solution_timetable(const solution *sol, const char *output_file);
-void print_solution(const solution *sol, FILE *stream);
-void print_solution_full(const solution *sol, FILE *stream);
-
-void solution_parser_init(solution_parser *solution_parser);
-bool solution_parser_parse(solution_parser *solution_parser, const char * input,
-                           solution *solution);
-void solution_parser_destroy(solution_parser *solution_parser);
-const char * solution_parser_get_error(solution_parser *solution_parser);
-
 void solution_init(solution *solution, const model *model);
-void solution_reinit(solution *solution);
+void solution_clear(solution *solution);
 void solution_destroy(solution *solution);
-
-
-const solution_helper * solution_get_helper(solution *solution);
-bool solution_invalidate_helper(solution *sol);
-bool solution_helper_equal(solution *s1, solution *s2);
-bool solution_helper_equal_0(const solution_helper *s1, const solution_helper *s2, const model *model);
 
 void solution_copy(solution *solution_dest, const solution *solution_src);
 
-void solution_set(solution *sol, int c, int r, int d, int s, bool value, int lecture);
-bool solution_get(const solution *sol, int c, int r, int d, int s);
-
-void solution_set_at(solution *sol, int index, bool value);
-bool solution_get_at(const solution *sol, int index);
+void solution_set_lecture_assignment(solution *sol, int l, int r, int d, int s);
+void solution_get_lecture_assignment(const solution *sol, int l, int *r, int *d, int *s);
 
 char * solution_to_string(const solution *sol);
 char * solution_quality_to_string(const solution *sol, bool verbose);
-
-char * solution_timetable_to_string(const solution *sol);
-
-void solution_fingerprint_init(solution_fingerprint_t *f);
-bool solution_equal(const solution *s1, const solution *s2);
-bool solution_fingerprint_equal(solution_fingerprint_t f1, solution_fingerprint_t f2);
-void solution_fingerprint_add(solution_fingerprint_t *f, int i);
-void solution_fingerprint_sub(solution_fingerprint_t *f, int i);
-
-solution_fingerprint_t solution_fingerprint(const solution *sol);
-int solution_assignment_count(const solution *sol);
+bool write_solution(const solution *sol, const char *filename);
 
 // Hard constraints
 bool solution_satisfy_hard_constraints(const solution *sol);
@@ -156,10 +112,5 @@ int solution_room_capacity_cost(const solution *sol);
 int solution_min_working_days_cost(const solution *sol);
 int solution_curriculum_compactness_cost(const solution *sol);
 int solution_room_stability_cost(const solution *sol);
-
-int solution_room_capacity_lecture_cost(solution *sol, int c, int r, int d, int s);
-int solution_min_working_days_course_cost(solution *sol, int c);
-int solution_curriculum_compactness_lecture_cost(solution *sol, int c, int r, int d, int s);
-int solution_room_stability_course_cost(solution *sol, int c);
 
 #endif // SOLUTION_H

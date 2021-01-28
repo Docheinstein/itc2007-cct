@@ -5,10 +5,10 @@
 
 typedef struct simulated_annealing_params {
     int max_idle;
-    double temperature;
+    double initial_temperature;
+    double cooling_rate;
     double min_temperature;
     double temperature_length_coeff;
-    double cooling_rate;
 } simulated_annealing_params;
 
 void simulated_annealing(heuristic_solver_state *state, void *arg);

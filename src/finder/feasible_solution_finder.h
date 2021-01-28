@@ -2,11 +2,11 @@
 #define FEASIBLE_SOLUTION_FINDER_H
 
 #include <stdbool.h>
-#include "model.h"
-#include "solution.h"
+#include "model/model.h"
+#include "solution/solution.h"
 
 typedef struct feasible_solution_finder_config {
-    double difficulty_ranking_randomness;
+    double ranking_randomness;
 } feasible_solution_finder_config;
 
 typedef struct feasible_solution_finder {
@@ -19,13 +19,8 @@ void feasible_solution_finder_config_destroy(feasible_solution_finder_config *co
 void feasible_solution_finder_init(feasible_solution_finder *finder);
 void feasible_solution_finder_destroy(feasible_solution_finder *finder);
 
-bool feasible_solution_finder_try_find(
-        feasible_solution_finder *finder,
-        feasible_solution_finder_config *config,
-        solution *sol);
-
-void feasible_solution_finder_find(feasible_solution_finder *finder,
-                                   feasible_solution_finder_config *config,
+bool feasible_solution_finder_find(feasible_solution_finder *finder,
+                                   const feasible_solution_finder_config *config,
                                    solution *solution);
 
 const char * feasible_solution_finder_find_get_error(feasible_solution_finder *finder);

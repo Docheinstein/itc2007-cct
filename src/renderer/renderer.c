@@ -23,7 +23,7 @@ double *renderer_r;
 double *renderer_g;
 double *renderer_b;
 
-bool render_solution_full(const solution *sol, char *output_dir, char *overview_file) {
+bool render_solution(const solution *sol, char *output_dir, char *overview_file) {
     renderer renderer;
     renderer_init(&renderer);
 
@@ -42,9 +42,13 @@ bool render_solution_full(const solution *sol, char *output_dir, char *overview_
     return success;
 }
 
+bool render_solution_full(const solution *sol, char *output_dir) {
+    return render_solution(sol, output_dir, NULL);
+}
 
-bool render_solution(const solution *sol, char *overview_file) {
-    return render_solution_full(sol, overview_file, NULL);
+
+bool render_solution_overview(const solution *sol, char *overview_file) {
+    return render_solution(sol, overview_file, NULL);
 }
 
 void renderer_config_init(renderer_config *config) {
@@ -384,7 +388,7 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
                     continue;
 
                 for (int r = 0; r < model->n_rooms; r++) {
-                    slot_assignments += solution->timetable[
+                    slot_assignments += solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
                                    d, model->n_days,
@@ -409,7 +413,7 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
                     continue;
 
                 for (int r = 0; r < model->n_rooms; r++) {
-                    if(solution->timetable[
+                    if(solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
                                    d, model->n_days,
@@ -471,7 +475,7 @@ bool renderer_render_course_timetable(renderer *renderer, const renderer_config 
             int slot_assignments = 0;
 
             for (int r = 0; r < model->n_rooms; r++) {
-                slot_assignments += solution->timetable[
+                slot_assignments += solution->timetable_crds[
                         INDEX4(course->index, model->n_courses,
                                r, model->n_rooms,
                                d, model->n_days,
@@ -492,7 +496,7 @@ bool renderer_render_course_timetable(renderer *renderer, const renderer_config 
             int slot_index = 0;
 
             for (int r = 0; r < model->n_rooms; r++) {
-                if(solution->timetable[
+                if(solution->timetable_crds[
                         INDEX4(course->index, model->n_courses,
                                r, model->n_rooms,
                                d, model->n_days,
@@ -552,7 +556,7 @@ bool renderer_render_room_timetable(renderer *renderer, const renderer_config *c
             int slot_assignments = 0;
             for (int c = 0; c < model->n_courses; c++) {
 
-                slot_assignments += solution->timetable[
+                slot_assignments += solution->timetable_crds[
                         INDEX4(c, model->n_courses,
                                room->index, model->n_rooms,
                                d, model->n_days,
@@ -573,7 +577,7 @@ bool renderer_render_room_timetable(renderer *renderer, const renderer_config *c
             int slot_index = 0;
             for (int c = 0; c < model->n_courses; c++) {
 
-                if(solution->timetable[
+                if(solution->timetable_crds[
                         INDEX4(c, model->n_courses,
                                room->index, model->n_rooms,
                                d, model->n_days,
@@ -636,7 +640,7 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
                     continue;
 
                 for (int r = 0; r < model->n_rooms; r++) {
-                    slot_assignments += solution->timetable[
+                    slot_assignments += solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
                                    d, model->n_days,
@@ -661,7 +665,7 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
                     continue;
 
                 for (int r = 0; r < model->n_rooms; r++) {
-                    if (solution->timetable[
+                    if (solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
                                    d, model->n_days,
@@ -741,7 +745,7 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
         for (int s = 0; s < model->n_slots; s++) {
             for (int c = 0; c < model->n_courses; c++) {
                 for (int r = 0; r < model->n_rooms; r++) {
-                    if(solution->timetable[
+                    if(solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
                                    d, model->n_days,

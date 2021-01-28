@@ -1,8 +1,8 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "model.h"
-#include "solution.h"
+#include "model/model.h"
+#include "solution/solution.h"
 
 
 
@@ -21,8 +21,8 @@ typedef struct renderer {
     char *error;
 } renderer;
 
-bool render_solution(const solution *sol, char *overview_file);
-bool render_solution_full(const solution *sol, char *output_dir, char *overview_file);
+bool render_solution_overview(const solution *sol, char *overview_file);
+bool render_solution_full(const solution *sol, char *output_dir);
 
 void renderer_config_init(renderer_config *config);
 void renderer_config_destroy(renderer_config *config);

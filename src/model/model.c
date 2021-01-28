@@ -21,6 +21,7 @@ void model_init(model *model) {
     model->curriculas = NULL;
     model->unavailability_constraints = NULL;
     model->n_lectures = 0;
+    model->lectures = NULL;
     model->n_teachers = 0;
     model->teachers = NULL;
     model->course_by_id = NULL;
@@ -35,6 +36,28 @@ void model_init(model *model) {
     model->course_availabilities = NULL;
     model->courses_share_curricula = NULL;
     model->courses_same_teacher = NULL;
+}
+
+static void course_destroy(const course *c) {
+    free(c->id);
+    free(c->teacher_id);
+}
+
+static void room_destroy(const room *r) {
+    free(r->id);
+}
+
+static void curricula_destroy(const curricula *q) {
+    free(q->id);
+    freearray(q->courses_ids, q->n_courses);
+}
+
+static void unavailability_constraint_destroy(const unavailability_constraint *uc) {
+    free(uc->course_id);
+}
+
+static void teacher_destroy(const teacher *t) {
+    free(t->id);
 }
 
 void model_destroy(const model *model) {
@@ -94,28 +117,6 @@ void model_destroy(const model *model) {
         g_hash_table_destroy(model->teacher_by_id);
 }
 
-void course_destroy(const course *c) {
-    free(c->id);
-    free(c->teacher_id);
-}
-
-void room_destroy(const room *r) {
-    free(r->id);
-}
-
-void curricula_destroy(const curricula *q) {
-    free(q->id);
-    freearray(q->courses_ids, q->n_courses);
-}
-
-void unavailability_constraint_destroy(const unavailability_constraint *uc) {
-    free(uc->course_id);
-}
-
-void teacher_destroy(const teacher *t) {
-    free(t->id);
-}
-
 void course_to_string(const course *course, char *buffer, size_t buflen) {
     snprintf(buffer, buflen,
              "(id=%s, teacher=%s, n_lectures=%d, min_working_days=%d, n_students=%d)",
@@ -151,62 +152,6 @@ void unavailability_constraint_to_string(const unavailability_constraint *uc,
     );
 }
 
-char * model_to_string(const model *model) {
-
-#define MODEL_APPEND_SECTION(header, n_entries, entries, to_string_func) do { \
-    if (entries) { \
-        strappend_realloc(&buffer, &buflen, header); \
-        for (int i = 0; i < (n_entries); ++i) { \
-            to_string_func(&(entries)[i], tmp, tmp_buffer_length); \
-            strappend_realloc(&buffer, &buflen, "%s\n", tmp); \
-        } \
-    } \
-} while(0)
-
-    char *buffer = NULL;
-    size_t buflen;
-
-    strappend_realloc(&buffer, &buflen,
-         "name = %s\n"
-         "# courses = %d\n"
-         "# rooms = %d\n"
-         "# days = %d\n"
-         "# periods_per_day = %d\n"
-         "# curricula = %d\n"
-         "# constraints = %d\n",
-         model->name,
-         model->n_courses,
-         model->n_rooms,
-         model->n_days,
-         model->n_slots,
-         model->n_curriculas,
-         model->n_unavailability_constraints
-    );
-
-    static const size_t tmp_buffer_length = 512;
-    char tmp[tmp_buffer_length];
-
-    MODEL_APPEND_SECTION("COURSES\n",
-                         model->n_courses, model->courses,
-                         course_to_string);
-    MODEL_APPEND_SECTION("ROOMS\n",
-                         model->n_rooms, model->rooms,
-                         room_to_string);
-    MODEL_APPEND_SECTION("CURRICULAS\n",
-                         model->n_curriculas, model->curriculas,
-                         curricula_to_string);
-    MODEL_APPEND_SECTION("UNAVAILABILITY_CONSTRAINTS\n",
-                         model->n_unavailability_constraints,
-                         model->unavailability_constraints,
-                         unavailability_constraint_to_string);
-
-    buffer[strlen(buffer) - 1] = '\0';
-
-#undef MODEL_APPEND_SECTION
-
-    return buffer; // must be freed outside
-}
-
 void model_finalize(model *model) {
     // Compute redundant data (for faster access)
     const int C = model->n_courses;
@@ -215,13 +160,10 @@ void model_finalize(model *model) {
     const int U = model->n_unavailability_constraints;
     const int D = model->n_days;
     const int S = model->n_slots;
+    const int L = model->n_lectures;
 
     static const int TMP_LEN = 256;
     char tmp[TMP_LEN];
-
-
-    for (int c = 0; c < model->n_courses; c++)
-        model->n_lectures += model->courses[c].n_lectures;
 
     // T
     GHashTable *teachers_set = g_hash_table_new(g_str_hash, g_str_equal);
@@ -376,6 +318,17 @@ void model_finalize(model *model) {
         model->courses[c].teacher =
                 model_teacher_by_id(model, model->courses[c].teacher_id);
     }
+
+    int l = 0;
+    for (int c = 0; c < C; c++) {
+        const course *course = &model->courses[c];
+        model->n_lectures += course->n_lectures;
+        for (int n = 0; n < course->n_lectures; n++) {
+            model->lectures[l].index = l;
+            model->lectures[l].course = course;
+            l++;
+        }
+    }
 }
 
 course *model_course_by_id(const model *model, char *id) {
@@ -436,11 +389,4 @@ bool model_share_curricula(const model *model, int course1_idx, int course2_idx,
 bool model_same_teacher(const model *model, int course1_idx, int course2_idx) {
     return model->courses_same_teacher[INDEX2(course1_idx, model->n_courses,
                                               course2_idx, model->n_courses)];
-}
-
-int model_lectures_count(const model *model) {
-    CRDSQT(model);
-    int count = 0;
-
-    return 0;
 }

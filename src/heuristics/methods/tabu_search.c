@@ -1,7 +1,7 @@
-#include <heuristics/neighbourhoods/neighbourhood_swap.h>
-#include <renderer.h>
+#include <heuristics/neighbourhoods/swap.h>
+#include <renderer/renderer.h>
 #include <utils/random_utils.h>
-#include <utils/def_utils.h>
+#include <utils/str_utils.h>
 #include "tabu_search.h"
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
@@ -22,10 +22,9 @@ typedef struct tabu_list {
     double frequency_penalty_coeff;
 } tabu_list;
 
-
-static void tabu_list_init(tabu_list *tabu, const model *model,
+static void tabu_list_init(tabu_list *tabu, const model *m,
                            int tenure, double frequency_penalty_coeff) {
-    CRDSQT(model);
+    MODEL(m);
     tabu->model = model;
     tabu->banned = callocx(C * R * D * S, sizeof(tabu_list_entry));
     tabu->tenure = tenure;
@@ -39,7 +38,7 @@ static void tabu_list_destroy(tabu_list *tabu) {
 static bool tabu_list_lecture_is_allowed(tabu_list *tabu, int c, int r, int d, int s, int time) {
     if (c < 0)
         return true;
-    CRDSQT(tabu->model);
+    MODEL(tabu->model);
     tabu_list_entry *entry = &tabu->banned[INDEX4(c, C, r, R, d, D, s, S)];
     if (!entry->count)
         return true;
@@ -47,31 +46,30 @@ static bool tabu_list_lecture_is_allowed(tabu_list *tabu, int c, int r, int d, i
 //    return entry->time + tabu->tenure + tabu->frequency_penalty_coeff * entry->count < time;
 }
 
-static bool tabu_list_move_is_allowed(tabu_list *tabu, neighbourhood_swap_move *mv, int time) {
+static bool tabu_list_move_is_allowed(tabu_list *tabu, swap_move *mv, int time) {
     return
-        tabu_list_lecture_is_allowed(tabu, mv->c1, mv->r2, mv->d2, mv->s2, time) &&
-        tabu_list_lecture_is_allowed(tabu, mv->c2, mv->r1, mv->d1, mv->s1, time);
+        tabu_list_lecture_is_allowed(tabu, mv->helper.c1, mv->r2, mv->d2, mv->s2, time) &&
+        tabu_list_lecture_is_allowed(tabu, mv->helper.c2, mv->helper.r1, mv->helper.d1, mv->helper.s1, time);
 }
 
-static void tabu_list_insert_lecture(tabu_list *tabu, int c, int r, int d, int s,
-                                     int time) {
+static void tabu_list_insert_lecture(tabu_list *tabu, int c, int r, int d, int s, int time) {
     if (c < 0)
         return;
-    CRDSQT(tabu->model);
+    MODEL(tabu->model);
     tabu_list_entry *entry = &tabu->banned[INDEX4(c, C, r, R, d, D, s, S)];
     entry->time = time;
     entry->count++;
 }
 
 static void tabu_list_clear(tabu_list *tabu) {
-    CRDSQT(tabu->model);
+    MODEL(tabu->model);
     memset(tabu->banned, 0, C * R * D * S * sizeof(tabu_list_entry));
 }
 
-static void tabu_list_insert_move(tabu_list *tabu, neighbourhood_swap_move *mv,
+static void tabu_list_insert_move(tabu_list *tabu, swap_move *mv,
                                   int time) {
-    tabu_list_insert_lecture(tabu, mv->c1, mv->r1, mv->d1, mv->s1, time);
-    tabu_list_insert_lecture(tabu, mv->c2, mv->r2, mv->d2, mv->s2, time);
+    tabu_list_insert_lecture(tabu, mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1, time);
+    tabu_list_insert_lecture(tabu, mv->helper.c2, mv->r2, mv->d2, mv->s2, time);
 }
 
 static void tabu_list_dump(tabu_list *tabu) {
@@ -91,24 +89,15 @@ static void tabu_list_dump(tabu_list *tabu) {
 #endif
 }
 
-static void apply_solution_fingerprint_diff(solution_fingerprint_t *f,
-                                     solution_fingerprint_t diff_plus,
-                                     solution_fingerprint_t diff_minus) {
-    f->sum += diff_plus.sum;
-    f->sum -= diff_minus.sum;
-    f->xor ^= diff_plus.xor;
-    f->xor ^= diff_minus.xor;
-}
-
 void tabu_search(heuristic_solver_state *state, void *arg) {
-    CRDSQT(state->model);
+    MODEL(state->model);
 
     tabu_search_params *params = (tabu_search_params *) arg;
     verbose("TS.max_idle = %d", params->max_idle);
     verbose("TS.tabu_tenure = %d", params->tabu_tenure);
     verbose("TS.frequency_penalty_coeff = %g", params->frequency_penalty_coeff);
-    verbose("TS.random_pick = %s", BOOL_TO_STR(params->random_pick));
-    verbose("TS.clear_on_best = %s", BOOL_TO_STR(params->clear_on_best));
+    verbose("TS.random_pick = %s", booltostr(params->random_pick));
+    verbose("TS.clear_on_best = %s", booltostr(params->clear_on_best));
 
     tabu_list tabu;
     tabu_list_init(&tabu, state->model,
@@ -119,16 +108,16 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
     int idle = 0;
     int iter = 0;
 
-    neighbourhood_swap_move *moves = mallocx(
+    swap_move *moves = mallocx(
             params->random_pick ? (tabu.model->n_lectures * R * D * S) : 1,
-            sizeof(neighbourhood_swap_move));
+            sizeof(swap_move));
 
     while (idle < params->max_idle) {
-        neighbourhood_swap_iter swap_iter;
-        neighbourhood_swap_iter_init(&swap_iter, state->current_solution);
+        swap_iter swap_iter;
+        swap_iter_init(&swap_iter, state->current_solution);
 
-        neighbourhood_swap_move swap_mv;
-        neighbourhood_swap_result swap_result;
+        swap_move swap_mv;
+        swap_result swap_result;
 
         int best_swap_cost = INT_MAX;
 
@@ -140,22 +129,20 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
 
         int move_cursor = 0;
 
-        while (neighbourhood_swap_iter_next(&swap_iter, &swap_mv)) {
-            neighbourhood_swap(state->current_solution, &swap_mv,
-                               NEIGHBOURHOOD_PREDICT_ALWAYS,
-                               NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
-                               NEIGHBOURHOOD_PREDICT_NEVER,
-                               NEIGHBOURHOOD_PERFORM_NEVER,
-                               &swap_result);
+        while (swap_iter_next(&swap_iter, &swap_mv)) {
+            swap_predict(state->current_solution, &swap_mv,
+                         NEIGHBOURHOOD_PREDICT_ALWAYS,
+                         NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+                         &swap_result);
 
             if (swap_result.feasible &&
-                    swap_result.delta_cost <= best_swap_cost &&
-                    (state->current_cost + swap_result.delta_cost < state->best_cost ||
+                    swap_result.delta.cost <= best_swap_cost &&
+                    (state->current_cost + swap_result.delta.cost < state->best_cost ||
                             tabu_list_move_is_allowed(&tabu, &swap_mv, iter))) {
 
-                if (swap_result.delta_cost < best_swap_cost) {
+                if (swap_result.delta.cost < best_swap_cost) {
                     move_cursor = 0;
-                    best_swap_cost = swap_result.delta_cost;
+                    best_swap_cost = swap_result.delta.cost;
                 }
 
                 moves[move_cursor] = swap_mv;
@@ -163,32 +150,29 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
                 if (params->random_pick)
                     move_cursor++;
 
-                if (swap_result.delta_cost < 0 && params->steepest) {
-                    // Go down without evaluating all the neighbours
+                if (swap_result.delta.cost < 0 && params->steepest) {
+                    // Perform an improving move without evaluating
+                    // all the neighbours
                     break;
                 }
             }
 
             bool banned = !tabu_list_move_is_allowed(&tabu, &swap_mv, iter);
-            bool side = swap_result.delta_cost == 0;
+            bool side = swap_result.delta.cost == 0;
             stats.n_banned_moves +=  banned;
             stats.n_side_moves += side;
             stats.n_side_banned_moves += (banned && side);
         }
 
-        neighbourhood_swap_iter_destroy(&swap_iter);
+        swap_iter_destroy(&swap_iter);
 
         if (best_swap_cost != INT_MAX) {
             int pick = params->random_pick ? rand_int_range(0, move_cursor) : 0;
             swap_mv = moves[pick];
-            neighbourhood_swap(state->current_solution, &swap_mv,
-                               NEIGHBOURHOOD_PREDICT_NEVER,
-                               NEIGHBOURHOOD_PREDICT_ALWAYS,
-                               NEIGHBOURHOOD_PREDICT_NEVER,
-                               NEIGHBOURHOOD_PERFORM_ALWAYS,
-                               &swap_result);
+            swap_perform(state->current_solution, &swap_mv,
+                         NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
 
-            state->current_cost += swap_result.delta_cost;
+            state->current_cost += best_swap_cost;
             bool new_best = heuristic_solver_state_update(state);
             if (new_best && params->clear_on_best)
                 tabu_list_clear(&tabu);

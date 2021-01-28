@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <limits.h>
 
 bool streq(const char *s1, const char *s2) {
     return (!s1 && !s2) || s1 && s2 && strcmp(s1, s2) == 0;
@@ -100,50 +101,58 @@ char *strtrim_chars(char *str, const char *chars) {
 }
 
 
-int strtoint(const char *str, bool *ok) {
-    return (uint) strtolong(str, ok);
+bool strtoint(const char *str, int *value) {
+    long long_value;
+    bool ok = strtolong(str, &long_value);
+    if (ok && long_value <= INT_MAX && long_value >= INT_MIN) {
+        *value = (int) long_value;
+        return true;
+    }
+    return false;
 }
 
-uint strtouint(const char *str, bool *ok) {
-    return (uint) strtoulong(str, ok);
+bool strtouint(const char *str, unsigned int *value) {
+    unsigned long ulong_value;
+    bool ok = strtoulong(str, &ulong_value);
+    if (ok && ulong_value <= UINT_MAX) {
+        *value = (unsigned int) ulong_value;
+        return true;
+    }
+    return false;
 }
 
-long strtolong(const char *str, bool *ok) {
+bool strtolong(const char *str, long *value) {
     char *endptr = NULL;
-
     errno = 0;
-    long ret = strtol(str, &endptr, 10);
-
-    if (ok != NULL)
-        *ok = (errno == 0 && str && endptr && *endptr == '\0');
-
-    return ret;
+    *value = strtol(str, &endptr, 10);
+    return errno == 0 && str && endptr && *endptr == '\0';
 }
 
-ulong strtoulong(const char *str, bool *ok) {
+bool strtoulong(const char *str, unsigned long *value) {
     char *endptr = NULL;
-
     errno = 0;
-    unsigned long ret = strtoul(str, &endptr, 10);
-
-    if (ok != NULL)
-        *ok = (errno == 0 && str && endptr && *endptr == '\0');
-
-    return ret;
+    *value = strtoul(str, &endptr, 10);
+    return errno == 0 && str && endptr && *endptr == '\0';
 }
 
-double strtodouble(const char *str, bool *ok) {
+bool strtodouble(const char *str, double *value) {
     char *endptr = NULL;
-
     errno = 0;
-    double ret = strtod(str, &endptr);
-
-    if (ok != NULL)
-        *ok = (errno == 0 && str && endptr && *endptr == '\0');
-
-    return ret;
+    *value = strtod(str, &endptr);
+    return errno == 0 && str && endptr && *endptr == '\0';
 }
 
+bool strtobool(const char *str, bool *value) {
+    if (streq(str, "true") || streq(str, "1") || streq(str, "yes")) {
+        *value = true;
+        return true;
+    }
+    if (streq(str, "false") || streq(str, "0") || streq(str, "no")) {
+        *value = false;
+        return true;
+    }
+    return false;
+}
 
 int strsplit(char *str, const char *delimiters, char **tokens, size_t max_tokens) {
     if (max_tokens <= 0)
@@ -268,3 +277,8 @@ char strfirst(const char *str) {
 char strlast(const char *str) {
     return str[strlen(str) - 1];
 }
+
+const char *booltostr(bool value) {
+    return value ? "true" : "false";
+}
+

@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <solution.h>
-#include <model_parser.h>
+#include <solution/solution.h>
+#include <model/model_parser.h>
 #include "munit/munit.h"
 #include <log/verbose.h>
 #include <utils/str_utils.h>
@@ -9,9 +9,9 @@
 #include <utils/array_utils.h>
 #include <log/debug.h>
 #include <utils/random_utils.h>
-#include <heuristics/neighbourhoods/neighbourhood_swap.h>
-#include <feasible_solution_finder.h>
-#include <renderer.h>
+#include <heuristics/neighbourhoods/swap.h>
+#include <finder/feasible_solution_finder.h>
+#include <renderer/renderer.h>
 #include "utils/os_utils.h"
 
 #define BUFLEN 128
@@ -544,19 +544,19 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
 
     feasible_solution_finder_find(&finder, &finder_config, &sol);
 
-    neighbourhood_swap_result swap_result;
+    swap_result swap_result;
     int cost = solution_cost(&sol);
 
     bool improved;
     do {
         improved = false;
 
-        neighbourhood_swap_iter iter;
-        neighbourhood_swap_iter_init(&iter, &sol);
+        swap_iter iter;
+        swap_iter_init(&iter, &sol);
 
-        neighbourhood_swap_move mv;
+        swap_move mv;
 
-        while (neighbourhood_swap_iter_next(&iter, &mv)) {
+        while (swap_iter_next(&iter, &mv)) {
             int c_rm = solution_room_capacity_cost(&sol);
             int c_mwd = solution_min_working_days_cost(&sol);
             int c_cc = solution_curriculum_compactness_cost(&sol);
@@ -601,7 +601,7 @@ static MunitResult test_compute_neighbourhood_swap_cost_constraints(const char *
             neighbourhood_swap_back(&sol, &mv, &swap_result, true);
             munit_assert_true(solution_satisfy_hard_constraints(&sol));
         }
-        neighbourhood_swap_iter_destroy(&iter);
+        swap_iter_destroy(&iter);
     } while (cost > 0 && improved);
 
     solution_destroy(&sol);
@@ -628,16 +628,16 @@ static MunitResult test_neighbourhood_iter_next(const char *dataset_file) {
 
     feasible_solution_finder_find(&finder, &finder_config, &sol);
 
-    neighbourhood_swap_iter iter;
-    neighbourhood_swap_iter_init(&iter, &sol);
+    swap_iter iter;
+    swap_iter_init(&iter, &sol);
 
-    neighbourhood_swap_move mv;
+    swap_move mv;
 
-    while (neighbourhood_swap_iter_next(&iter, &mv)) {
+    while (swap_iter_next(&iter, &mv)) {
         munit_assert_true(solution_get(&sol, mv.c1, mv.r1, mv.d1, mv.s1));
     }
 
-    neighbourhood_swap_iter_destroy(&iter);
+    swap_iter_destroy(&iter);
 
     solution_destroy(&sol);
     model_destroy(&m);
@@ -670,7 +670,7 @@ static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_bette
 
     feasible_solution_finder_find(&finder, &finder_config, &sol);
 
-    neighbourhood_swap_result swap_result;
+    swap_result swap_result;
     int cost = solution_cost(&sol);
 
     bool improved;
@@ -683,12 +683,12 @@ static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_bette
         solution_init(&sol_neigh, &m);
         solution_copy(&sol_neigh, &sol);
 
-        neighbourhood_swap_iter iter;
-        neighbourhood_swap_iter_init(&iter, &sol_neigh);
+        swap_iter iter;
+        swap_iter_init(&iter, &sol_neigh);
 
-        neighbourhood_swap_move mv;
+        swap_move mv;
 
-        while (neighbourhood_swap_iter_next(&iter, &mv)) {
+        while (swap_iter_next(&iter, &mv)) {
             bool restart = false;
 
             if (neighbourhood_swap(&sol_neigh, &mv,
@@ -722,7 +722,7 @@ static MunitResult test_compute_neighbourhood_swap_perform_if_feasible_and_bette
         }
 
         solution_destroy(&sol_neigh);
-        neighbourhood_swap_iter_destroy(&iter);
+        swap_iter_destroy(&iter);
     } while (cost > 0 && improved);
 
     solution_destroy(&sol);
@@ -735,17 +735,17 @@ static MunitResult test_neighbourhood_swap_helper(const char *dataset_file) {
     solution s;
     find_feasible_solution(&m, &s, "datasets/comp01.ctt");    bool improved;
 
-    CRDSQT(&m);
+    MODEL(&m);
     do {
         improved = false;
 
-        neighbourhood_swap_iter iter;
-        neighbourhood_swap_iter_init(&iter, &s);
+        swap_iter iter;
+        swap_iter_init(&iter, &s);
 
-        neighbourhood_swap_move mv;
-        struct neighbourhood_swap_result res;
+        swap_move mv;
+        struct swap_result res;
 
-        while (neighbourhood_swap_iter_next(&iter, &mv)) {
+        while (swap_iter_next(&iter, &mv)) {
             neighbourhood_swap(&s, &mv,
                                NEIGHBOURHOOD_PREDICT_ALWAYS,
                                NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
@@ -788,7 +788,7 @@ static MunitResult test_neighbourhood_swap_helper(const char *dataset_file) {
             }
         }
 
-        neighbourhood_swap_iter_destroy(&iter);
+        swap_iter_destroy(&iter);
     } while (improved);
 
     model_destroy(&m);

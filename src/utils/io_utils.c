@@ -49,10 +49,10 @@ int fileclear(const char *filename) {
 /*
  * Returns NULL on success, or a malloc-ed error string on failure.
  */
-char * fileparse(const char *input_file,
+char * fileparse(const char *filename,
+                 fileparse_options *parse_options,
                  parse_line_callback callback,
-                 void *callback_arg,
-                 fileparse_options *parse_options) {
+                 void *callback_arg) {
     static const int MAX_ERROR_LENGTH = 256;
     char error_reason[MAX_ERROR_LENGTH];
     error_reason[0] = '\0';
@@ -62,11 +62,11 @@ char * fileparse(const char *input_file,
     char *line;
     int line_num = 0;
 
-    verbose2("Opening file: '%s'", input_file);
-    FILE *file = fopen(input_file, "r");
+    verbose2("Opening file: '%s'", filename);
+    FILE *file = fopen(filename, "r");
     if (!file) {
         snprintf(error_reason, MAX_ERROR_LENGTH,
-                 "failed to open '%s' (%s)\n", input_file, strerror(errno));
+                 "failed to open '%s' (%s)\n", filename, strerror(errno));
         goto QUIT;
     }
 
@@ -83,12 +83,12 @@ char * fileparse(const char *input_file,
         if (strempty(line) || strstarts(line, comment_prefix))
             continue;
 
-        continue_parsing = callback(line, callback_arg, error_reason, MAX_ERROR_LENGTH);
+        continue_parsing = callback(line, callback_arg);
     }
 
-    verbose2("Closing file: '%s'", input_file);
+    verbose2("Closing file: '%s'", filename);
     if (fclose(file) != 0)
-        verbose("WARN: failed to close '%s' (%s)", input_file, strerror(errno));
+        verbose("WARN: failed to close '%s' (%s)", filename, strerror(errno));
 
 QUIT:
     if (!strempty(error_reason)) {

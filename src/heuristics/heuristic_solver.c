@@ -3,26 +3,25 @@
 #include <log/verbose.h>
 #include <utils/str_utils.h>
 #include <utils/time_utils.h>
-#include <utils/def_utils.h>
-#include <omp.h>
-#include "feasible_solution_finder.h"
+#include "timeout/timeout.h"
+#include "finder/feasible_solution_finder.h"
 #include "utils/mem_utils.h"
 
 
 void heuristic_solver_config_init(heuristic_solver_config *config) {
-    config->methods = g_array_new(false, false, sizeof(heuristic_method_parameterized));
-    config->time_limit = -1;
-    config->cycles_limit = -1;
+    config->methods = g_array_new(false, false, sizeof(heuristic_solver_method_callback_param));
+    config->max_time = -1;
+    config->max_cycles = -1;
     config->starting_solution = NULL;
     config->multistart = false;
     config->restore_best_after_cycles = -1;
 }
 
 void heuristic_solver_config_add_method(heuristic_solver_config *config,
-                                        heuristic_method method,
+                                        heuristic_solver_method_callback method,
                                         void *param,
                                         const char *name) {
-    heuristic_method_parameterized method_parameterized = {
+    heuristic_solver_method_callback_param method_parameterized = {
         .method = method,
         .param = param,
         .name = name
@@ -47,6 +46,7 @@ const char *heuristic_solver_get_error(heuristic_solver *solver) {
 }
 
 bool generate_feasible_solution_if_needed(const heuristic_solver_config *solver_conf,
+                                          const feasible_solution_finder_config *finder_conf,
                                           heuristic_solver_state *state) {
     if (solver_conf->starting_solution) {
         debug("Using provided initial solution");
@@ -57,13 +57,8 @@ bool generate_feasible_solution_if_needed(const heuristic_solver_config *solver_
         feasible_solution_finder finder;
         feasible_solution_finder_init(&finder);
 
-        feasible_solution_finder_config finder_config;
-        feasible_solution_finder_config_init(&finder_config);
-//        finder_config.difficulty_ranking_randomness = config->difficulty_ranking_randomness;
-
-        if (state->current_cost != INT_MAX)
-            solution_reinit(state->current_solution);
-        feasible_solution_finder_find(&finder, &finder_config, state->current_solution);
+        solution_clear(state->current_solution);
+        feasible_solution_finder_find(&finder, finder_conf, state->current_solution);
         // error, in case in unable to find solution
 
         state->current_cost = solution_cost(state->current_solution);
@@ -75,11 +70,14 @@ bool generate_feasible_solution_if_needed(const heuristic_solver_config *solver_
     return true;
 }
 
-bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_config *solver_conf,
+bool heuristic_solver_solve(heuristic_solver *solver,
+                            const heuristic_solver_config *solver_conf,
+                            const feasible_solution_finder_config *finder_conf,
                             solution *sol_out) {
     const model *model = sol_out->model;
 
-    heuristic_method_parameterized *methods = (heuristic_method_parameterized *) solver_conf->methods->data;
+    heuristic_solver_method_callback_param *methods =
+            (heuristic_solver_method_callback_param *) solver_conf->methods->data;
     int n_methods = solver_conf->methods->len;
 
     if (!n_methods) {
@@ -87,14 +85,14 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
         return false;
     }
 
-    verbose("solver.time_limit = %d", solver_conf->time_limit);
-    verbose("solver.cycles_limit = %d", solver_conf->cycles_limit);
-    verbose("solver.multistart = %s", BOOL_TO_STR(solver_conf->multistart));
+    verbose("solver.time_limit = %d", solver_conf->max_time);
+    verbose("solver.cycles_limit = %d", solver_conf->max_cycles);
+    verbose("solver.multistart = %s", booltostr(solver_conf->multistart));
     verbose("solver.restore_best_after_cycles = %d", solver_conf->restore_best_after_cycles);
 
-    long starting_time = ms();
-    long deadline = solver_conf->time_limit > 0 ? (starting_time + solver_conf->time_limit * 1000) : 0;
-    int cycles_limit = solver_conf->cycles_limit >= 0 ? solver_conf->cycles_limit : INT_MAX;
+    set_timeout(solver_conf->max_time);
+
+    int cycles_limit = solver_conf->max_cycles >= 0 ? solver_conf->max_cycles : INT_MAX;
 
     solution current_solution;
     solution_init(&current_solution, model);
@@ -105,7 +103,7 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
     state->current_cost = INT_MAX;
     state->best_solution = sol_out;
     state->best_cost = INT_MAX;
-    state->starting_time = starting_time;
+    state->starting_time = ms();
     state->best_solution_time = LONG_MAX;
     state->ending_time = LONG_MAX;
 
@@ -124,8 +122,8 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
     int non_improving_current_cycles = 0;
 
     while (state->best_cost > 0) {
-        if (deadline > 0 && !(ms() < deadline)) {
-            debug("Time limit reached (%ds), stopping here", solver_conf->time_limit);
+        if (timeout) {
+            debug("Time limit reached (%ds), stopping here", solver_conf->max_time);
             break;
         }
 
@@ -138,7 +136,7 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
         int cycle_begin_current_cost = state->current_cost;
 
         // In case of multistart, generate a new solution each cycle
-        generate_feasible_solution_if_needed(solver_conf, state);
+        generate_feasible_solution_if_needed(solver_conf, finder_conf, state);
 
         // Restore the best known solution after 'restore_best_after_cycles'
         if (solver_conf->restore_best_after_cycles > 0 &&
@@ -164,10 +162,12 @@ bool heuristic_solver_solve(heuristic_solver *solver, const heuristic_solver_con
 
 
         for (int i = 0; i < solver_conf->methods->len; i++) {
-            heuristic_method_parameterized *method = &methods[i];
-            verbose("------------ %s BEGIN (%d) ------------", method->name, state->current_cost);
+            heuristic_solver_method_callback_param *method = &methods[i];
+            verbose("------------ %s BEGIN (%d) ------------",
+                    method->name, state->current_cost);
             method->method(state, method->param);
-            verbose("------------ %s END   (%d) --------------", method->name, state->current_cost);
+            verbose("------------ %s END   (%d) --------------",
+                    method->name, state->current_cost);
         }
 
         non_improving_current_cycles =

@@ -4,8 +4,8 @@
 #include "heuristics/heuristic_solver.h"
 
 typedef struct tabu_search_params {
-    int tabu_tenure;
     int max_idle;
+    int tabu_tenure;
     double frequency_penalty_coeff;
     bool random_pick;
     bool steepest;

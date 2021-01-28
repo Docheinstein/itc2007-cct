@@ -2,28 +2,40 @@
 #define CONFIG_H
 
 #include <stdbool.h>
-#include <resolution_method.h>
+#include <heuristics/methods/heuristic_method.h>
 
 typedef struct config {
     // Solver
     struct {
-        resolution_method *methods;
-        int n_methods;
-        int cycles_limit;
-        int time_limit;
+        struct {
+            heuristic_method *data;
+            int len;
+        } methods;
+        int max_time;
+        int max_cycles;
         bool multistart;
         int restore_best_after_cycles;
     } solver;
 
+    // Feasible solution finder
+    struct {
+        double ranking_randomness;
+    } finder;
+
+    // Local Search
+    struct {
+        bool steepest;
+    } ls;
+
     // Hill Climbing
     struct {
-        int idle;
+        int max_idle;
     } hc;
 
     // Tabu Search
     struct {
-        int idle;
-        int tenure;
+        int max_idle;
+        int tabu_tenure;
         double frequency_penalty_coeff;
         bool random_pick;
         bool steepest;
@@ -32,19 +44,17 @@ typedef struct config {
 
     // Simulated Annealing
     struct {
-        int idle;
-        double temperature;
+        int max_idle;
+        double initial_temperature;
+        double cooling_rate;
         double min_temperature;
         double temperature_length_coeff;
-        double cooling_rate;
     } sa;
 } config;
 
-void config_default(config *cfg);
+void config_init(config *cfg);
 void config_destroy(config *cfg);
 
 char * config_to_string(const config *cfg);
-
-
 
 #endif // CONFIG_H
