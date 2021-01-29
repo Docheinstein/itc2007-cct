@@ -117,7 +117,7 @@ int solution_curriculum_compactness_cost(const solution *sol);
 int solution_room_stability_cost(const solution *sol);
 
 // Debug purpose
-unsigned long long solution_hash(const solution *sol);
+unsigned long long solution_fingerprint(const solution *sol);
 void solution_assert(const solution *sol, bool expected_feasibility, int expected_cost);
 void solution_assert_consistency(const solution *sol);
 

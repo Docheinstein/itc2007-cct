@@ -7,8 +7,6 @@
 #include "model/model.h"
 #include "utils/assert_utils.h"
 
-
-
 static bool check_lectures_constraint(
         const solution *sol, int c1, int d1, int s1, int c2, int d2, int s2) {
     MODEL(sol->model);
@@ -413,7 +411,12 @@ static void swap_move_compute_helper(const solution *sol,
            mv->l1, mv->r2, mv->d2, mv->s2);
 
     mv->helper.c1 = sol->model->lectures[mv->l1].course->index;
-    solution_get_lecture_assignment(sol, mv->l1, &mv->helper.r1, &mv->helper.d1, &mv->helper.s1);
+
+    const assignment *a = &sol->assignments[mv->l1];
+//    solution_get_lecture_assignment(sol, mv->l1, &mv->helper.r1, &mv->helper.d1, &mv->helper.s1);
+    mv->helper.r1 = a->r;
+    mv->helper.d1 = a->d;
+    mv->helper.s1 = a->s;
 
     mv->helper.l2 = sol->l_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
     if (mv->helper.l2 >= 0)

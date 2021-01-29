@@ -160,102 +160,63 @@ int main (int argc, char **argv) {
             exit(EXIT_FAILURE);
     }
 
-    // Setup solver
-    feasible_solution_finder_config finder_config;
-    feasible_solution_finder_config_init(&finder_config);
-    finder_config.ranking_randomness = cfg.finder.ranking_randomness;
-
+    // Add methods (solver.methods) to solver
     heuristic_solver_config solver_conf;
     heuristic_solver_config_init(&solver_conf);
 
     solver_conf.max_cycles = cfg.solver.max_cycles;
-    solver_conf.max_time = cfg.solver.max_time;
+    solver_conf.max_time = args.max_time >= 0 ? args.max_time : cfg.solver.max_time;
     solver_conf.starting_solution = solution_loaded ? &sol : NULL;
     solver_conf.multistart = cfg.solver.multistart;
     solver_conf.restore_best_after_cycles = cfg.solver.restore_best_after_cycles;
     solver_conf.dont_solve = args.dont_solve;
 
-    if (args.max_time)
-        solver_conf.max_time = args.max_time;
-
-    // Add methods (solver.methods) to solver
-    local_search_params *ls_params = NULL;
-    hill_climbing_params *hc_params = NULL;
-    tabu_search_params *ts_params = NULL;
-    simulated_annealing_params *sa_params = NULL;
-
-    for (int i = 0; i < cfg.solver.methods.len; i++) {
-        heuristic_method method = cfg.solver.methods.data[i];
+    heuristic_method *methods = (heuristic_method *) cfg.solver.methods->data;
+    for (int i = 0; i < cfg.solver.methods->len; i++) {
+        heuristic_method method = methods[i];
         const char *method_name = heuristic_method_to_string(method);
 
         if (method == HEURISTIC_METHOD_LOCAL_SEARCH) {
-            if (!ls_params) {
-                ls_params = mallocx(1, sizeof(local_search_params));
-                ls_params->steepest = cfg.ls.steepest;
-            }
             heuristic_solver_config_add_method(&solver_conf, local_search,
-                                               ls_params, method_name);
+                                               &cfg.ls, method_name);
         } else if (method == HEURISTIC_METHOD_TABU_SEARCH) {
-            if (!ts_params) {
-                ts_params = mallocx(1, sizeof(tabu_search_params));
-                ts_params->max_idle = cfg.ts.max_idle;
-                ts_params->tabu_tenure = cfg.ts.tabu_tenure;
-                ts_params->frequency_penalty_coeff = cfg.ts.frequency_penalty_coeff;
-                ts_params->random_pick = cfg.ts.random_pick;
-                ts_params->steepest = cfg.ts.steepest;
-                ts_params->clear_on_best = cfg.ts.clear_on_best;
-            }
             heuristic_solver_config_add_method(&solver_conf, tabu_search,
-                                               ts_params, method_name);
+                                               &cfg.ts, method_name);
         } else if (method == HEURISTIC_METHOD_HILL_CLIMBING) {
-            if (!hc_params) {
-                hc_params = mallocx(1, sizeof(hill_climbing_params));
-                hc_params->max_idle = cfg.hc.max_idle;
-            }
             heuristic_solver_config_add_method(&solver_conf, hill_climbing,
-                                               hc_params, method_name);
+                                               &cfg.hc, method_name);
         } else if (method == HEURISTIC_METHOD_SIMULATED_ANNEALING) {
-            if (!sa_params) {
-                sa_params = mallocx(1, sizeof(simulated_annealing_params));
-                sa_params->max_idle = cfg.sa.max_idle;
-                sa_params->initial_temperature = cfg.sa.initial_temperature;
-                sa_params->cooling_rate = cfg.sa.cooling_rate;
-                sa_params->min_temperature = cfg.sa.min_temperature;
-                sa_params->temperature_length_coeff = cfg.sa.temperature_length_coeff;
-            }
             heuristic_solver_config_add_method(&solver_conf, simulated_annealing,
-                                               sa_params, method_name);
+                                               &cfg.sa, method_name);
         }
     }
 
     heuristic_solver solver;
     heuristic_solver_init(&solver);
 
-    solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &finder_config, &sol);
+    solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &cfg.finder, &sol);
     if (!solution_loaded)
         eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
 
     heuristic_solver_destroy(&solver);
     heuristic_solver_config_destroy(&solver_conf);
 
-    free(ls_params);
-    free(hc_params);
-    free(ts_params);
-    free(sa_params);
 
     if (solution_loaded) {
+        unsigned long long fingerprint = solution_fingerprint(&sol);
+
         if (args.benchmark_mode) {
             // Just print a line with the format:
             // <seed> <feasible> <rc> <mwd> <cc> <rs> <cost>
-            char benchmark_output[64];
+            char benchmark_output[128];
             int rc = solution_room_capacity_cost(&sol);
             int mwd = solution_min_working_days_cost(&sol);
             int cc = solution_curriculum_compactness_cost(&sol);
             int rs = solution_room_stability_cost(&sol);
             int cost = rc + mwd + cc + rs;
             bool feasible = solution_satisfy_hard_constraints(&sol);
-            snprintf(benchmark_output, 64, "%u %d %d %d %d %d %d\n",
-                     rand_get_seed(), feasible, rc, mwd, cc, rs, cost);
+            snprintf(benchmark_output, 128, "%u %llu %d %d %d %d %d %d\n",
+                     rand_get_seed(), fingerprint, feasible, rc, mwd, cc, rs, cost);
 
             printf("%s", benchmark_output);
 
@@ -277,12 +238,10 @@ int main (int argc, char **argv) {
             free(sol_str);
             free(sol_quality_str);
 
+            verbose("Solution fingerprint: %llu", fingerprint);
             if (args.output_file)
                 write_solution(&sol, args.output_file);
         }
-
-        if (get_verbosity())
-            verbose("Solution hash: %llu", solution_hash(&sol));
     }
 
 

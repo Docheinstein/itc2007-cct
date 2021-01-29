@@ -6,12 +6,13 @@
 #include "config_parser.h"
 
 char *config_to_string(const config *cfg) {
-    char *methods[cfg->solver.methods.len];
-    for (int i = 0; i < cfg->solver.methods.len; i++)
-        methods[i] = strdup(heuristic_method_to_string(cfg->solver.methods.data[i]));
-    char *solver_methods = strjoin(methods, cfg->solver.methods.len, ", ");
-    for (int i = 0; i < cfg->solver.methods.len; i++)
-        free(methods[i]);
+    char *methods_str[cfg->solver.methods->len];
+    heuristic_method *methods = (heuristic_method *) cfg->solver.methods->data;
+    for (int i = 0; i < cfg->solver.methods->len; i++)
+        methods_str[i] = strdup(heuristic_method_to_string(methods[i]));
+    char *solver_methods = strjoin(methods_str, cfg->solver.methods->len, ", ");
+    for (int i = 0; i < cfg->solver.methods->len; i++)
+        free(methods_str[i]);
 
     char *s = strmake(
         "solver.methods = %s\n"
@@ -65,33 +66,30 @@ char *config_to_string(const config *cfg) {
 }
 
 void config_init(config *cfg) {
-    cfg->solver.methods.data = NULL;
-    cfg->solver.methods.len = 0;
-    cfg->solver.max_time = -1;
+    cfg->solver.methods = g_array_new(false, false, sizeof(heuristic_method));
+    cfg->solver.max_time = 60;
     cfg->solver.max_cycles = -1;
     cfg->solver.multistart = false;
-    cfg->solver.restore_best_after_cycles = -1;
+    cfg->solver.restore_best_after_cycles = 15;
 
-    cfg->finder.ranking_randomness = 0.33;
+    // Default methods: HC+SA
+//    heuristic_method *hc = mallocx(1, sizeof(heuristic_method));
+//    heuristic_method *sa = mallocx(1, sizeof(heuristic_method));
+//    *hc = HEURISTIC_METHOD_HILL_CLIMBING;
+//    *sa = HEURISTIC_METHOD_SIMULATED_ANNEALING;
+    heuristic_method hc = HEURISTIC_METHOD_HILL_CLIMBING;
+    heuristic_method sa = HEURISTIC_METHOD_SIMULATED_ANNEALING;
 
-    cfg->ls.steepest = true;
+    g_array_append_val(cfg->solver.methods, hc);
+    g_array_append_val(cfg->solver.methods, sa);
 
-    cfg->hc.max_idle = 120000;
-
-    cfg->ts.max_idle = 400;
-    cfg->ts.tabu_tenure = 120;
-    cfg->ts.frequency_penalty_coeff = 1.2;
-    cfg->ts.random_pick = true;
-    cfg->ts.steepest = true;
-    cfg->ts.clear_on_best = true;
-
-    cfg->sa.max_idle = 80000;
-    cfg->sa.initial_temperature = 1.5;
-    cfg->sa.cooling_rate = 0.96;
-    cfg->sa.min_temperature = 0.08;
-    cfg->sa.temperature_length_coeff = 1;
+    feasible_solution_finder_config_default(&cfg->finder);
+    local_search_params_default(&cfg->ls);
+    hill_climbing_params_default(&cfg->hc);
+    tabu_search_params_default(&cfg->ts);
+    simulated_annealing_params_default(&cfg->sa);
 }
 
 void config_destroy(config *cfg) {
-    free(cfg->solver.methods.data);
+    g_array_free(cfg->solver.methods, true);
 }

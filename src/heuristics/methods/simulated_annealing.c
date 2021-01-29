@@ -6,6 +6,16 @@
 
 #define SA_ACCEPTANCE(delta, t) pow(M_E, - (double) (delta) / (t))
 
+
+void simulated_annealing_params_default(simulated_annealing_params *params) {
+    params->max_idle = 80000;
+    params->initial_temperature = 1.5;
+    params->cooling_rate = 0.96;
+    params->min_temperature = 0.08;
+    params->temperature_length_coeff = 1;
+}
+
+
 static bool simulated_annealing_accept(heuristic_solver_state *state,
                                        swap_result *swap_result,
                                        double temperature) {

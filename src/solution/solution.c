@@ -795,7 +795,7 @@ bool write_solution(const solution *sol, const char *filename) {
     return success;
 }
 
-unsigned long long solution_hash(const solution *sol) {
+unsigned long long solution_fingerprint(const solution *sol) {
     MODEL(sol->model);
     unsigned long long h = 0;
     char *ptr = (char *) sol->assignments;

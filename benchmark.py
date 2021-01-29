@@ -9,81 +9,81 @@ executable = Path("build/itc2007-cct")
 runs_per_dataset = 10
 seconds_per_run = 168
 
+LS_OPTIONS = ["solver.methods=ls", "solver.multistart=true"]
 
-def benchmark_arg(name, method):
-    return f"datasets/{name}.ctt", f"configs/{method}.conf", f"benchmarks/{method}/{name}.out"
-
-
-benchmark_args = [
-    # benchmark_arg("comp01", "ls"),
-    # benchmark_arg("comp02", "ls"),
-    # benchmark_arg("comp03", "ls"),
-    # benchmark_arg("comp04", "ls"),
-    benchmark_arg("comp05", "ls"),
-    # benchmark_arg("comp06", "ls"),
-    # benchmark_arg("comp07", "ls")
+benchmarks = [
+    ("comp01-ls", "datasets/comp01.ctt", "benchmarks/ls/comp01.out", LS_OPTIONS),
+    ("comp02-ls", "datasets/comp02.ctt", "benchmarks/ls/comp02.out", LS_OPTIONS),
+    ("comp03-ls", "datasets/comp03.ctt", "benchmarks/ls/comp03.out", LS_OPTIONS),
+    ("comp04-ls", "datasets/comp04.ctt", "benchmarks/ls/comp04.out", LS_OPTIONS),
+    ("comp05-ls", "datasets/comp05.ctt", "benchmarks/ls/comp05.out", LS_OPTIONS),
+    ("comp06-ls", "datasets/comp06.ctt", "benchmarks/ls/comp06.out", LS_OPTIONS),
+    ("comp07-ls", "datasets/comp07.ctt", "benchmarks/ls/comp07.out", LS_OPTIONS),
 ]
 
 # -----------------------------------
 
-if not executable.exists():
-    print(f"'{executable.absolute()}' not found: please build itc2007-cct",
-          file=sys.stderr)
-    exit(1)
+if __name__ == "__main__":
+    bench_filter = sys.argv[1] if len(sys.argv) > 1 else None
 
-print("=============== BENCHMARK ===============")
-print(f"# Benchmarks:        {len(benchmark_args)}")
-print(f"Runs per benchmark:  {runs_per_dataset}")
-print(f"Seconds per run:     {seconds_per_run}")
-print(f"Estimated time:      {int(len(benchmark_args) * runs_per_dataset * seconds_per_run / 60)} minutes")
-print("=========================================")
+    if not executable.exists():
+        print(f"'{executable.absolute()}' not found: please build itc2007-cct",
+              file=sys.stderr)
+        exit(1)
 
-for b_i, bench_arg in enumerate(benchmark_args):
-    dataset, config, output = bench_arg
+    filtered_benchmarks = []
+    for bench in benchmarks:
+        bench_name = bench[0]
+        if bench_filter and bench_name.find(bench_filter) == -1:
+            continue
+        filtered_benchmarks.append(bench)
 
-    dataset_path = Path(dataset)
-    config_path = Path(config)
-    output_path = Path(output)
+    print("=============== BENCHMARK ===============")
+    print(f"# Datasets:          {len(filtered_benchmarks)}")
+    print(f"Runs per benchmark:  {runs_per_dataset}")
+    print(f"Seconds per run:     {seconds_per_run}")
+    print(f"Estimated time:      {int(len(filtered_benchmarks) * runs_per_dataset * seconds_per_run / 60)} minutes")
+    print("=========================================")
 
-    if not dataset_path.exists():
-        print(f"WARN: skipping benchmark, missing dataset at path '{dataset_path}'")
-        continue
+    for b_i, bench in enumerate(filtered_benchmarks):
+        bench_name, dataset, output, options = bench
 
-    if not config_path.exists():
-        print(f"WARN: skipping benchmark, missing config at path '{config_path}'")
-        continue
+        dataset_path = Path(dataset)
+        output_path = Path(output)
 
-    print(f"[{b_i + 1}/{len(benchmark_args)}] {dataset} -c {config}")
+        if not dataset_path.exists():
+            print(f"WARN: skipping benchmark, missing dataset at path '{dataset_path}'")
+            continue
 
-    output_folder = output_path.parent
-    output_folder.mkdir(parents=True, exist_ok=True)
+        print(f"[{b_i + 1}/{len(filtered_benchmarks)}] {dataset} {options}")
 
-    with output_path.open("w") as out:
-        out.write("# ----------------------------------------------------------\n")
-        out.write("# ----------------------- BENCHMARK ------------------------\n")
-        out.write("# ----------------------------------------------------------\n")
-        out.write(f"# Dataset:          {dataset}\n")
-        out.write(f"# Datetime:         {datetime.now().strftime('%H:%M:%S %m/%d/%Y')}\n")
-        out.write(f"# Seconds per run:  {seconds_per_run}\n")
-        out.write("# ----------------------------------------------------------\n")
-        with config_path.open() as cfg:
-            for line in cfg.readlines():
-                line = line.strip()
-                if line:
-                    print(f"# {line}")
-                    out.write(f"# {line}\n")
-        out.write("# ---------------------------------------------------------\n")
-        out.write("# seed  feasible  cost_rc  cost_mwd  cost_cc  cost_rs  cost\n")
-        out.write("# ---------------------------------------------------------\n")
+        output_folder = output_path.parent
+        output_folder.mkdir(parents=True, exist_ok=True)
 
-    for i in range(runs_per_dataset):
-        print(f"  {i + 1}/{runs_per_dataset}... ", end="", flush=True)
-        subprocess.run([
-            str(executable),
-            dataset,
-            output,
-            "-t", str(seconds_per_run),
-            "-c", config,
-            "-b"])
+        with output_path.open("w") as out:
+            out.write("# ----------------------------------------------------------\n")
+            out.write("# ----------------------- BENCHMARK ------------------------\n")
+            out.write("# ----------------------------------------------------------\n")
+            out.write(f"# Dataset:          {dataset}\n")
+            out.write(f"# Datetime:         {datetime.now().strftime('%H:%M:%S %m/%d/%Y')}\n")
+            out.write(f"# Seconds per run:  {seconds_per_run}\n")
+            out.write(f"# Options:\n")
+            for opt in options:
+                out.write(f"#   {opt}\n")
+            out.write("#\n")
+            out.write("# ---------------------------------------------------------\n")
+            out.write("# seed  fingerprint  feasible  cost_rc  cost_mwd  cost_cc  cost_rs  cost\n")
+            out.write("# ---------------------------------------------------------\n")
 
-    print("--------------------------------------")
+        for i in range(runs_per_dataset):
+            print(f"  {i + 1}/{runs_per_dataset}... ", end="", flush=True)
+            subprocess.run([
+                str(executable),
+                dataset,
+                output,
+                "-t", str(seconds_per_run),
+                "-b",
+                *(" ".join([f"-o {opt}" for opt in options]).split(" "))]
+            )
+
+        print("--------------------------------------")

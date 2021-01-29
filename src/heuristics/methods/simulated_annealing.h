@@ -11,6 +11,8 @@ typedef struct simulated_annealing_params {
     double temperature_length_coeff;
 } simulated_annealing_params;
 
+void simulated_annealing_params_default(simulated_annealing_params *params);
+
 void simulated_annealing(heuristic_solver_state *state, void *arg);
 
 #endif // SIMULATED_ANNEALING_H

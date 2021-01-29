@@ -5,6 +5,10 @@
 #include "hill_climbing.h"
 #include "local_search.h"
 
+void local_search_params_default(local_search_params *params) {
+    params->steepest = true;
+}
+
 void local_search(heuristic_solver_state *state, void *arg) {
     local_search_params *params = (local_search_params *) arg;
 

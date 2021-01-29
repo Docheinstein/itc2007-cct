@@ -363,12 +363,11 @@ GLIB_TEST_ARG(test_finder) {
     feasible_solution_finder_init(&finder);
 
     feasible_solution_finder_config finder_config;
-    feasible_solution_finder_config_init(&finder_config);
+    feasible_solution_finder_config_default(&finder_config);
 
     g_assert_true(feasible_solution_finder_find(&finder, &finder_config, &s));
     g_assert_true(solution_satisfy_hard_constraints(&s));
 
-    feasible_solution_finder_config_destroy(&finder_config);
     feasible_solution_finder_destroy(&finder);
 
     model_destroy(&m);
@@ -386,11 +385,10 @@ static void parse_model_and_find_solution(model *m, solution *s, const char *mod
     feasible_solution_finder_init(&finder);
 
     feasible_solution_finder_config finder_config;
-    feasible_solution_finder_config_init(&finder_config);
+    feasible_solution_finder_config_default(&finder_config);
 
     feasible_solution_finder_find(&finder, &finder_config, s);
 
-    feasible_solution_finder_config_destroy(&finder_config);
     feasible_solution_finder_destroy(&finder);
 }
 

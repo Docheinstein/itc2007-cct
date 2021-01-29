@@ -6,9 +6,9 @@
 int get_verbosity();
 void set_verbosity(int level);
 
-void verbose_internal(int level, const char *fmt, ...);
+void verbose_lv(int level, const char *fmt, ...);
 
-#define verbose(format, ...) verbose_internal(1, format "\n", ##__VA_ARGS__)
-#define verbose2(format, ...) verbose_internal(2, format "\n", ##__VA_ARGS__)
+#define verbose(format, ...) verbose_lv(1, format "\n", ##__VA_ARGS__)
+#define verbose2(format, ...) verbose_lv(2, format "\n", ##__VA_ARGS__)
 
 #endif // VERBOSE_H"

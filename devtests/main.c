@@ -32,7 +32,7 @@ void test_finder(model *model, double ranking_randomness, int trials) {
     solution_init(&s, model);
 
     feasible_solution_finder_config finder_conf;
-    feasible_solution_finder_config_init(&finder_conf);
+    feasible_solution_finder_config_default(&finder_conf);
     finder_conf.ranking_randomness = ranking_randomness;
 
     int successes = 0;
@@ -46,7 +46,7 @@ void test_finder(model *model, double ranking_randomness, int trials) {
         successes += success;
 #if COUNT_DIFFERENT_SOLUTIONS
         if (success) {
-            hashes[i] = solution_hash(&s);
+            hashes[i] = solution_fingerprint(&s);
             g_hash_table_add(sols, &hashes[i]);
         }
 #endif
@@ -90,8 +90,6 @@ void test_finder_multi(const char **datasets, double r_from, double r_to, double
 
 void tests() {
     test_finder_single("datasets/comp03.ctt", 0.33, 0.33, 0.00, 100000);
-    print("t1=%ldms", t1);
-    print("t2=%ldms", t2);
 //    test_finder_multi(DATASETS, 0.20, 0.60, 0.02, 1000);
 }
 

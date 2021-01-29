@@ -5,6 +5,10 @@
 #include <log/debug.h>
 #include <heuristics/neighbourhoods/swap.h>
 
+void hill_climbing_params_default(hill_climbing_params *params) {
+    params->max_idle = 120000;
+}
+
 void hill_climbing(heuristic_solver_state *state, void *arg) {
     hill_climbing_params *params = (hill_climbing_params *) arg;
     verbose("HC.max_idle = %d", params->max_idle);

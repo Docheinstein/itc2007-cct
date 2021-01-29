@@ -9,6 +9,7 @@
 #include "utils/io_utils.h"
 #include "config.h"
 
+static const int MAX_METHODS = 10;
 
 bool parse_config_file(config *config, const char *filename) {
     config_parser parser;
@@ -41,12 +42,34 @@ bool parse_config_options(config *config, const char **options, int n_options) {
     return success;
 }
 
+
+
 void config_parser_init(config_parser *parser) {
     parser->error = NULL;
 }
 
 void config_parser_destroy(config_parser *parser) {
     free(parser->error);
+}
+
+static void config_parser_add_method(config *cfg, const char *method) {
+    debug("Adding method: '%s'", method);
+    heuristic_method m;
+
+    if (streq(method, "ls"))
+        m = HEURISTIC_METHOD_LOCAL_SEARCH;
+    else if (streq(method, "ts"))
+        m = HEURISTIC_METHOD_TABU_SEARCH;
+    else if (streq(method, "hc"))
+        m = HEURISTIC_METHOD_HILL_CLIMBING;
+    else if (streq(method, "sa"))
+        m = HEURISTIC_METHOD_SIMULATED_ANNEALING;
+    else {
+        print("WARN: unexpected method, skipping '%s' (possible values are 'ls', 'ts', 'hc', 'sa'", method);
+        return;
+    }
+
+    g_array_append_val(cfg->solver.methods, m);
 }
 
 static char * config_parser_key_value_handler(config *cfg, char *key, char *value) {
@@ -58,28 +81,11 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
     debug("Parsing config line: %s=%s", key, value);
 
     if (streq(key, "solver.methods")) {
-        static const int MAX_METHODS = 10;
-        if (!cfg->solver.methods.data)
-            cfg->solver.methods.data = mallocx(MAX_METHODS, sizeof(heuristic_method));
+        g_array_remove_range(cfg->solver.methods, 0, cfg->solver.methods->len);
         char **methods_strings = mallocx(MAX_METHODS, sizeof(char *));
-        cfg->solver.methods.len = strsplit(value, ",", methods_strings, MAX_METHODS);
-
-        for (int i = 0; i < cfg->solver.methods.len; i++) {
-            char *method = strtrim(methods_strings[i]);
-            debug("Found method: '%s'", method);
-            if (streq(method, "ls"))
-                cfg->solver.methods.data[i] = HEURISTIC_METHOD_LOCAL_SEARCH;
-            else if (streq(method, "ts"))
-                cfg->solver.methods.data[i] = HEURISTIC_METHOD_TABU_SEARCH;
-            else if (streq(method, "hc"))
-                cfg->solver.methods.data[i] = HEURISTIC_METHOD_HILL_CLIMBING;
-            else if (streq(method, "sa"))
-                cfg->solver.methods.data[i] = HEURISTIC_METHOD_SIMULATED_ANNEALING;
-            else {
-                print("WARN: unexpected method, skipping '%s' (possible values are 'ls', 'ts', 'hc', 'sa'", method);
-                cfg->solver.methods.data[i] = HEURISTIC_METHOD_NONE;
-            }
-        }
+        int n_methods = strsplit(value, ",", methods_strings, MAX_METHODS);
+        for (int i = 0; i < n_methods; i++)
+            config_parser_add_method(cfg, strtrim(methods_strings[i]));
         free(methods_strings);
         return NULL;
     }
@@ -135,6 +141,7 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
     return NULL;
 };
 
+
 static char * config_parser_line_handler(const char *line, void *arg) {
     config *cfg = (config *) arg;
 
@@ -164,6 +171,7 @@ bool config_parser_add_option(config_parser *parser, config *config, const char 
     parser->error = config_parser_line_handler(option, config);
     return strempty(parser->error);
 }
+
 
 bool config_parser_parse(config_parser *parser, config *config, const char *filename) {
     fileparse_options options = { .comment_prefix = '#' };

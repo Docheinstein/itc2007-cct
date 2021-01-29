@@ -12,11 +12,9 @@
 #define WHITE 1, 1, 1
 #define BLACK 0, 0, 0
 #define LIGHT_GRAY 0.9, 0.9, 0.9
-#define DARK_GRAY 0.6, 0.6, 0.6
 
 #define DARK_THRESHOLD 0.3
 #define LIGHT_THRESHOLD 0.95
-
 
 static int renderer_n_colors;
 double *renderer_r;
@@ -28,7 +26,7 @@ bool render_solution(const solution *sol, char *output_dir, char *overview_file)
     renderer_init(&renderer);
 
     renderer_config config;
-    renderer_config_init(&config);
+    renderer_config_default(&config);
     config.output_dir = overview_file;
     config.output_file = output_dir;
 
@@ -36,7 +34,6 @@ bool render_solution(const solution *sol, char *output_dir, char *overview_file)
     if (!success)
         eprint("WARN: failed to render solution (%s)", renderer_get_error(&renderer));
 
-    renderer_config_destroy(&config);
     renderer_destroy(&renderer);
 
     return success;
@@ -46,23 +43,17 @@ bool render_solution_full(const solution *sol, char *output_dir) {
     return render_solution(sol, output_dir, NULL);
 }
 
-
 bool render_solution_overview(const solution *sol, char *overview_file) {
     return render_solution(sol, overview_file, NULL);
 }
 
-void renderer_config_init(renderer_config *config) {
+void renderer_config_default(renderer_config *config) {
     config->output_dir = NULL;
     config->output_file = NULL;
     config->width = 1920;
     config->height = 1080;
     config->font_size_medium = config->width / 80;
     config->font_size_small = config->width / 100;
-    config->font_size_very_small = config->width / 120;
-}
-
-void renderer_config_destroy(renderer_config *config) {
-
 }
 
 void renderer_init(renderer *renderer) {
@@ -73,7 +64,7 @@ void renderer_destroy(renderer *renderer) {
     free(renderer->error);
 }
 
-static void renderer_reinit(renderer *renderer) {
+static void renderer_reset(renderer *renderer) {
     renderer_init(renderer);
     renderer_destroy(renderer);
 }
@@ -366,7 +357,7 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
-    const model *model = solution->model;
+    MODEL(solution->model);
 
     if (!prologue(renderer, config, solution,
                   "curriculums", q->id,
@@ -376,18 +367,16 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
                   model->n_courses, &red, &green, &blue))
         return false;
 
-    debug("renderer_render_curriculum_timetable(%s) -> '%s'", q->id, path);
-
     int max_slot_assignments = 0;
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
+    FOR_D {
+        FOR_S {
             int slot_assignments = 0;
-            for (int c = 0; c < model->n_courses; c++) {
+            FOR_C {
                 if (!model_course_belongs_to_curricula(model, c, q->index))
                     continue;
 
-                for (int r = 0; r < model->n_rooms; r++) {
+                FOR_R {
                     slot_assignments += solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
@@ -399,20 +388,16 @@ bool renderer_render_curriculum_timetable(renderer *renderer, const renderer_con
         }
     }
 
-    debug("renderer_render_curriculum_timetable max_slot_assignments = %d",
-          max_slot_assignments);
-
-
     double H = ((double) row_height / max_slot_assignments);
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
+    FOR_D {
+        FOR_S {
             int slot_index = 0;
-            for (int c = 0; c < model->n_courses; c++) {
+            FOR_C {
                 if (!model_course_belongs_to_curricula(model, c, q->index))
                     continue;
 
-                for (int r = 0; r < model->n_rooms; r++) {
+                FOR_R {
                     if(solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
@@ -456,7 +441,7 @@ bool renderer_render_course_timetable(renderer *renderer, const renderer_config 
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
-    const model *model = solution->model;
+    MODEL(solution->model);
 
     if (!prologue(renderer, config, solution,
                   "courses", course->id,
@@ -466,15 +451,13 @@ bool renderer_render_course_timetable(renderer *renderer, const renderer_config 
                   model->n_rooms, &red, &green, &blue))
         return false;
 
-    debug("renderer_render_course_timetable(%s) -> '%s'", course->id, path);
-
     int max_slot_assignments = 0;
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
+    FOR_D {
+        FOR_S {
             int slot_assignments = 0;
 
-            for (int r = 0; r < model->n_rooms; r++) {
+            FOR_R {
                 slot_assignments += solution->timetable_crds[
                         INDEX4(course->index, model->n_courses,
                                r, model->n_rooms,
@@ -485,17 +468,13 @@ bool renderer_render_course_timetable(renderer *renderer, const renderer_config 
         }
     }
 
-    debug("renderer_render_course_timetable max_slot_assignments = %d",
-          max_slot_assignments);
-
-
     double H = ((double) row_height / max_slot_assignments);
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
+    FOR_D {
+        FOR_S {
             int slot_index = 0;
 
-            for (int r = 0; r < model->n_rooms; r++) {
+            FOR_R {
                 if(solution->timetable_crds[
                         INDEX4(course->index, model->n_courses,
                                r, model->n_rooms,
@@ -537,7 +516,7 @@ bool renderer_render_room_timetable(renderer *renderer, const renderer_config *c
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
-    const model *model = solution->model;
+    MODEL(solution->model);
 
     if (!prologue(renderer, config, solution,
                   "rooms", room->id,
@@ -547,14 +526,12 @@ bool renderer_render_room_timetable(renderer *renderer, const renderer_config *c
                   model->n_courses, &red, &green, &blue))
         return false;
 
-    debug("renderer_render_room_timetable(%s) -> '%s'", room->id, path);
-
     int max_slot_assignments = 0;
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
+    FOR_D {
+        FOR_S {
             int slot_assignments = 0;
-            for (int c = 0; c < model->n_courses; c++) {
+            FOR_C {
 
                 slot_assignments += solution->timetable_crds[
                         INDEX4(c, model->n_courses,
@@ -566,16 +543,12 @@ bool renderer_render_room_timetable(renderer *renderer, const renderer_config *c
         }
     }
 
-    debug("renderer_render_room_timetable max_slot_assignments = %d",
-          max_slot_assignments);
-
-
     double H = ((double) row_height / max_slot_assignments);
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
+    FOR_D {
+        FOR_S {
             int slot_index = 0;
-            for (int c = 0; c < model->n_courses; c++) {
+            FOR_C {
 
                 if(solution->timetable_crds[
                         INDEX4(c, model->n_courses,
@@ -618,7 +591,7 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
-    const model *model = solution->model;
+    MODEL(solution->model);
 
     if (!prologue(renderer, config, solution,
                   "teachers", teacher->id,
@@ -628,18 +601,16 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
                   model->n_courses, &red, &green, &blue))
         return false;
 
-    debug("renderer_render_teacher_timetable(%s) -> '%s'", teacher->id, path);
-
     int max_slot_assignments = 0;
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
+    FOR_D {
+        FOR_S {
             int slot_assignments = 0;
-            for (int c = 0; c < model->n_courses; c++) {
+            FOR_C {
                 if (!model_course_is_taught_by_teacher(model, c, teacher->index))
                     continue;
 
-                for (int r = 0; r < model->n_rooms; r++) {
+                FOR_R {
                     slot_assignments += solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
@@ -651,20 +622,16 @@ bool renderer_render_teacher_timetable(renderer *renderer, const renderer_config
         }
     }
 
-    debug("renderer_render_teacher_timetable max_slot_assignments = %d",
-          max_slot_assignments);
-
-
     double H = ((double) row_height / max_slot_assignments);
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
+    FOR_D {
+        FOR_S {
             int slot_index = 0;
-            for (int c = 0; c < model->n_courses; c++) {
+            FOR_C {
                 if (!model_course_is_taught_by_teacher(model, c, teacher->index))
                     continue;
 
-                for (int r = 0; r < model->n_rooms; r++) {
+                FOR_R {
                     if (solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
@@ -708,7 +675,8 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
     int cols, rows, col_width, row_height;
     char *path;
     double *red, *green, *blue;
-    const model *model = solution->model;
+    MODEL(solution->model);
+
     int font_size =MIN(
             (double) config->height / (model->n_slots * model->n_rooms) * 0.6,
             (double) config->width / (model->n_days * 10));
@@ -720,31 +688,13 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
                   &cols, &rows, &col_width, &row_height,
                   model->n_courses, &red, &green, &blue))
         return false;
-
-    debug("renderer_render_overview_timetable -> '%s'", path);
-
-//    int max_slot_assignments = 0;
-//
-//    for (int d = 0; d < model->n_days; d++) {
-//        for (int s = 0; s < model->n_slots; s++) {
-//            int slot_assignments = 0;
-//            for (int c = 0; c < model->n_courses; c++) {
-//                for (int r = 0; r < model->n_rooms; r++) {
-//                    slot_assignments += solution_get(solution, c, r, d, s);
-//                }
-//            }
-//            max_slot_assignments = MAX(max_slot_assignments, slot_assignments);
-//        }
-//    }
-
-//    debug("renderer_render_overview_timetable max_slot_assignments = %d",
-//          max_slot_assignments);
+    
     double H = ((double) row_height / model->n_rooms);
 
-    for (int d = 0; d < model->n_days; d++) {
-        for (int s = 0; s < model->n_slots; s++) {
-            for (int c = 0; c < model->n_courses; c++) {
-                for (int r = 0; r < model->n_rooms; r++) {
+    FOR_D {
+        FOR_S {
+            FOR_C {
+                FOR_R {
                     if(solution->timetable_crds[
                             INDEX4(c, model->n_courses,
                                    r, model->n_rooms,
@@ -776,9 +726,9 @@ bool renderer_render_overview_timetable(renderer *renderer, const renderer_confi
 
 bool renderer_render(renderer *renderer, const renderer_config *config,
                      const solution *solution) {
-    const model *model = solution->model;
+    MODEL(solution->model);
 
-    renderer_reinit(renderer);
+    renderer_reset(renderer);
 
     if (strempty(config->output_dir) && strempty(config->output_file)) {
         renderer->error = strmake("output directory or output file must be specified");
@@ -792,32 +742,32 @@ bool renderer_render(renderer *renderer, const renderer_config *config,
 
     if (!strempty(config->output_dir)) {
         for (int q = 0; q < model->n_curriculas; q++) {
-            verbose("Rendering timetable of curriculum '%s'", model->curriculas[q].id);
+            verbose("Rendering timetable of curriculum '%s'...", model->curriculas[q].id);
             if (!renderer_render_curriculum_timetable(renderer, config,
                                                       solution, &model->curriculas[q]))
                 return false;
         }
-        for (int c = 0; c < model->n_courses; c++) {
-            verbose("Rendering timetable of course '%s'", model->courses[c].id);
+        FOR_C {
+            verbose("Rendering timetable of course '%s'...", model->courses[c].id);
             if (!renderer_render_course_timetable(renderer, config,
                                                   solution, &model->courses[c]))
                 return false;
         }
-        for (int r = 0; r < model->n_rooms; r++) {
-            verbose("Rendering timetable of room '%s'", model->rooms[r].id);
+        FOR_R {
+            verbose("Rendering timetable of room '%s'...", model->rooms[r].id);
             if (!renderer_render_room_timetable(renderer, config,
                                                 solution, &model->rooms[r]))
                 return false;
         }
         for (int t = 0; t < model->n_teachers; t++) {
-            verbose("Rendering timetable of teacher '%s'", model->teachers[t].id);
+            verbose("Rendering timetable of teacher '%s...'", model->teachers[t].id);
             if (!renderer_render_teacher_timetable(renderer, config,
                                                    solution, &model->teachers[t]))
                 return false;
         }
     }
 
-    verbose("Rendering overview timetable");
+    verbose("Rendering overview timetable...");
     renderer_render_overview_timetable(renderer, config, solution);
 
     return strempty(renderer->error);

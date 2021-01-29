@@ -12,11 +12,14 @@ typedef struct heuristic_solver_state {
     int current_cost;
     int best_cost;
 
-    int cycle;
+    long cycle;
+    long move_count;
 
     long starting_time;
     long best_solution_time;
     long ending_time;
+
+    long last_log_time;
 } heuristic_solver_state;
 
 bool heuristic_solver_state_update(heuristic_solver_state *state);
@@ -32,12 +35,13 @@ typedef struct heuristic_solver_method_callback_param {
 } heuristic_solver_method_callback_param;
 
 typedef struct heuristic_solver_config {
-    solution *starting_solution;
     GArray *methods;
     int max_time;
     int max_cycles;
     bool multistart;
     int restore_best_after_cycles;
+
+    solution *starting_solution;
     bool dont_solve;
 } heuristic_solver_config;
 
@@ -48,6 +52,7 @@ typedef struct heuristic_solver {
 } heuristic_solver;
 
 void heuristic_solver_config_init(heuristic_solver_config *config);
+
 void heuristic_solver_config_add_method(heuristic_solver_config *config,
                                         heuristic_solver_method_callback method,
                                         void *param, const char *name);

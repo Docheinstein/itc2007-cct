@@ -9,6 +9,16 @@
 #include "log/debug.h"
 #include "log/verbose.h"
 
+
+void tabu_search_params_default(tabu_search_params *params) {
+    params->max_idle = 400;
+    params->tabu_tenure = 120;
+    params->frequency_penalty_coeff = 1.2;
+    params->random_pick = true;
+    params->steepest = true;
+    params->clear_on_best = true;
+}
+
 typedef struct tabu_list_entry {
     int time;
     int count;

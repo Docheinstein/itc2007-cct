@@ -12,6 +12,8 @@ typedef struct tabu_search_params {
     bool clear_on_best;
 } tabu_search_params;
 
+void tabu_search_params_default(tabu_search_params *params);
+
 void tabu_search(heuristic_solver_state *state, void *arg);
 
 #endif // TABU_SEARCH_H

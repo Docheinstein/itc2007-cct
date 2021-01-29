@@ -12,7 +12,7 @@ void set_verbosity(int level) {
     verbosity = level;
 }
 
-void verbose_internal(int level, const char *fmt, ...) {
+void verbose_lv(int level, const char *fmt, ...) {
 #ifndef DEBUG
     if (level > verbosity)
         return;

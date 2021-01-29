@@ -130,7 +130,7 @@ static struct argp_option options[] = {
   { "option", OPTION_OPTION, "KEY=VALUE", 0,
         "Set an option KEY to VALUE (as if it was specified in a config file)" },
   { "benchmark", OPTION_BENCHMARK_MODE, NULL, 0,
-        "Benchmark mode: print only the cost of the final solution" },
+        "Benchmark mode: append a line of stats to OUTPUT (instead of writing the solution) with the format <seed> <fingerprint> <feasible> <rc> <mwd> <cc> <rs> <cost>" },
   { "no-solve", OPTION_DONT_SOLVE, NULL, 0,
         "Do not solve the model: can be useful with -i to print the cost of a loaded solution, and with -d to it render it" },
   { "draw-all", OPTION_DRAW_ALL_DIRECTORY, "DIR", 0,

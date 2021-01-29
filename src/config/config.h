@@ -3,53 +3,25 @@
 
 #include <stdbool.h>
 #include <heuristics/methods/heuristic_method.h>
+#include <heuristics/heuristic_solver.h>
+#include <heuristics/methods/local_search.h>
+#include <heuristics/methods/hill_climbing.h>
+#include <heuristics/methods/tabu_search.h>
+#include <heuristics/methods/simulated_annealing.h>
 
 typedef struct config {
-    // Solver
-    struct {
-        struct {
-            heuristic_method *data;
-            int len;
-        } methods;
+    struct solver {
+        GArray *methods;
         int max_time;
         int max_cycles;
         bool multistart;
         int restore_best_after_cycles;
     } solver;
-
-    // Feasible solution finder
-    struct {
-        double ranking_randomness;
-    } finder;
-
-    // Local Search
-    struct {
-        bool steepest;
-    } ls;
-
-    // Hill Climbing
-    struct {
-        int max_idle;
-    } hc;
-
-    // Tabu Search
-    struct {
-        int max_idle;
-        int tabu_tenure;
-        double frequency_penalty_coeff;
-        bool random_pick;
-        bool steepest;
-        bool clear_on_best;
-    } ts;
-
-    // Simulated Annealing
-    struct {
-        int max_idle;
-        double initial_temperature;
-        double cooling_rate;
-        double min_temperature;
-        double temperature_length_coeff;
-    } sa;
+    feasible_solution_finder_config finder;
+    local_search_params ls;
+    hill_climbing_params hc;
+    tabu_search_params ts;
+    simulated_annealing_params sa;
 } config;
 
 void config_init(config *cfg);

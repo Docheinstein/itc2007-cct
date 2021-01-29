@@ -194,6 +194,9 @@ static char * model_parser_line_handler(const char *line, void *arg) {
         goto QUIT;
     }
 
+    free(fields);
+    fields = NULL;
+
     // Inside section?
     if (state->section == MODEL_PARSER_SECTION_COURSES) {
         if (state->section_cursor >= model->n_courses)
@@ -315,11 +318,11 @@ bool model_parser_parse(model_parser *parser, const char *filename, model *model
     if (success) {
         model->_filename = filename;
         verbose("Model '%s' parsed successfully.\n"
-                 "Courses: %d\n"
-                 "Rooms: %d\n"
-                 "Days: %d\n"
-                 "Slots: %d\n"
-                 "Curriculas: %d",
+                 " Courses: %d\n"
+                 " Rooms: %d\n"
+                 " Days: %d\n"
+                 " Slots: %d\n"
+                 " Curriculas: %d",
                  filename,
                  model->n_courses,
                  model->n_rooms,
@@ -327,7 +330,7 @@ bool model_parser_parse(model_parser *parser, const char *filename, model *model
                  model->n_slots,
                  model->n_curriculas);
         model_finalize(model);
-        verbose("Lectures: %d", model->n_lectures);
+        verbose(" Lectures: %d", model->n_lectures);
 
     }
     return success;

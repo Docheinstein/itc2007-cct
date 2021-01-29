@@ -4,8 +4,6 @@
 #include "model/model.h"
 #include "solution/solution.h"
 
-
-
 typedef struct renderer_config {
     char *output_dir;
     char *output_file;
@@ -13,9 +11,7 @@ typedef struct renderer_config {
     int height;
     int font_size_medium;
     int font_size_small;
-    int font_size_very_small;
 } renderer_config;
-
 
 typedef struct renderer {
     char *error;
@@ -24,14 +20,15 @@ typedef struct renderer {
 bool render_solution_overview(const solution *sol, char *overview_file);
 bool render_solution_full(const solution *sol, char *output_dir);
 
-void renderer_config_init(renderer_config *config);
-void renderer_config_destroy(renderer_config *config);
+
+void renderer_config_default(renderer_config *config);
 
 void renderer_init(renderer *renderer);
 void renderer_destroy(renderer *renderer);
 
-bool renderer_render(renderer *renderer, const renderer_config *config,
-                     const solution *solution);
+bool renderer_render(
+        renderer *renderer, const renderer_config *config,
+        const solution *solution);
 bool renderer_render_overview_timetable(
         renderer *renderer, const renderer_config *config,
         const solution *solution);

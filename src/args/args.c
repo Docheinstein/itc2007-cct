@@ -40,7 +40,7 @@ void args_init(args *args) {
     args->output_file = NULL;
     args->verbosity = 0;
     args->seed = 0;
-    args->max_time = 0;
+    args->max_time = -1;
     args->config_file = NULL;
     args->options = g_array_new(false, false, sizeof(char *));
     args->benchmark_mode = false;
@@ -51,5 +51,5 @@ void args_init(args *args) {
 }
 
 void args_destroy(args *args) {
-    g_array_free(args->options, false);
+    g_array_free(args->options, true);
 }
