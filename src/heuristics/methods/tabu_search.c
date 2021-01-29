@@ -73,8 +73,8 @@ static void tabu_list_insert_move(tabu_list *tabu, swap_move *mv,
 }
 
 static void tabu_list_dump(tabu_list *tabu) {
-#if DEBUG2
-    CRDSQT(tabu->model);
+#if DEBUG
+    MODEL(tabu->model);
     FOR_C {
         FOR_R {
             FOR_D {

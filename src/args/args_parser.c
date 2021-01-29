@@ -47,7 +47,7 @@ static const char *argp_doc =
     "# (0 produces always the same deterministic solution,\n"
     "# higher value produces \"more random\" solutions,\n"
     "# but makes it harder to find feasible ones)"
-    "# Default: 0.66\n"
+    "# Default: 0.33\n"
     "finder.ranking_randomness=N\n"
     "\n"
     "# Maximum non-improving iterations number.\n"
@@ -132,7 +132,7 @@ static struct argp_option options[] = {
   { "benchmark", OPTION_BENCHMARK_MODE, NULL, 0,
         "Benchmark mode: print only the cost of the final solution" },
   { "no-solve", OPTION_DONT_SOLVE, NULL, 0,
-        "Do not solve the model: can be useful with -S and -d to load a solution to render without solve it" },
+        "Do not solve the model: can be useful with -i to print the cost of a loaded solution, and with -d to it render it" },
   { "draw-all", OPTION_DRAW_ALL_DIRECTORY, "DIR", 0,
         "Draw all the timetables (room, teacher, course, curricula) of the solution and place them in DIR" },
   { "draw-overview", OPTION_DRAW_OVERVIEW_FILE, "FILE", 0,
@@ -164,6 +164,9 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
 #define PARSE_INT(str, var) PARSE_X(strtoint, str, var, "integer conversion failed ('%s')", str)
 #define PARSE_UINT(str, var) PARSE_X(strtouint, str, var, "integer conversion failed ('%s')", str)
 #define PARSE_DOUBLE(str, var) PARSE_X(strtodouble, str, var, "double conversion failed ('%s')", str)
+
+    debug_if(isascii(key), "Parsing argument %s%c%s%s",
+             key ? "-" : "", key ? key : ' ' , arg ? " " : "", arg ? arg : "");
 
     switch (key) {
     case OPTION_VERBOSE:

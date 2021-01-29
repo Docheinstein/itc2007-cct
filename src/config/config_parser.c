@@ -55,7 +55,7 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
 #define PARSE_DOUBLE(str, var) strtodouble(str, var) ? NULL: strmake("double conversion failed ('%s')", str)
 #define PARSE_BOOL(str, var) strtobool(str, var) ? NULL: strmake("boolean conversion failed ('%s')", str)
 
-    debug("config_parser_key_value_handler (%s,%s)", key, value);
+    debug("Parsing config line: %s=%s", key, value);
 
     if (streq(key, "solver.methods")) {
         static const int MAX_METHODS = 10;
@@ -160,6 +160,7 @@ QUIT:
 
 
 bool config_parser_add_option(config_parser *parser, config *config, const char *option) {
+    debug("Adding option to config: %s", option);
     parser->error = config_parser_line_handler(option, config);
     return strempty(parser->error);
 }

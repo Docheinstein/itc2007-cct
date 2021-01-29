@@ -12,16 +12,16 @@ void set_verbosity(int level) {
     verbosity = level;
 }
 
-int verbose_internal(int level, const char *fmt, ...) {
+void verbose_internal(int level, const char *fmt, ...) {
+#ifndef DEBUG
     if (level > verbosity)
-        return 0;
+        return;
+#endif
 
     va_list args;
     va_start(args, fmt);
 
-    int ret = vprintf(fmt, args);
+    vprintf(fmt, args);
 
     va_end(args);
-
-    return ret;
 }

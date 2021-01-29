@@ -5,6 +5,9 @@
 #include "model/model.h"
 #include "solution/solution.h"
 
+extern long t1;
+extern long t2;
+
 typedef struct feasible_solution_finder_config {
     double ranking_randomness;
 } feasible_solution_finder_config;
@@ -19,9 +22,15 @@ void feasible_solution_finder_config_destroy(feasible_solution_finder_config *co
 void feasible_solution_finder_init(feasible_solution_finder *finder);
 void feasible_solution_finder_destroy(feasible_solution_finder *finder);
 
-bool feasible_solution_finder_find(feasible_solution_finder *finder,
-                                   const feasible_solution_finder_config *config,
-                                   solution *solution);
+bool feasible_solution_finder_try_find(
+        feasible_solution_finder *finder,
+        const feasible_solution_finder_config *config,
+        solution *sol);
+
+bool feasible_solution_finder_find(
+        feasible_solution_finder *finder,
+        const feasible_solution_finder_config *config,
+        solution *solution);
 
 const char * feasible_solution_finder_find_get_error(feasible_solution_finder *finder);
 

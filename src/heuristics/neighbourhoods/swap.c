@@ -31,7 +31,7 @@ static bool check_conflicts_curriculum_constraint(
 
     if (c1 >= 0) {
         int c1_n_curriculas;
-        int * c1_curriculas = model_curriculas_of_course(model, c1, &c1_n_curriculas);
+        int *c1_curriculas = model_curriculas_of_course(model, c1, &c1_n_curriculas);
         for (int cq = 0; cq < c1_n_curriculas; cq++) {
             const int q = c1_curriculas[cq];
             bool share_curricula = c2 >= 0 && model_share_curricula(model, c1, c2, q);
@@ -273,8 +273,8 @@ static int compute_curriculum_compactness_cost(
 
 static bool swap_move_check_hard_constraints(const solution *sol,
                                              const swap_move *mv) {
-    debug2("Check hard constraints of swap_extended (%d, %d %d, %d) <-> (%d, %d, %d, %d)",
-           mv->helper.c1, mv->helper.r1, mv->d1, mv->helper.s1, mv->helper.c2, mv->r2, mv->d2, mv->s2);
+    debug2("Check hard constraints of (%d, %d %d, %d) <-> (%d, %d, %d, %d)",
+           mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1, mv->helper.c2, mv->r2, mv->d2, mv->s2);
 
     if (mv->helper.c1 == mv->helper.c2)
         return true; // nothing to do
@@ -364,26 +364,42 @@ static void swap_move_compute_cost(
             result->delta.curriculum_compactness_cost +
             result->delta.room_stability_cost;
 
-    debug2("swap_move_compute_cost cost = %d", result->delta_cost);
+    debug2("swap_move_compute_cost cost = %d", result->delta.cost);
 }
 
+#define DUMP_MOVES 0
 
 static void swap_move_do(solution *sol, const swap_move *mv) {
-//    char tmp[92];
-//    snprintf(tmp, 92, "%*d,%*d,%*d,%*d | %*d,%*d,%*d,%*d\n",
-//            2, c1, 2, r1, 2, d1, 2, s1, 2, c2, 2, r2, 2, d2, 2, s2);
-//    fileappend("/tmp/moves.txt", tmp);
-
-    // Update timetable
-    if (mv->l1 >= 0)
-        solution_set_lecture_assignment(sol, mv->l1, mv->r2, mv->d2, mv->s2);
+    solution_unassign_lecture(sol, mv->l1);
     if (mv->helper.l2 >= 0)
-        solution_set_lecture_assignment(sol, mv->helper.l2, mv->helper.r1, mv->helper.d1, mv->helper.s1);
+        solution_unassign_lecture(sol, mv->helper.l2);
+    solution_assign_lecture(sol, mv->l1, mv->r2, mv->d2, mv->s2);
+    if (mv->helper.l2 >= 0)
+        solution_assign_lecture(sol, mv->helper.l2, mv->helper.r1, mv->helper.d1, mv->helper.s1);
+
+#if DUMP_MOVES
+    static bool clear = false;
+    static const char *MOVES_FILE = "/tmp/moves.txt";
+    if (!clear) {
+        clear = true;
+        fileclear(MOVES_FILE);
+    }
+    char tmp[92];
+    snprintf(tmp, 92, "%*d:%s,%*d:%s,%*d,%*d | %*d:%s,%*d:%s,%*d,%*d\n",
+        2, mv->helper.c1, mv->helper.c1 >= 0 ? sol->model->courses[mv->helper.c1].id : "-",
+        2, mv->helper.r1, mv->helper.r1 >= 0 ? sol->model->rooms[mv->helper.r1].id : "-",
+        2, mv->helper.d1, 2, mv->helper.s1,
+        2, mv->helper.c2, mv->helper.c2 >= 0 ? sol->model->courses[mv->helper.c2].id : "-",
+        2, mv->r2, mv->r2 >= 0 ? sol->model->rooms[mv->r2].id : "-",
+        2, mv->d2, 2, mv->s2
+    );
+    fileappend(MOVES_FILE, tmp);
+#endif
 }
 
 void swap_iter_init(swap_iter *iter, const solution *sol) {
     iter->solution = sol;
-    iter->current.l1 = iter->current.r2 = iter->current.d2 = iter->current.s2;
+    iter->current.l1 = iter->current.r2 = iter->current.d2 = iter->current.s2 = -1;
     iter->end = false;
     iter->i = iter->ii = 0;
 }
@@ -393,12 +409,21 @@ void swap_iter_destroy(swap_iter *iter) {}
 static void swap_move_compute_helper(const solution *sol,
                                      swap_move *mv) {
     MODEL(sol->model);
+    debug2("swap_move_compute_helper: l=%d -> (r=%d, d=%d, s=%d)",
+           mv->l1, mv->r2, mv->d2, mv->s2);
+
     mv->helper.c1 = sol->model->lectures[mv->l1].course->index;
     solution_get_lecture_assignment(sol, mv->l1, &mv->helper.r1, &mv->helper.d1, &mv->helper.s1);
 
     mv->helper.l2 = sol->l_rds[INDEX3(mv->r2, R, mv->d2, D, mv->s2, S)];
     if (mv->helper.l2 >= 0)
         mv->helper.c2 = sol->model->lectures[mv->helper.l2].course->index;
+    else
+        mv->helper.c2 = -1;
+
+    debug2("swap_move_compute_helper: COMPUTED (l=%d, c=%d, r=%d, d=%d, s=%d) <-> (l=%d, c=%d, r=%d, d=%d, s=%d)",
+       mv->l1, mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1,
+       mv->helper.l2, mv->helper.c2, mv->r2, mv->d2, mv->s2);
 }
 
 static bool swap_move_is_effective(const swap_move *mv) {
@@ -423,24 +448,26 @@ bool swap_iter_next(swap_iter *iter,
             if (!iter->current.d2) {
                 iter->current.r2 = (iter->current.r2 + 1) % R;
                 if (!iter->current.r2) {
-                    iter->current.l1 = (iter->current.l1 + 1) % L;
-                    if (!iter->current.l1) {
+                    iter->current.l1 = (iter->current.l1 + 1);
+                    if (!(iter->current.l1 < L)) {
                         debug2("Iter exhausted after %d iters", iter->i);
                         iter->end = true;
                         return false;
                     }
-                    swap_move_compute_helper(iter->solution, &iter->current);
                 }
             }
         }
+        swap_move_compute_helper(iter->solution, &iter->current);
         iter->ii++;
     } while (swap_iter_skip(iter));
+
     assert(swap_move_is_effective(&iter->current));
 
     iter->i++;
 
     swap_move_copy(move, &iter->current);
-
+    debug2("swap_iter_next: l=%d -> (r=%d, d=%d, s=%d)",
+           move->l1, move->r2, move->d2, move->s2);
     return true;
 }
 
@@ -484,7 +511,9 @@ bool swap_extended(solution *sol, const swap_move *mv,
 void swap_move_generate_random(const solution *sol, swap_move *mv, bool require_feasible) {
     MODEL(sol->model);
 
-    swap_result result;
+    swap_result result = {
+        .feasible = false
+    };
 
     do {
         do {
@@ -500,7 +529,9 @@ void swap_move_generate_random(const solution *sol, swap_move *mv, bool require_
                          NEIGHBOURHOOD_PREDICT_ALWAYS,
                          NEIGHBOURHOOD_PREDICT_NEVER,
                          &result);
-    } while(!require_feasible || result.feasible);
+    } while(!(result.feasible || !require_feasible));
+
+    assert(result.feasible || !require_feasible);
 }
 
 void swap_move_copy(swap_move *dest, const swap_move *src) {

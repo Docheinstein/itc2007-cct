@@ -19,25 +19,20 @@ char *config_to_string(const config *cfg) {
         "solver.max_cycles = %d\n"
         "solver.multistart = %s\n"
         "solver.restore_best_after_cycles = %d\n"
-        "\n"
         "finder.ranking_randomness = %g\n"
-        "\n"
         "ls.steepest = %s\n"
-        "\n"
         "hc.max_idle = %d\n"
-        "\n"
         "ts.max_idle = %d\n"
         "ts.tabu_tenure = %d\n"
         "ts.frequency_penalty_coeff = %g\n"
         "ts.random_pick = %s\n"
         "ts.steepest = %s\n"
         "ts.clear_on_best = %s\n"
-        "\n"
         "sa.max_idle = %d\n"
         "sa.initial_temperature = %g\n"
-        "sa.cooling_rate = %d\n"
-        "sa.min_temperature = %d\n"
-        "sa.temperature_length_coeff = %d",
+        "sa.cooling_rate = %g\n"
+        "sa.min_temperature = %g\n"
+        "sa.temperature_length_coeff = %g",
         solver_methods,
         cfg->solver.max_time,
         cfg->solver.max_cycles,
@@ -77,7 +72,7 @@ void config_init(config *cfg) {
     cfg->solver.multistart = false;
     cfg->solver.restore_best_after_cycles = -1;
 
-    cfg->finder.ranking_randomness = 0.66;
+    cfg->finder.ranking_randomness = 0.33;
 
     cfg->ls.steepest = true;
 

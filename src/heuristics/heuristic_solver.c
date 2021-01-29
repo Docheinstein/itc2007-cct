@@ -3,6 +3,9 @@
 #include <log/verbose.h>
 #include <utils/str_utils.h>
 #include <utils/time_utils.h>
+#include <stdlib.h>
+#include <utils/assert_utils.h>
+#include <renderer/renderer.h>
 #include "timeout/timeout.h"
 #include "finder/feasible_solution_finder.h"
 #include "utils/mem_utils.h"
@@ -15,6 +18,7 @@ void heuristic_solver_config_init(heuristic_solver_config *config) {
     config->starting_solution = NULL;
     config->multistart = false;
     config->restore_best_after_cycles = -1;
+    config->dont_solve = false;
 }
 
 void heuristic_solver_config_add_method(heuristic_solver_config *config,
@@ -51,22 +55,27 @@ bool generate_feasible_solution_if_needed(const heuristic_solver_config *solver_
     if (solver_conf->starting_solution) {
         debug("Using provided initial solution");
         solution_copy(state->current_solution, solver_conf->starting_solution);
+        return true;
     }
-    else if (state->current_cost == INT_MAX || solver_conf->multistart) {
-        debug("Finding initial feasible solution...");
+
+    if (state->current_cost == INT_MAX || solver_conf->multistart) {
+        verbose("Finding initial feasible solution...");
         feasible_solution_finder finder;
         feasible_solution_finder_init(&finder);
 
         solution_clear(state->current_solution);
-        feasible_solution_finder_find(&finder, finder_conf, state->current_solution);
-        // error, in case in unable to find solution
-
-        state->current_cost = solution_cost(state->current_solution);
-        heuristic_solver_state_update(state);
-
-        verbose("Feasible initial solution found, cost = %d", state->current_cost);
+        if (feasible_solution_finder_find(&finder, finder_conf, state->current_solution)) {
+            state->current_cost = solution_cost(state->current_solution);
+            verbose("Found initial feasible solution of cost = %d", state->current_cost);
+            heuristic_solver_state_update(state);
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
+    // Nothing to generate, continue from the current solution (standard case)
     return true;
 }
 
@@ -80,19 +89,30 @@ bool heuristic_solver_solve(heuristic_solver *solver,
             (heuristic_solver_method_callback_param *) solver_conf->methods->data;
     int n_methods = solver_conf->methods->len;
 
-    if (!n_methods) {
-        solver->error = strmake("no methods provided to solver");
-        return false;
+
+    if (get_verbosity()) {
+        char *names[n_methods];
+        for (int i = 0; i < n_methods; i++)
+            names[i] = strdup(methods[i].name);
+        char *methods_str = strjoin(names, n_methods, ", ");
+        verbose("solver.methods = %s", methods_str);
+        for (int i = 0; i < n_methods; i++)
+            free(names[i]);
+        free(methods_str);
+
+        verbose("solver.time_limit = %d", solver_conf->max_time);
+        verbose("solver.cycles_limit = %d", solver_conf->max_cycles);
+        verbose("solver.multistart = %s", booltostr(solver_conf->multistart));
+        verbose("solver.restore_best_after_cycles = %d", solver_conf->restore_best_after_cycles);
     }
 
-    verbose("solver.time_limit = %d", solver_conf->max_time);
-    verbose("solver.cycles_limit = %d", solver_conf->max_cycles);
-    verbose("solver.multistart = %s", booltostr(solver_conf->multistart));
-    verbose("solver.restore_best_after_cycles = %d", solver_conf->restore_best_after_cycles);
-
-    set_timeout(solver_conf->max_time);
+    if (solver_conf->max_time >= 0)
+        set_timeout(solver_conf->max_time);
 
     int cycles_limit = solver_conf->max_cycles >= 0 ? solver_conf->max_cycles : INT_MAX;
+
+    if (solver_conf->dont_solve)
+        cycles_limit = 0;
 
     solution current_solution;
     solution_init(&current_solution, model);
@@ -103,25 +123,24 @@ bool heuristic_solver_solve(heuristic_solver *solver,
     state->current_cost = INT_MAX;
     state->best_solution = sol_out;
     state->best_cost = INT_MAX;
+    state->cycle = 0;
     state->starting_time = ms();
     state->best_solution_time = LONG_MAX;
     state->ending_time = LONG_MAX;
 
-    if (get_verbosity()) {
-        char *names[n_methods];
-        for (int i = 0; i < n_methods; i++)
-            names[i] = strdup(methods[i].name);
-        char *methods_str = strjoin(names, n_methods, ", ");
-        verbose("Starting solver with %d methods (%s)", n_methods, methods_str);
-        for (int i = 0; i < n_methods; i++)
-            free(names[i]);
-        free(methods_str);
+    if (!n_methods) {
+        solver->error = strmake("no methods provided to solver");
+        return false;
     }
 
     int non_improving_best_cycles = 0;
     int non_improving_current_cycles = 0;
 
     while (state->best_cost > 0) {
+        // In case of multistart, generate a new solution each cycle
+        if (!generate_feasible_solution_if_needed(solver_conf, finder_conf, state))
+            break;
+
         if (timeout) {
             debug("Time limit reached (%ds), stopping here", solver_conf->max_time);
             break;
@@ -134,9 +153,6 @@ bool heuristic_solver_solve(heuristic_solver *solver,
 
         int cycle_begin_best_cost = state->best_cost;
         int cycle_begin_current_cost = state->current_cost;
-
-        // In case of multistart, generate a new solution each cycle
-        generate_feasible_solution_if_needed(solver_conf, finder_conf, state);
 
         // Restore the best known solution after 'restore_best_after_cycles'
         if (solver_conf->restore_best_after_cycles > 0 &&
@@ -189,10 +205,17 @@ bool heuristic_solver_solve(heuristic_solver *solver,
 
 bool heuristic_solver_state_update(heuristic_solver_state *state) {
     if (state->current_cost < state->best_cost) {
+//        write_solution(state->best_solution, "/tmp/before");
+//        render_solution_overview(state->best_solution, "/tmp/before.png");
+//        write_solution(state->current_solution, "/tmp/after");
+//        render_solution_overview(state->current_solution, "/tmp/after.png");
+        verbose("Found new best solution of cost %d", state->current_cost);
+        assert(solution_satisfy_hard_constraints(state->current_solution));
+        assert(state->current_cost == solution_cost(state->current_solution));
         state->best_cost = state->current_cost;
         state->best_solution_time = ms();
         solution_copy(state->best_solution, state->current_solution);
-        verbose("New best solution of cost %d", state->best_cost);
+        assert(state->best_cost == solution_cost(state->best_solution));
         return true;
     }
     return false;

@@ -2,6 +2,7 @@
 #include <log/verbose.h>
 #include <string.h>
 #include <log/debug.h>
+#include <stdlib.h>
 #include "io_utils.h"
 #include "mem_utils.h"
 #include "str_utils.h"
@@ -62,7 +63,7 @@ char * fileparse(const char *filename,
     char *line;
     int line_num = 0;
 
-    verbose2("Opening file: '%s'", filename);
+    verbose("Opening file: '%s'", filename);
     FILE *file = fopen(filename, "r");
     if (!file) {
         snprintf(error_reason, MAX_ERROR_LENGTH,
@@ -83,16 +84,24 @@ char * fileparse(const char *filename,
         if (strempty(line) || strstarts(line, comment_prefix))
             continue;
 
-        continue_parsing = callback(line, callback_arg);
+        char *err = callback(line, callback_arg);
+        if (err) {
+            continue_parsing = false;
+            snprintf(error_reason, MAX_ERROR_LENGTH, "%s", err);
+            free(err);
+        }
     }
 
-    verbose2("Closing file: '%s'", filename);
+    verbose("Closing file: '%s'", filename);
     if (fclose(file) != 0)
         verbose("WARN: failed to close '%s' (%s)", filename, strerror(errno));
 
 QUIT:
     if (!strempty(error_reason)) {
-        debug("Parser error: %s", error_reason);
+        verbose("-- PARSE FAILURE --\n"
+                "Error reason: %s\n"
+                "Line number: %d\n"
+                "Line: %s", error_reason, line_num, line);
         return strmake("parse error at line %d (%s)", line_num, error_reason);
     }
 

@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <log/debug.h>
+#include <log/verbose.h>
 
 volatile sig_atomic_t timeout;
 
@@ -12,7 +13,7 @@ void timeout_handler(int sig) {
 }
 
 void set_timeout(unsigned int seconds) {
-    debug("Setting timeout to %u seconds", seconds);
+    verbose("Timeout: %u seconds", seconds);
     timeout_seconds = seconds;
     signal(SIGALRM, timeout_handler);
     alarm(seconds);

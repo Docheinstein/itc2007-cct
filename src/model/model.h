@@ -64,6 +64,8 @@ typedef struct unavailability_constraint {
     char *course_id;
     int day;
     int slot;
+
+    const course *course; // redundant, for faster access
 } unavailability_constraint;
 
 typedef struct lecture {
@@ -106,6 +108,8 @@ typedef struct model {
 
     bool *courses_share_curricula;
     bool *courses_same_teacher;
+
+    const char *_filename;
 } model;
 
 void model_init(model *model);

@@ -27,10 +27,13 @@ link_directories("${CMAKE_SOURCE_DIR}/lib")
 
 add_executable(itc2007-cct ${sources} ${gurobi} "src/main.c")
 add_executable(itc2007-cct-tests ${sources} ${munit} "tests/main.c")
+add_executable(itc2007-cct-devtests ${sources} "devtests/main.c")
 add_executable(itc2007-cct-validator "validator/main.cpp")
 
 target_include_directories(itc2007-cct PRIVATE ${GLIB_INCLUDE_DIRS} ${CAIRO_INCLUDE_DIRS})
 target_include_directories(itc2007-cct-tests PRIVATE ${GLIB_INCLUDE_DIRS} ${CAIRO_INCLUDE_DIRS})
+target_include_directories(itc2007-cct-devtests PRIVATE ${GLIB_INCLUDE_DIRS} ${CAIRO_INCLUDE_DIRS})
 
 target_link_libraries(itc2007-cct ${CMAKE_DL_LIBS} ${GLIB_LIBRARIES} ${CAIRO_LIBRARIES} -lgurobi91 m)
 target_link_libraries(itc2007-cct-tests ${CMAKE_DL_LIBS} ${GLIB_LIBRARIES} ${CAIRO_LIBRARIES} -lgurobi91 m)
+target_link_libraries(itc2007-cct-devtests ${CMAKE_DL_LIBS} ${GLIB_LIBRARIES} ${CAIRO_LIBRARIES}  m)

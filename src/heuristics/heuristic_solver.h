@@ -38,6 +38,7 @@ typedef struct heuristic_solver_config {
     int max_cycles;
     bool multistart;
     int restore_best_after_cycles;
+    bool dont_solve;
 } heuristic_solver_config;
 
 

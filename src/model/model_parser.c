@@ -1,7 +1,6 @@
 #include "model_parser.h"
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
 #include <utils/io_utils.h>
 #include <utils/str_utils.h>
 #include "log/verbose.h"
@@ -122,7 +121,78 @@ static char * model_parser_line_handler(const char *line, void *arg) {
 
     char **fields = NULL;
     char *error = NULL;
-    char *line_copy = strdup(line);
+    char *line_copy1 = strdup(line);
+    char *line_copy2 = strdup(line);
+
+
+    // Outside section?
+    fields = mallocx(2, sizeof(char *));
+    int n_fields = strsplit(line_copy1, ":", fields, 2);
+    if (n_fields > 2)
+        ABORT_PARSE("unexpected line syntax '%s'", line);
+
+    const char *key = n_fields >= 1 ? strtrim(fields[0]) : "";
+    const char *value = n_fields == 2 ? strtrim(fields[1]) : "";
+
+    // Header?
+    if (streq("END.", key)) {
+        goto QUIT;
+    }
+    if (streq("Name", key)) {
+        PARSE_STR(value, &model->name);
+        goto QUIT;
+    }
+    if (streq("Courses", key)) {
+        PARSE_INT(value, &model->n_courses);
+        goto QUIT;
+    }
+    if (streq("Rooms", key)) {
+        PARSE_INT(value, &model->n_rooms);
+        goto QUIT;
+    }
+    if (streq("Days", key)) {
+        PARSE_INT(value, &model->n_days);
+        goto QUIT;
+    }
+    if (streq("Periods_per_day", key)) {
+        PARSE_INT(value, &model->n_slots);
+        goto QUIT;
+    }
+    if (streq("Curricula", key)) {
+        PARSE_INT(value, &model->n_curriculas);
+        goto QUIT;
+    }
+    if (streq("Constraints", key)) {
+        PARSE_INT(value, &model->n_unavailability_constraints);
+        goto QUIT;
+    }
+
+    // Sections begin?
+    if (streq("COURSES", key) && strempty(value)) {
+        state->section = MODEL_PARSER_SECTION_COURSES;
+        state->section_cursor = 0;
+        model->courses = mallocx(model->n_courses, sizeof(course));
+        goto QUIT;
+    }
+    if (streq("ROOMS", key) && strempty(value)) {
+        state->section = MODEL_PARSER_SECTION_ROOMS;
+        state->section_cursor = 0;
+        model->rooms = mallocx(model->n_rooms, sizeof(course));
+        goto QUIT;
+    }
+    if (streq("CURRICULA", key) && strempty(value)) {
+        state->section = MODEL_PARSER_SECTION_CURRICULAS;
+        state->section_cursor = 0;
+        model->curriculas = mallocx(model->n_curriculas, sizeof(course));
+        goto QUIT;
+    }
+    if (streq("UNAVAILABILITY_CONSTRAINTS", key) && strempty(value)) {
+        state->section = MODEL_PARSER_SECTION_CONSTRAINTS;
+        state->section_cursor = 0;
+        model->unavailability_constraints =
+                mallocx(model->n_unavailability_constraints, sizeof(course));
+        goto QUIT;
+    }
 
     // Inside section?
     if (state->section == MODEL_PARSER_SECTION_COURSES) {
@@ -130,7 +200,7 @@ static char * model_parser_line_handler(const char *line, void *arg) {
             ABORT_PARSE("unexpected courses count");
 
         fields = mallocx(COURSE_FIELDS, sizeof(char *));
-        if (strsplit(line_copy, FIELDS_SEPARATORS, fields, COURSE_FIELDS) != COURSE_FIELDS)
+        if (strsplit(line_copy2, FIELDS_SEPARATORS, fields, COURSE_FIELDS) != COURSE_FIELDS)
             ABORT_PARSE("unexpected course entry syntax ('%s')", line);
 
         int f = 0;
@@ -151,7 +221,7 @@ static char * model_parser_line_handler(const char *line, void *arg) {
             ABORT_PARSE("unexpected rooms count");
 
         fields = mallocx(ROOM_FIELDS, sizeof(char *));
-        if (strsplit(line_copy, FIELDS_SEPARATORS, fields, ROOM_FIELDS) != ROOM_FIELDS)
+        if (strsplit(line_copy2, FIELDS_SEPARATORS, fields, ROOM_FIELDS) != ROOM_FIELDS)
             ABORT_PARSE("unexpected room entry syntax ('%s')", line);
 
         int f = 0;
@@ -171,7 +241,7 @@ static char * model_parser_line_handler(const char *line, void *arg) {
         // Don't know in advance how many fields we will have
         // Therefore alloc at least 2 + n_courses
         fields = mallocx(CURRICULA_FIXED_FIELDS + model->n_courses, sizeof(char *));
-        int n_fields = strsplit(line_copy, FIELDS_SEPARATORS, fields,
+        n_fields = strsplit(line_copy2, FIELDS_SEPARATORS, fields,
                                 CURRICULA_FIXED_FIELDS + model->n_courses);
 
         if (n_fields < CURRICULA_FIXED_FIELDS) 
@@ -195,11 +265,11 @@ static char * model_parser_line_handler(const char *line, void *arg) {
         goto QUIT;
     }
     if (state->section == MODEL_PARSER_SECTION_CONSTRAINTS) {
-        if (state->section_cursor >= model->n_curriculas)
+        if (state->section_cursor >= model->n_unavailability_constraints)
             ABORT_PARSE("unexpected constraints count");
 
         fields = mallocx(UNAVAILABILITY_CONSTRAINTS_FIELDS, sizeof(char *));
-        if (strsplit(line_copy, FIELDS_SEPARATORS, fields, UNAVAILABILITY_CONSTRAINTS_FIELDS)
+        if (strsplit(line_copy2, FIELDS_SEPARATORS, fields, UNAVAILABILITY_CONSTRAINTS_FIELDS)
                 != UNAVAILABILITY_CONSTRAINTS_FIELDS)
             ABORT_PARSE("unexpected constraint entry syntax ('%s')", line);
 
@@ -216,58 +286,11 @@ static char * model_parser_line_handler(const char *line, void *arg) {
         goto QUIT;
     }
 
-    // Outside section?
-    fields = mallocx(2, sizeof(char *));
-    if (strsplit(line_copy, ":", fields, 2) != 2)
-        ABORT_PARSE("unexpected line syntax '%s'", line);
-
-    const char *key = strtrim(fields[0]);
-    const char *value = strtrim(fields[1]);
-
-    // Header?
-    if (streq("Name", key))
-        PARSE_STR(value, &model->name);
-    else if (streq("Courses", key))
-        PARSE_INT(value, &model->n_courses);
-    else if (streq("Rooms", key))
-        PARSE_INT(value, &model->n_rooms);
-    else if (streq("Days", key))
-        PARSE_INT(value, &model->n_days);
-    else if (streq("Periods_per_day", key))
-        PARSE_INT(value, &model->n_slots);
-    else if (streq("Curricula", key))
-        PARSE_INT(value, &model->n_curriculas);
-    else if (streq("Constraints", key))
-        PARSE_INT(value, &model->n_unavailability_constraints);
-
-    // Sections begin?
-    else if (streq("COURSES", key) && strempty(value)) {
-        state->section = MODEL_PARSER_SECTION_COURSES;
-        state->section_cursor = 0;
-        model->courses = mallocx(model->n_courses, sizeof(course));
-    }
-    else if (streq("ROOMS", key) && strempty(value)) {
-        state->section = MODEL_PARSER_SECTION_ROOMS;
-        state->section_cursor = 0;
-        model->rooms = mallocx(model->n_rooms, sizeof(course));
-    }
-    else if (streq("CURRICULA", key) && strempty(value)) {
-        state->section = MODEL_PARSER_SECTION_CURRICULAS;
-        state->section_cursor = 0;
-        model->curriculas = mallocx(model->n_curriculas, sizeof(course));
-    }
-    else if (streq("UNAVAILABILITY_CONSTRAINTS", key) && strempty(value)) {
-        state->section = MODEL_PARSER_SECTION_CONSTRAINTS;
-        state->section_cursor = 0;
-        model->unavailability_constraints =
-                mallocx(model->n_unavailability_constraints, sizeof(course));
-    }
-    else {
-        eprint("WARN: unexpected line '%s'", line);
-    }
+    eprint("WARN: unexpected line '%s'", line);
 
 QUIT:
-    free(line_copy);
+    free(line_copy1);
+    free(line_copy2);
     free(fields);
 
 #undef ABORT_PARSE
@@ -283,14 +306,29 @@ bool model_parser_parse(model_parser *parser, const char *filename, model *model
         .model = model
     };
 
+    verbose("Going to parse model '%s'", filename);
     solution_parser_state_init(parser->_state);
     parser->error = fileparse(filename, NULL, model_parser_line_handler, &arg);
     solution_parser_state_destroy(parser->_state);
 
     bool success = strempty(parser->error);
     if (success) {
-        debug("Model '%s' parsed successfully", filename);
+        model->_filename = filename;
+        verbose("Model '%s' parsed successfully.\n"
+                 "Courses: %d\n"
+                 "Rooms: %d\n"
+                 "Days: %d\n"
+                 "Slots: %d\n"
+                 "Curriculas: %d",
+                 filename,
+                 model->n_courses,
+                 model->n_rooms,
+                 model->n_days,
+                 model->n_slots,
+                 model->n_curriculas);
         model_finalize(model);
+        verbose("Lectures: %d", model->n_lectures);
+
     }
     return success;
 }

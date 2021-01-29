@@ -67,7 +67,7 @@ static char * solution_parser_line_handler(const char *line, void *arg) {
     char *error = NULL;
     char *line_copy = strdup(line);
 
-    if (strsplit(line_copy, "=", fields, 4) != 4) {
+    if (strsplit(line_copy, " ", fields, 4) != 4) {
         error = strmake("unexpected fields count: expected 4");
         goto QUIT;
     }
@@ -103,7 +103,7 @@ static char * solution_parser_line_handler(const char *line, void *arg) {
         goto QUIT;
     }
 
-    solution_set_lecture_assignment(sol, l, r, d, s);
+    solution_assign_lecture(sol, l, r, d, s);
 
 QUIT:
     free(line_copy);
@@ -120,7 +120,7 @@ bool solution_parser_parse(solution_parser *parser,
     };
 
     solution_parser_state_init(parser->_state, sol->model);
-    parser->error = fileparse(filename, NULL, solution_parser_line_handler, sol);
+    parser->error = fileparse(filename, NULL, solution_parser_line_handler, &arg);
     solution_parser_state_destroy(parser->_state);
 
     return strempty(parser->error);

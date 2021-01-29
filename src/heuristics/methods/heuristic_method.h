@@ -10,5 +10,6 @@ typedef enum heuristic_method {
 } heuristic_method;
 
 const char * heuristic_method_to_string(heuristic_method method);
+const char * heuristic_method_to_string_short(heuristic_method method);
 
 #endif // HEURISTIC_METHOD_H

@@ -1,6 +1,7 @@
 #include <log/verbose.h>
 #include <utils/mem_utils.h>
 #include <heuristics/neighbourhoods/swap.h>
+#include <log/debug.h>
 #include "hill_climbing.h"
 #include "local_search.h"
 
@@ -28,6 +29,7 @@ void local_search(heuristic_solver_state *state, void *arg) {
                          &swap_result);
 
             if (swap_result.feasible && swap_result.delta.cost < best_swap_cost) {
+                debug("LS: best swap move candidate of cost %d", swap_result.delta.cost);
                 best_swap_cost = swap_result.delta.cost;
                 best_swap_mv = swap_mv;
                 if (swap_result.delta.cost < 0 && params->steepest) {

@@ -7,9 +7,11 @@
 #include "timeout/timeout.h"
 #include <stdlib.h>
 #include <utils/random_utils.h>
+#include <utils/assert_utils.h>
+#include <utils/time_utils.h>
 
 void feasible_solution_finder_config_init(feasible_solution_finder_config *config) {
-    config->ranking_randomness = 0.66;
+    config->ranking_randomness = 0.33;
 }
 
 void feasible_solution_finder_config_destroy(feasible_solution_finder_config *config) {}
@@ -22,6 +24,13 @@ void feasible_solution_finder_destroy(feasible_solution_finder *finder) {
     free(finder->error);
 }
 
+
+static void feasible_solution_finder_reset(feasible_solution_finder *finder) {
+    free(finder->error);
+    finder->error = NULL;
+}
+
+
 typedef struct lecture_assignment {
     const lecture *lecture;
     double difficulty;
@@ -33,16 +42,15 @@ static int lecture_assignment_compare(const void *_1, const void *_2) {
     return (int) (ca2->difficulty - ca1->difficulty);
 }
 
-static bool feasible_solution_finder_try_find(
-        feasible_solution_finder *finder,
-        const feasible_solution_finder_config *config,
-        solution *sol) {
+long t1 = 0;
+long t2 = 0;
 
+bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
+                                       const feasible_solution_finder_config *config,
+                                       solution *sol) {
     MODEL(sol->model);
-
-    debug("feasible_solution_finder_find: %d assignments to do", required_assignments);
-
-    lecture_assignment *assignments = mallocx(C, sizeof(lecture_assignment));
+    feasible_solution_finder_reset(finder);
+    solution_assert_consistency(sol);
 
     // Sort the courses by the difficulty, in order to assign the most
     // difficult courses before the easy ones
@@ -58,21 +66,23 @@ static bool feasible_solution_finder_try_find(
     static const int UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR = 1;
     static const int COURSE_LECTURES_DIFFICULTY_FACTOR = 1;
 
-    FOR_L {
-        const lecture *lecture = &model->lectures[l];
-        const int c = lecture->course->index;
-        const int t = lecture->course->teacher->index;
+    long start = ms();
+
+    int *courses_difficulty = mallocx(model->n_courses, sizeof(int));
+    FOR_C {
+        const course *course = &model->courses[c];
+        const int t = course->teacher->index;
 
         // 1. H3a: How many curriculum does the course belong to?
         int n_curriculas;
         model_curriculas_of_course(model, c, &n_curriculas);
-        debug2("Course %s belongs to %d curriculas",  course->id, n_curriculas);
+        debug3("Course %s belongs to %d curriculas",  course->id, n_curriculas);
 
 
         // 2. H3b: How many courses the teacher of the course teaches?
         int n_teacher_courses;
         model_courses_of_teacher(model, t, &n_teacher_courses);
-        debug2("Course %s has teacher %s which teaches %d courses",
+        debug3("Course %s has teacher %s which teaches %d courses",
                course->id, model->courses[c].teacher_id, n_teacher_courses);
 
         // 3. H4: How many unavailability constraint the course has?
@@ -82,23 +92,55 @@ static bool feasible_solution_finder_try_find(
                 n_unavailabilities += !model_course_is_available_on_period(model, c, d, s);
             }
         }
-        debug2("Course %s has %d unavailabilities constraints",
+        debug3("Course %s has %d unavailabilities constraints",
                model->courses[c].id, n_unavailabilities);
 
-        lecture_assignment *la = &assignments[l];
-        la->lecture = lecture;
-        la->difficulty =
-                (n_curriculas * CURRICULAS_CONFLICTS_DIFFICULTY_FACTOR +
-                 n_teacher_courses * UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR +
-                 n_unavailabilities * UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR)
-                * MAX(1, lecture->course->n_lectures * COURSE_LECTURES_DIFFICULTY_FACTOR)
-                * rand_normal(1, config->ranking_randomness);
+        courses_difficulty[c] = (n_curriculas * CURRICULAS_CONFLICTS_DIFFICULTY_FACTOR +
+                                 n_teacher_courses * UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR +
+                                 n_unavailabilities * UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR)
+                                * MAX(1, course->n_lectures * COURSE_LECTURES_DIFFICULTY_FACTOR);
 
-        debug2("Course %s has assignment difficulty %d (random ranking factor = %g)",
-               ca->course->id, ca->difficulty, ca->difficulty_ranking_factor);
+        debug2("Course %s has assignment difficulty = %d",
+               course->id, courses_difficulty[c]);
     }
 
-    qsort(assignments, C, sizeof(lecture_assignment), lecture_assignment_compare);
+    t1 += ms() - start;
+
+    start = ms();
+
+    lecture_assignment *assignments = mallocx(L, sizeof(lecture_assignment));
+    FOR_L {
+        lecture_assignment *la = &assignments[l];
+        const lecture *lecture = &model->lectures[l];
+        la->lecture = lecture;
+        double r = rand_normal(1, config->ranking_randomness);
+        la->difficulty = courses_difficulty[lecture->course->index] * r;
+        debug2("Assignment difficulty of lecture %d (%s) = %g (base=%d, rand_factor=%g)",
+               l, lecture->course->id, la->difficulty,
+               courses_difficulty[lecture->course->index], r);
+    }
+
+    free(courses_difficulty);
+
+    qsort(assignments, L, sizeof(lecture_assignment), lecture_assignment_compare);
+
+#if DEBUG
+    char *tmp = NULL;
+    size_t sz = 0;
+    FOR_L {
+        strappend_realloc(&tmp, &sz, "(%d:%s:%g)",
+                          assignments[l].lecture->index,
+                          assignments[l].lecture->course->id,
+                          assignments[l].difficulty);
+        if (l < L - 1)
+            strappend_realloc(&tmp, &sz, ", ");
+        if (l && l % 4 == 0)
+            strappend_realloc(&tmp, &sz, "\n");
+    }
+    debug("Computed assignment order (ranking_randomness=%g):\n"
+          "[%s]", config->ranking_randomness, tmp);
+    free(tmp);
+#endif
 
     int n_assignments = 0;
     int n_attempts = 0;
@@ -107,11 +149,15 @@ static bool feasible_solution_finder_try_find(
     bool *teacher_is_busy = callocx(T * D * S, sizeof(bool));
     bool *curriculum_is_assigned = callocx(Q * D * S, sizeof(bool));
 
-    FOR_L {
-        const lecture_assignment *la = &assignments[l];
-        const course *course = la->lecture->course;
+    for (int i = 0; i < L; i++) {
+        const lecture_assignment *la = &assignments[i];
+        const lecture *lecture = la->lecture;
+        const course *course = lecture->course;
+        const int l = lecture->index;
         const int c = course->index;
         const int t = course->teacher->index;
+
+//        debug("Trying to assign lecture[%d]=%d", i, l);
 
         int course_n_curriculas;
         int *course_curriculas = model_curriculas_of_course(model, c, &course_n_curriculas);
@@ -120,14 +166,15 @@ static bool feasible_solution_finder_try_find(
         for (int r = 0; r < R && !assigned; r++) {
             for (int d = 0; d < D && !assigned; d++) {
                 for (int s = 0; s < S; s++) {
-                    debug2("\t%s in room %s on (day=%d, slot=%d)?", course->id, model->rooms[r].id, d, s);
+                    debug2("Assignment attempt: lecture %d (%s) in room %s on (day=%d, slot=%d)?",
+                           l, course->id, model->rooms[r].id, d, s);
                     n_attempts++;
 
                     // Check hard constraints
 
                     // H2: RoomOccupancy
                     if (room_is_used[INDEX3(r, sol->R, d, D, s, S)]) {
-                        debug2("\t\tfailed (RoomOccupancy: %s)", model->rooms[r].id);
+                        debug2("\tfailed (RoomOccupancy: %s)", model->rooms[r].id);
                         continue;
                     }
 
@@ -140,24 +187,25 @@ static bool feasible_solution_finder_try_find(
                         }
                     }
                     if (curriculum_conflict >= 0) {
-                        debug2("\t\tfailed (CurriculumConflict: %s)",
+                        debug2("\tfailed (CurriculumConflict: %s)",
                                model->curriculas[course_curriculas[curriculum_conflict]].id);
                         continue;
                     }
 
                     // H3b: Conflicts (Teacher)
                     if (teacher_is_busy[INDEX3(t, T, d, D, s, S)]) {
-                        debug2("\t\tfailed (TeacherConflict %s)", model->teachers[t].id);
+                        debug2("\tfailed (TeacherConflict %s)", model->teachers[t].id);
                         continue;
                     }
 
                     // H4: availabilities
                     if (!model_course_is_available_on_period(model, c, d, s)) {
-                        debug2("\t\tfailed (Availabilities (%s, %d, %d))", course->id, d, s);
+                        debug2("\tfailed (Availabilities (%s, %d, %d))", course->id, d, s);
                         continue;
                     }
 
-                    debug2(" -> OK!");
+                    debug2("\t-> ASSIGNED c=%d:%s to (r=%d:%s, d=%d, s=%d)",
+                           c, model->courses[c].id, r, model->rooms[r].id, d, s);
                     room_is_used[INDEX3(r, R, d, D, s, S)] = true;
                     teacher_is_busy[INDEX3(t, T, d, D, s, S)] = true;
                     for (int cq = 0 ; cq < course_n_curriculas; cq++) {
@@ -165,7 +213,7 @@ static bool feasible_solution_finder_try_find(
                                 course_curriculas[cq], Q, d, D, s, S)] =  true;
                     }
 
-                    solution_set_lecture_assignment(sol, l, r, d, s);
+                    solution_assign_lecture(sol, l, r, d, s);
                     assigned = true;
                     n_assignments++;
                     break;
@@ -174,13 +222,17 @@ static bool feasible_solution_finder_try_find(
         };
 
         if (!assigned) {
-            debug("Can't find a feasible assignment for lecture of course %s (%d attempts, %d/%d assignments done)",
-                  course->id, n_attempts, n_assignments, required_assignments);
-            finder->error = strmake("can't find a feasible solution: %d attempts, %d/%d assignments",
-                                    n_attempts, n_assignments, model->n_lectures);
+            verbose("Failed to found a feasible solution: %d/%d assignments in %d attempts",
+                    n_assignments, model->n_lectures, n_attempts);
+            debug("h(sol)=%llu", solution_hash(sol));
+            debug("Failed on lecture %d (%s)", l, course->id);
+            finder->error = strmake("can't find a feasible solution: %d/%d assignments in %d attempts",
+                                    n_assignments, model->n_lectures, n_attempts);
             break;
         }
     }
+
+    t2 += ms() - start;
 
     free(assignments);
     free(room_is_used);
@@ -189,8 +241,9 @@ static bool feasible_solution_finder_try_find(
 
     bool success = strempty(finder->error);
     if (success) {
-        debug("Found feasible solution: %d attempts for %d/%d assignments",
-              n_attempts, n_assignments, model->n_lectures);
+        verbose("Found feasible solution: %d/%d assignments in %d attempts",
+                n_assignments, model->n_lectures, n_attempts);
+        solution_assert(sol, true, -1);
     }
 
     return success;
@@ -199,13 +252,22 @@ static bool feasible_solution_finder_try_find(
 bool feasible_solution_finder_find(feasible_solution_finder *finder,
                                    const feasible_solution_finder_config *config,
                                    solution *sol) {
-    while (!timeout) {
-        if (feasible_solution_finder_try_find(finder, config, sol))
-            return true;
-        solution_clear(sol);
+    int n_trials = 0;
+    bool found = false;
+
+    while (!timeout && !found) {
+        n_trials++;
+        found = feasible_solution_finder_try_find(finder, config, sol);
+        if (!found)
+            solution_clear(sol);
     }
-    debug("feasible_solution_finder_find: timed out");
-    return false;
+
+    if (found)
+        verbose("Solution have been found after %d trials", n_trials);
+    else
+        verbose("Finder timed out");
+
+    return found;
 }
 
 const char *feasible_solution_finder_find_get_error(feasible_solution_finder *finder) {

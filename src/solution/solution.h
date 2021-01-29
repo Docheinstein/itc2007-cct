@@ -77,6 +77,8 @@ typedef struct solution {
     int *sum_tds;
 
     assignment *assignments;
+
+    int _id;
 } solution;
 
 
@@ -86,7 +88,8 @@ void solution_destroy(solution *solution);
 
 void solution_copy(solution *solution_dest, const solution *solution_src);
 
-void solution_set_lecture_assignment(solution *sol, int l, int r, int d, int s);
+void solution_assign_lecture(solution *sol, int l1, int r2, int d2, int s2);
+void solution_unassign_lecture(solution *sol, int l);
 void solution_get_lecture_assignment(const solution *sol, int l, int *r, int *d, int *s);
 
 char * solution_to_string(const solution *sol);
@@ -112,5 +115,10 @@ int solution_room_capacity_cost(const solution *sol);
 int solution_min_working_days_cost(const solution *sol);
 int solution_curriculum_compactness_cost(const solution *sol);
 int solution_room_stability_cost(const solution *sol);
+
+// Debug purpose
+unsigned long long solution_hash(const solution *sol);
+void solution_assert(const solution *sol, bool expected_feasibility, int expected_cost);
+void solution_assert_consistency(const solution *sol);
 
 #endif // SOLUTION_H

@@ -1,6 +1,7 @@
 #include <utils/str_utils.h>
 #include <utils/io_utils.h>
 #include <utils/assert_utils.h>
+#include <renderer/renderer.h>
 #include "solution.h"
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
@@ -13,8 +14,13 @@ const int CURRICULUM_COMPACTNESS_COST_FACTOR = 2;
 const int ROOM_STABILITY_COST_FACTOR = 1;
 
 void solution_init(solution *sol, const model *m) {
-    sol->model = m;
     MODEL(m);
+    static int solution_id = 0;
+    sol->_id = solution_id++;
+
+    debug2("Initializing solution {%d}", sol->_id);
+
+    sol->model = model;
 
     sol->timetable_crds = mallocx(C * R * D * S, sizeof(bool));
     sol->timetable_cdsr = mallocx(C * D * S * R, sizeof(bool));
@@ -34,13 +40,13 @@ void solution_init(solution *sol, const model *m) {
     sol->sum_tds = mallocx(T * D * S, sizeof(int));
 
     sol->assignments = mallocx(model->n_lectures, sizeof(assignment));
-//    sol->lectures_crds = mallocx(C * R * D * S, sizeof(int));
 
     solution_clear(sol);
 }
 
 void solution_clear(solution *sol) {
     MODEL(sol->model);
+    debug2("Clearing solution {%d}", sol->_id);
 
     memset(sol->timetable_crds, 0, C * R * D * S * sizeof(bool));
     memset(sol->timetable_cdsr, 0, C * D * S * R * sizeof(bool));
@@ -60,15 +66,15 @@ void solution_clear(solution *sol) {
     memset(sol->sum_tds, 0, T * D * S * sizeof(int));
 
     memset(sol->assignments, -1, model->n_lectures * sizeof(assignment));
-//    memset(sol->lectures_crds, -1, C * R * D * S * sizeof(int));
 }
 
 void solution_destroy(solution *sol) {
+    debug2("Destroying solution {%d}", sol->_id);
+
     free(sol->timetable_crds);
     free(sol->timetable_cdsr);
     free(sol->timetable_rdsc);
     free(sol->timetable_qdscr);
-
     free(sol->timetable_tdscr);
 
     free(sol->c_rds);
@@ -83,11 +89,12 @@ void solution_destroy(solution *sol) {
     free(sol->sum_tds);
 
     free(sol->assignments);
-//    free(sol->lectures_crds);
 }
 
 void solution_copy(solution *sol_dest, const solution *sol_src) {
     MODEL(sol_src->model);
+    debug2("Copying solution {%d} -> %d", sol_src->_id, sol_dest->_id);
+
     sol_dest->model = model; // should already be the same
 
     memcpy(sol_dest->timetable_crds, sol_src->timetable_crds, 
@@ -97,9 +104,9 @@ void solution_copy(solution *sol_dest, const solution *sol_src) {
     memcpy(sol_dest->timetable_rdsc, sol_src->timetable_rdsc,
            R * D * S * C * sizeof(bool));
     memcpy(sol_dest->timetable_qdscr, sol_src->timetable_qdscr,
-           Q * D * S * R * C * sizeof(bool));
+           Q * D * S * C * R * sizeof(bool));
     memcpy(sol_dest->timetable_tdscr, sol_src->timetable_tdscr,
-           T * D * S * R * C * sizeof(bool));
+           T * D * S * C * R * sizeof(bool));
 
     memcpy(sol_dest->c_rds, sol_src->c_rds,
            R * D * S * sizeof(int));
@@ -126,17 +133,24 @@ void solution_copy(solution *sol_dest, const solution *sol_src) {
 }
 
 static void solution_update(solution *sol, int l, int c, int r, int d, int s, bool yes) {
+    if (l < 0 || c < 0 || r < 0 || d < 0 || s < 0)
+        return;
+
     MODEL(sol->model);
 
     int n_curriculas;
     int *curriculas = model_curriculas_of_course(sol->model, c, &n_curriculas);
     int t = sol->model->courses[c].teacher->index;
 
+
     sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)] = yes;
 
     sol->c_rds[INDEX3(r, R, d, D, s, S)] = yes ? c : -1;
     sol->r_cds[INDEX3(c, C, d, D, s, S)] = yes ? r : -1;
     sol->l_rds[INDEX3(r, R, d, D, s, S)] = yes ? l : -1;
+
+    debug2("tt_crds[%d][%d][%d][%d]=%d", c, r, d, s, sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+    debug2("c_rds[%d][%d][%d]=%d", r, d, s, sol->c_rds[INDEX3(r, R, d, D, s, S)]);
 
     sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)] = yes;
     sol->timetable_rdsc[INDEX4(r, r, d, D, s, S, c, C)] = yes;
@@ -155,20 +169,86 @@ static void solution_update(solution *sol, int l, int c, int r, int d, int s, bo
     }
 }
 
-void solution_set_lecture_assignment(solution *sol, int l, int r, int d, int s) {
-    MODEL(sol->model);
-    assert(l >= 0 && l < L && r >= 0 && r < R && d >= 0 && d < D && s >= 0 && s < S);
+//
+//void solution_set_lecture_assignment(solution *sol, int l1, int r2, int d2, int s2) {
+//    MODEL(sol->model);
+//    assert(l1 >= 0 && l1 < L && r2 >= 0 && r2 < R && d2 >= 0 && d2 < D && s2 >= 0 && s2 < S);
+//
+//    int l2 = sol->l_rds[INDEX3(r2, R, d2, D, s2, S)];
+//    int c2 = l2 >= 0 ? model->lectures[l2].course->index : -1;
+//
+//    int c1 = model->lectures[l1].course->index;
+//    int r1, d1, s1;
+//    solution_get_lecture_assignment(sol, l1, &r1, &d1, &s1);
+//
+//    debug2("Updating solution {%d}: [lecture %d (%d:%s)] assigned from "
+//           "(r=%d:%s, d=%d, s=%d) to (r=%d:%s, d=%d, s=%d) [lecture %d (%d:%s)]",
+//           sol->_id,
+//           l1, c1, model->courses[c1].id,
+//           r1, r1 >= 0 ? model->rooms[r1].id : "-",
+//           d1, s1,
+//           r2, model->rooms[r2].id, d2, s2,
+//           l2, c2, c2 >= 0 ? model->courses[c2].id : "-");
+//
+//    solution_update(sol, l1, c1, r1, d1, s1, false);
+//    solution_update(sol, l2, c2, r2, d2, s2, false);
+//    solution_update(sol, l1, c1, r2, d2, s2, true);
+//    solution_update(sol, l2, c2, r1, d1, s1, true);
+//
+//    assignment *a1 = &sol->assignments[l1];
+//    a1->r = r2;
+//    a1->d = d2;
+//    a1->s = s2;
+//
+//    if (l2 >= 0) {
+//        assignment *a2 = &sol->assignments[l2];
+//        a2->r = r1;
+//        a2->d = d1;
+//        a2->s = s1;
+//    }
+//
+//    solution_assert_consistency(sol);
+//}
 
-    int c = model->lectures[l].course->index;
-    if (sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)])
-        return;
+void solution_assign_lecture(solution *sol, int l1, int r2, int d2, int s2) {
+    assert(l1 >= 0 && l1 < sol->model->n_lectures && r2 >= 0 && r2 < sol->model->n_rooms &&
+           d2 >= 0 && d2 < sol->model->n_days && s2 >= 0 && s2 < sol->model->n_slots);
 
+    int c1 = sol->model->lectures[l1].course->index;
+    assignment *a1 = &sol->assignments[l1];
+
+    debug2("Updating solution {%d}: assigning [lecture %d (%d:%s)] to (r=%d:%s, d=%d, s=%d)",
+           sol->_id,
+           c1, c1, sol->model->courses[c1].id,
+           r2, r2 >= 0 ? sol->model->rooms[r2].id : "-",
+           d2, s2);
+
+    solution_update(sol, l1, c1, r2, d2, s2, true);
+    a1->r = r2;
+    a1->d = d2;
+    a1->s = s2;
+
+    solution_assert_consistency(sol);
+}
+
+void solution_unassign_lecture(solution *sol, int l) {
+    assert(l >= 0 && l < sol->model->n_lectures);
+
+    int c = sol->model->lectures[l].course->index;
     assignment *a = &sol->assignments[l];
+
+    debug2("Updating solution {%d}: unassign [lecture %d (%d:%s)] previously in (r=%d:%s, d=%d, s=%d)",
+           sol->_id,
+           c, c, sol->model->courses[c].id,
+           a->r, a->r >= 0 ? sol->model->rooms[a->r].id : "-",
+           a->d, a->s);
+
     solution_update(sol, l, c, a->r, a->d, a->s, false);
-    solution_update(sol, l, c, r, d, s, true);
-    a->r = r;
-    a->d = d;
-    a->s = s;
+    a->r = -1;
+    a->d = -1;
+    a->s = -1;
+
+    solution_assert_consistency(sol);
 }
 
 void solution_get_lecture_assignment(const solution *sol, int l, int *r, int *d, int *s) {
@@ -346,7 +426,7 @@ static int solution_hard_constraint_conflicts_violations_a(const solution *sol, 
 
     FOR_Q {
         int q_n_courses;
-        int * q_courses = model_courses_of_curricula(sol->model, q, &q_n_courses);
+        int *q_courses = model_courses_of_curricula(sol->model, q, &q_n_courses);
 
         FOR_D {
             FOR_S {
@@ -383,7 +463,7 @@ static int solution_hard_constraint_conflicts_violations_b(const solution *sol, 
 
     FOR_T {
         int t_n_courses;
-        int * t_courses = model_courses_of_teacher(sol->model, t, &t_n_courses);
+        int *t_courses = model_courses_of_teacher(sol->model, t, &t_n_courses);
 
         FOR_D {
             FOR_S {
@@ -559,11 +639,11 @@ static int solution_curriculum_compactness_cost_dump(const solution *sol,
 
     int penalties = 0;
 
-    int * slots = mallocx(sol->model->n_slots, sizeof(int));
+    int *slots = mallocx(sol->model->n_slots, sizeof(int));
 
     FOR_Q {
         int q_n_courses;
-        int * q_courses = model_courses_of_curricula(sol->model, q, &q_n_courses);
+        int *q_courses = model_courses_of_curricula(sol->model, q, &q_n_courses);
 
         FOR_D {
             FOR_S {
@@ -713,4 +793,153 @@ bool write_solution(const solution *sol, const char *filename) {
     free(sol_str);
 
     return success;
+}
+
+unsigned long long solution_hash(const solution *sol) {
+    MODEL(sol->model);
+    unsigned long long h = 0;
+    char *ptr = (char *) sol->assignments;
+    size_t len = L * sizeof(assignment);
+    int i = 0;
+    while (i < len) {
+        h += *ptr;
+        h *= 85637481940593;
+        ptr++;
+        i++;
+    }
+    return h;
+}
+
+void solution_assert_consistency(const solution *sol) {
+#ifdef ASSERT
+    MODEL(sol->model);
+//    render_solution_overview(sol, "/tmp/sol.png");
+
+    // timetable_crds;
+    // timetable_cdsr;
+    // timetable_rdsc;
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    bool b1 = sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)];
+                    bool b2 = sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)];
+                    bool b3 = sol->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)];
+                    assert(b1 == b2);
+                    assert(b2 == b3);
+                }
+            }
+        }
+    }
+
+    // timetable_qdscr
+    FOR_Q {
+        FOR_C {
+            FOR_R {
+                FOR_D {
+                    FOR_S {
+                        if (sol->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)])
+                            assert(sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                    }
+                }
+            }
+        }
+    };
+
+    // timetable_tdscr
+    FOR_T {
+        FOR_C {
+            FOR_R {
+                FOR_D {
+                    FOR_S {
+                        if (sol->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)])
+                            assert(sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                    }
+                }
+            }
+        }
+    };
+
+    // c_rds (1)
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    if (sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)])
+                        assert(sol->c_rds[INDEX3(r, R, d, D, s, S)] == c);
+                }
+            }
+        }
+    }
+
+    // c_rds (2)
+    FOR_R {
+        FOR_D {
+            FOR_S {
+                int c = sol->c_rds[INDEX3(r, R, d, D, s, S)];
+                if (c >= 0)
+                    assert(sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                else {
+                    FOR_C {
+                        assert(!sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                    }
+                }
+            }
+        }
+    }
+
+    // l_rds (1)
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    if (sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]) {
+                        int l = sol->l_rds[INDEX3(r, R, d, D, s, S)];
+                        assert(l >= 0);
+                        assignment *a = &sol->assignments[l];
+                        assert(a->r == r);
+                        assert(a->d == d);
+                        assert(a->s == s);
+                    }
+                }
+            }
+        }
+    }
+
+    // l_rds (2)
+    FOR_R {
+        FOR_D {
+            FOR_S {
+                int l = sol->l_rds[INDEX3(r, R, d, D, s, S)];
+                if (l >= 0) {
+                    assert(sol->timetable_crds[INDEX4(model->lectures[l].course->index, C, r, R, d, D, s, S)]);
+                }
+                else {
+                    FOR_C {
+                        assert(!sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                    }
+                }
+            }
+        }
+    }
+
+    // assignments
+    FOR_L {
+        const lecture *ll = &model->lectures[l];
+        const int c = ll->course->index;
+        const assignment *a = &sol->assignments[l];
+        if (a->r >= 0 && a->d >= 0 && a->s >= 0) {
+            assert(sol->timetable_crds[INDEX4(c, C, a->r, R, a->d, D, a->s, S)]);
+            assert(sol->l_rds[INDEX3(a->r, R, a->d, D, a->s, S)] == l);
+        }
+    }
+
+#endif
+}
+
+void solution_assert(const solution *sol, bool expected_feasibility, int expected_cost) {
+    solution_assert_consistency(sol);
+    assert(expected_feasibility == solution_satisfy_hard_constraints(sol));
+    if (expected_cost >= 0)
+        assert(expected_cost == solution_cost(sol));
 }
