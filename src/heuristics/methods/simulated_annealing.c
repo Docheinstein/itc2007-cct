@@ -13,6 +13,9 @@ void simulated_annealing_params_default(simulated_annealing_params *params) {
     params->cooling_rate = 0.96;
     params->min_temperature = 0.08;
     params->temperature_length_coeff = 1;
+
+    params->intensification_threshold = 1.1;
+    params->intensification_coeff = 1.5;
 }
 
 
@@ -32,10 +35,10 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
     simulated_annealing_params *params = (simulated_annealing_params *) arg;
     int temperature_length = (int) (state->model->n_lectures * params->temperature_length_coeff);
     verbose("SA.max_idle = %d", params->max_idle);
-    verbose("SA.initial_temperature = %g", params->initial_temperature);
-    verbose("SA.cooling_rate = %g", params->cooling_rate);
-    verbose("SA.min_temperature = %g", params->min_temperature);
-    verbose("SA.temperature_length_coeff = %g (=> temperature_length = %d)",
+    verbose("SA.initial_temperature = %f", params->initial_temperature);
+    verbose("SA.cooling_rate = %f", params->cooling_rate);
+    verbose("SA.min_temperature = %f", params->min_temperature);
+    verbose("SA.temperature_length_coeff = %f (=> temperature_length = %d)",
             params->temperature_length_coeff, temperature_length);
 
     int local_best_cost = state->current_cost;
@@ -46,7 +49,7 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
 
     while (t > params->min_temperature && idle < params->max_idle) {
         if (iter % (temperature_length * 5) == 0)
-            verbose2("temperature = %g | p(+1) = %g  p(+5) = %g  p(+10) = %g",
+            verbose2("temperature = %f | p(+1) = %f  p(+5) = %f  p(+10) = %f",
                      t, SA_ACCEPTANCE(1, t), SA_ACCEPTANCE(5, t), SA_ACCEPTANCE(10, t));
 
         for (int it = 0; it < temperature_length; it++) {
@@ -76,8 +79,8 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
             if (get_verbosity() >= 2 &&
                     idle > 0 && idle % (params->max_idle / 10) == 0) {
                 verbose2("current = %d | local best = %d | global best = %d\n"
-                     "iter = %d | idle progress = %d/%d (%g%%)\n"
-                     "temperature = %g | p(+1) = %g  p(+5) = %g  p(+10) = %g",
+                     "iter = %d | idle progress = %d/%d (%f%%)\n"
+                     "temperature = %f | p(+1) = %f  p(+5) = %f  p(+10) = %f",
                      state->current_cost, local_best_cost, state->best_cost,
                      iter, idle, params->max_idle, (double) 100 * idle / params->max_idle,
                      t, SA_ACCEPTANCE(1, t), SA_ACCEPTANCE(5, t), SA_ACCEPTANCE(10, t));

@@ -225,17 +225,16 @@ int main (int argc, char **argv) {
         }
         else {
             // Print the solution and the violations/costs
-            char *sol_str = solution_to_string(&sol);
-            char *sol_quality_str = solution_quality_to_string(&sol, true);
+            if (!args.output_file || get_verbosity()) {
+                char *sol_str = solution_to_string(&sol);
+                verbose("====== SOLUTION ======\n"
+                        "%s\n"
+                        "----------------------", sol_str);
+                free(sol_str);
+            }
 
-            print("====== SOLUTION ======\n"
-                  "%s\n"
-                  "----------------------\n"
-                  "%s",
-                  sol_str,
-                  sol_quality_str);
-
-            free(sol_str);
+            char *sol_quality_str = solution_quality_to_string(&sol, get_verbosity());
+            print("%s", sol_quality_str);
             free(sol_quality_str);
 
             verbose("Solution fingerprint: %llu", fingerprint);

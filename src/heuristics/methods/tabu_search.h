@@ -10,6 +10,9 @@ typedef struct tabu_search_params {
     bool random_pick;
     bool steepest;
     bool clear_on_best;
+
+    double intensification_threshold;
+    double intensification_coeff;
 } tabu_search_params;
 
 void tabu_search_params_default(tabu_search_params *params);

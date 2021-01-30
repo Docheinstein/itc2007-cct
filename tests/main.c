@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <heuristics/neighbourhoods/swap.h>
 #include <utils/array_utils.h>
+#include <renderer/renderer.h>
 #include "utils/str_utils.h"
 #include "utils/os_utils.h"
 #include "model/model_parser.h"
@@ -9,6 +10,7 @@
 #include "solution/solution.h"
 #include "log/verbose.h"
 #include "finder/feasible_solution_finder.h"
+
 #define VERBOSITY 2
 
 
@@ -423,6 +425,47 @@ GLIB_TEST_ARG(test_swap_iter_next) {
     EPILOGUE();
 }
 
+typedef struct test_swap_effectivness_params {
+    const char *model_file;
+    int trials;
+} test_swap_effectivness_params;
+
+
+GLIB_TEST_ARG(test_swap_effectivness) {
+    test_swap_effectivness_params *params = (test_swap_effectivness_params *) arg;
+    PROLOGUE(params->model_file);
+
+    swap_move mv;
+    swap_result result;
+
+    unsigned long long h = solution_fingerprint(&s);
+
+    for (int i = 0; i < params->trials; i++) {
+        swap_move_generate_random_raw(&s, &mv);
+        swap_predict(&s, &mv,
+                     NEIGHBOURHOOD_PREDICT_ALWAYS,
+                     NEIGHBOURHOOD_PREDICT_NEVER,
+                     &result);
+
+        if (!result.feasible)
+            continue;
+
+//        render_solution_overview(&s, "/tmp/before.png");
+        swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
+//        render_solution_overview(&s, "/tmp/after.png");
+
+        unsigned long long h2 = solution_fingerprint(&s);
+
+        if (swap_move_is_effective(&mv))
+            g_assert_cmpuint(h, !=, h2);
+        else
+            g_assert_cmpuint(h, ==, h2);
+        h = h2;
+    }
+
+    EPILOGUE();
+}
+
 
 int main(int argc, char *argv[]) {
     set_verbosity(0);
@@ -477,6 +520,24 @@ int main(int argc, char *argv[]) {
     GLIB_ADD_TEST_ARG("/itc/finder/comp03", test_finder, "datasets/comp03.ctt");
 
     GLIB_ADD_TEST_ARG("/itc/swap_iter_next/comp01", test_swap_iter_next, "datasets/comp01.ctt");
+
+    test_swap_effectivness_params _5 = {
+        .model_file = "datasets/toy.ctt",
+        .trials = 10000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_effectivness/toy", test_swap_effectivness, &_5);
+
+    test_swap_effectivness_params _6 = {
+        .model_file = "datasets/comp01.ctt",
+        .trials = 5000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_effectivness/comp01", test_swap_effectivness, &_6);
+
+    test_swap_effectivness_params _7 = {
+        .model_file = "datasets/comp03.ctt",
+        .trials = 2000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_effectivness/comp03", test_swap_effectivness, &_7);
 
     g_test_run();
 }

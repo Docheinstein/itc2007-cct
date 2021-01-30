@@ -3,21 +3,26 @@
 #include "heuristics/neighbourhoods/swap.h"
 #include "hill_climbing.h"
 #include <log/debug.h>
-#include <heuristics/neighbourhoods/swap.h>
 
 void hill_climbing_params_default(hill_climbing_params *params) {
-    params->max_idle = 120000;
+    params->max_idle = 80000;
+    params->intensification_threshold = 1.1;
+    params->intensification_coeff = 1.5;
 }
 
 void hill_climbing(heuristic_solver_state *state, void *arg) {
     hill_climbing_params *params = (hill_climbing_params *) arg;
-    verbose("HC.max_idle = %d", params->max_idle);
+    debug("HC.max_idle = %d", params->max_idle);
+    debug("HC.intensification_threshold = %f", params->intensification_threshold);
+    debug("HC.intensification_coeff = %f", params->intensification_coeff);
 
     int local_best_cost = state->current_cost;
     int idle = 0;
     int iter = 0;
 
-    while (idle < params->max_idle) {
+    while (idle < params->max_idle ||
+                (state->current_cost < params->intensification_threshold * state->best_cost &&
+                idle < params->max_idle * params->intensification_coeff)) {
         int prev_cost = state->current_cost;
 
         swap_move swap_mv;
@@ -36,15 +41,17 @@ void hill_climbing(heuristic_solver_state *state, void *arg) {
             heuristic_solver_state_update(state);
         }
 
-        if (state->current_cost < prev_cost)
+        if (state->current_cost < local_best_cost) {
+            local_best_cost = state->current_cost;
             idle = 0;
+        }
         else
             idle++;
 
         if (idle && idle % (params->max_idle / 10) == 0)
-            verbose2("current = %d | local best = %d | global best = %d\n"
-                     "iter = %d | idle progress = %d/%d (%g%%)",
-                     state->current_cost, local_best_cost, state->best_cost,
-                     iter, idle, params->max_idle, (double) 100 * idle / params->max_idle);
+            verbose2("%s: Iter = %d | Idle progress = %d/%d (%.2f%%) | Current = %d | Local best = %d | Global best = %d",
+                     state->methods_name[state->method],
+                     iter, idle, params->max_idle, (double) 100 * idle / params->max_idle,
+                     state->current_cost, local_best_cost, state->best_cost);
     }
 }

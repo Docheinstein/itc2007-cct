@@ -36,6 +36,10 @@ void swap_iter_init(swap_iter *iter, const solution *sol);
 void swap_iter_destroy(swap_iter *iter);
 bool swap_iter_next(swap_iter *iter, swap_move *move);
 
+bool swap_move_is_effective(const swap_move *mv);
+void swap_move_generate_random_raw(const solution *sol, swap_move *mv);
+void swap_move_generate_random(const solution *sol, swap_move *mv, bool require_feasible);
+void swap_move_copy(swap_move *dest, const swap_move *src);
 
 void swap_predict(const solution *sol, const swap_move *move,
                   neighbourhood_predict_strategy predict_feasibility,
@@ -50,8 +54,5 @@ bool swap_extended(solution *sol, const swap_move *move,
                    neighbourhood_predict_strategy predict_cost,
                    neighbourhood_perform_strategy perform,
                    swap_result *result);
-
-void swap_move_generate_random(const solution *sol, swap_move *mv, bool require_feasible);
-void swap_move_copy(swap_move *dest, const swap_move *src);
 
 #endif // SWAP_H

@@ -9,6 +9,9 @@ typedef struct simulated_annealing_params {
     double cooling_rate;
     double min_temperature;
     double temperature_length_coeff;
+
+    double intensification_threshold;
+    double intensification_coeff;
 } simulated_annealing_params;
 
 void simulated_annealing_params_default(simulated_annealing_params *params);

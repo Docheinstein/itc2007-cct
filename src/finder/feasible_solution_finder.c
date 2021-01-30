@@ -128,7 +128,7 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
         la->lecture = lecture;
         double r = rand_normal(1, config->ranking_randomness);
         la->difficulty = courses_difficulty[lecture->course->index] * r;
-        debug2("Assignment difficulty of lecture %d (%s) = %g (base=%d, rand_factor=%g)",
+        debug2("Assignment difficulty of lecture %d (%s) = %f (base=%d, rand_factor=%f)",
                l, lecture->course->id, la->difficulty,
                courses_difficulty[lecture->course->index], r);
     }
@@ -139,7 +139,7 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
     char *tmp = NULL;
     size_t sz = 0;
     FOR_L {
-        strappend_realloc(&tmp, &sz, "(%d:%s:%g)",
+        strappend_realloc(&tmp, &sz, "(%d:%s:%f)",
                           assignments[l].lecture->index,
                           assignments[l].lecture->course->id,
                           assignments[l].difficulty);
@@ -148,7 +148,7 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
         if (l && l % 4 == 0)
             strappend_realloc(&tmp, &sz, "\n");
     }
-    debug("Computed assignment order (ranking_randomness=%g):\n"
+    debug("Computed assignment order (ranking_randomness=%f):\n"
           "[%s]", config->ranking_randomness, tmp);
     free(tmp);
 #endif

@@ -17,6 +17,9 @@ void tabu_search_params_default(tabu_search_params *params) {
     params->random_pick = true;
     params->steepest = true;
     params->clear_on_best = true;
+
+    params->intensification_threshold = 1.1;
+    params->intensification_coeff = 1.5;
 }
 
 typedef struct tabu_list_entry {
@@ -90,7 +93,7 @@ static void tabu_list_dump(tabu_list *tabu) {
             FOR_D {
                 FOR_S {
                     tabu_list_entry *entry = &tabu->banned[INDEX4(c, C, r, R, d, D, s, S)];
-                    debug2("Tabu[%d][%d][%d][%d] = {time=%d, count=%d, delta_sum=%d (mean=%g)}",
+                    debug2("Tabu[%d][%d][%d][%d] = {time=%d, count=%d, delta_sum=%d (mean=%f)}",
                           c, r, d, s, entry->time, entry->count, entry->delta_cost_sum, (double) entry->delta_cost_sum / entry->count);
                 }
             }
@@ -105,7 +108,7 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
     tabu_search_params *params = (tabu_search_params *) arg;
     verbose("TS.max_idle = %d", params->max_idle);
     verbose("TS.tabu_tenure = %d", params->tabu_tenure);
-    verbose("TS.frequency_penalty_coeff = %g", params->frequency_penalty_coeff);
+    verbose("TS.frequency_penalty_coeff = %f", params->frequency_penalty_coeff);
     verbose("TS.random_pick = %s", booltostr(params->random_pick));
     verbose("TS.clear_on_best = %s", booltostr(params->clear_on_best));
 
@@ -161,8 +164,8 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
                     move_cursor++;
 
                 if (swap_result.delta.cost < 0 && params->steepest) {
-                    // Perform an improving move without evaluating
-                    // all the neighbours
+                    // Perform an improving move without
+                    // evaluating all the neighbours
                     break;
                 }
             }
@@ -200,7 +203,7 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
         if (get_verbosity() >= 2 &&
             (idle > 0 && idle % (params->max_idle / 10) == 0)) {
             verbose2("current = %d | local best = %d | global best = %d\n"
-                     "iter = %d | idle progress = %d/%d (%g%%)\n"
+                     "iter = %d | idle progress = %d/%d (%f%%)\n"
                      "# banned = %d/%d | # side = %d/%d (%d/%d banned)",
                      state->current_cost, local_best_cost, state->best_cost,
                      iter, idle, params->max_idle, (double) 100 * idle / params->max_idle,

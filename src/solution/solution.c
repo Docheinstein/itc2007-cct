@@ -324,7 +324,7 @@ static int solution_hard_constraint_lectures_violations_a(const solution *sol, c
             debug2("H1 [Lectures] violation: %d lectures assigned instead of %d "
                   "for course '%s'",
                   n, course->n_lectures, course->id);
-            if (strout)
+            if (strout && *strout)
                 strappend_realloc(strout, strsize,
                   "H1 [Lectures] violation: %d lectures assigned instead of %d "
                   "for course '%s'\n",
@@ -360,7 +360,7 @@ static int solution_hard_constraint_lectures_violations_b(const solution *sol, c
                     debug2("H1 [Lectures] violation: %d rooms used for course '%s' "
                           "at (day=%d, slot=%d)",
                           n, sol->model->courses[c].id, d, s);
-                    if (strout)
+                    if (strout && *strout)
                         strappend_realloc(strout, strsize,
                           "H1 [Lectures] violation: %d rooms used for course '%s' "
                           "at (day=%d, slot=%d)\n",
@@ -401,7 +401,7 @@ static int solution_room_occupancy_violations_dump(const solution *sol, char **s
                     debug2("H2 [RoomOccupancy] violation: %d courses in room '%s' "
                           "at (day=%d, slot=%d)",
                           n, sol->model->rooms[r].id, d, s);
-                    if (strout)
+                    if (strout && *strout)
                         strappend_realloc(strout, strsize,
                         "H2 [RoomOccupancy] violation: %d courses in room '%s' "
                         "at (day=%d, slot=%d)\n",
@@ -442,7 +442,7 @@ static int solution_hard_constraint_conflicts_violations_a(const solution *sol, 
                     debug2("H3 [Conflicts] violation: %d courses of curriculum '%s' "
                           "scheduled at (day=%d, slot=%d)",
                           n, sol->model->curriculas[q].id, d, s);
-                    if (strout)
+                    if (strout && *strout)
                         strappend_realloc(strout, strsize,
                         "H3 [Conflicts] violation: %d courses of curriculum '%s' "
                         "scheduled at (day=%d, slot=%d)\n",
@@ -478,7 +478,7 @@ static int solution_hard_constraint_conflicts_violations_b(const solution *sol, 
                     debug2("H3 [Conflicts] violation: %d courses taught by "
                           "teacher '%s' scheduled at (day=%d, slot=%d)",
                           n, sol->model->teachers[t].id, d, s);
-                    if (strout)
+                    if (strout && *strout)
                         strappend_realloc(strout, strsize,
                         "H3 [Conflicts] violation: %d courses taught by "
                         "teacher '%s' scheduled at (day=%d, slot=%d)\n",
@@ -518,7 +518,7 @@ static int solution_availabilities_violations_dump(const solution *sol, char **s
                     debug2("H4 [Availabilities] violation: course '%s' scheduled %d time(s) on "
                           "(day=%d, slot=%d) but breaks unavailability constraint",
                           sol->model->courses[c].id, n, d, s);
-                    if (strout)
+                    if (strout && *strout)
                         strappend_realloc(strout, strsize,
                             "H4 [Availabilities] violation: course '%s' scheduled %d time(s) on "
                             "(day=%d, slot=%d) but breaks unavailability constraint\n",
@@ -563,7 +563,7 @@ static int solution_room_capacity_cost_dump(const solution *sol, char **strout, 
                                   sol->model->courses[c].id, sol->model->courses[c].n_students,
                                   sol->model->rooms[r].id, sol->model->rooms[r].capacity,
                                   d, s);
-                            if (strout)
+                            if (strout && *strout)
                                 strappend_realloc(strout, strsize,
                                     "S1(%d) [RoomCapacity] penalty: course '%s' has %d"
                                     " students but it's scheduled in room '%s' with %d "
@@ -614,7 +614,7 @@ static int solution_min_working_days_cost_dump(const solution *sol, char **strou
                    delta * MIN_WORKING_DAYS_COST_FACTOR,
                   sol->model->courses[c].id, sum_y_cd,
                   sol->model->courses[c].min_working_days);
-            if (strout)
+            if (strout && *strout)
                 strappend_realloc(strout, strsize,
                     "S2(%d) [MinWorkingDays] penalty: course '%s' spread among %d different days "
                     "but Minimum Working Days are %d\n",
@@ -668,7 +668,7 @@ static int solution_curriculum_compactness_cost_dump(const solution *sol,
                           "has %d isolated lecture(s) at (day=%d, slot=%d)",
                            CURRICULUM_COMPACTNESS_COST_FACTOR,
                            sol->model->curriculas[q].id, slots[s], d, s);
-                    if (strout)
+                    if (strout && *strout)
                         strappend_realloc(strout, strsize,
                             "S3(%d) [CurriculumCompactness] penalty: curriculum '%s' "
                             "has %d isolated lecture(s) at (day=%d, slot=%d)\n",
@@ -715,7 +715,7 @@ static int solution_room_stability_cost_dump(const solution *sol,
             debug2("S4(%d) [RoomStability] penalty: course '%s' uses %d rooms",
                    delta * ROOM_STABILITY_COST_FACTOR,
                   sol->model->courses[c].id, sum_w_cr);
-            if (strout)
+            if (strout && *strout)
                 strappend_realloc(strout, strsize,
                     "S4(%d) [RoomStability] penalty: course '%s' uses %d rooms\n",
                                   delta * ROOM_STABILITY_COST_FACTOR,
@@ -748,10 +748,7 @@ char *solution_quality_to_string(const solution *sol, bool verbose) {
     int s3 = solution_curriculum_compactness_cost_dump(sol, &str, &strsize);
     int s4 = solution_room_stability_cost_dump(sol, &str, &strsize);
 
-    if (!str)
-        strappend_realloc(&str, &strsize, "");
-    else
-        strappend_realloc(&str, &strsize, "\n");
+    strappend_realloc(&str, &strsize, str ? "\n" : "");
 
     strappend_realloc(&str, &strsize,
         "Violations (%d)\n"
@@ -798,6 +795,11 @@ bool write_solution(const solution *sol, const char *filename) {
 unsigned long long solution_fingerprint(const solution *sol) {
     MODEL(sol->model);
     unsigned long long h = 0;
+    for (int i = 0; i < C * R * D * S; i++) {
+        h += sol->timetable_crds[i];
+        h *= 85637481940593;
+    }
+    /*
     char *ptr = (char *) sol->assignments;
     size_t len = L * sizeof(assignment);
     int i = 0;
@@ -807,6 +809,7 @@ unsigned long long solution_fingerprint(const solution *sol) {
         ptr++;
         i++;
     }
+    */
     return h;
 }
 

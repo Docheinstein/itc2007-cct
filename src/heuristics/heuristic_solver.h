@@ -4,6 +4,12 @@
 #include <finder/feasible_solution_finder.h>
 #include "solution/solution.h"
 
+typedef struct heuristic_solver_state_method_stats {
+    int improvement;
+    long execution_time;
+    long move_count;
+} heuristic_solver_state_method_stats;
+
 typedef struct heuristic_solver_state {
     const model *model;
 
@@ -13,13 +19,31 @@ typedef struct heuristic_solver_state {
     int best_cost;
 
     long cycle;
-    long move_count;
+    int method;
 
-    long starting_time;
-    long best_solution_time;
-    long ending_time;
+    long non_improving_best_cycles;
+    long non_improving_current_cycles;
 
-    long last_log_time;
+    bool collect_stats;
+    bool collect_trend;
+
+    const char **methods_name;
+
+    struct {
+        long move_count;
+
+        heuristic_solver_state_method_stats *methods;
+
+        long starting_time;
+        long best_solution_time;
+        long ending_time;
+
+        long last_log_time;
+
+        GArray *trend_current;
+        GArray *trend_best;
+    } stats;
+
 } heuristic_solver_state;
 
 bool heuristic_solver_state_update(heuristic_solver_state *state);
@@ -28,11 +52,11 @@ typedef void (*heuristic_solver_method_callback)(
         heuristic_solver_state *    /* current resolution state */,
         void *                      /* any arg */);
 
-typedef struct heuristic_solver_method_callback_param {
+typedef struct heuristic_solver_method_callback_parameterized {
     heuristic_solver_method_callback method;
     void *param;
     const char *name;
-} heuristic_solver_method_callback_param;
+} heuristic_solver_method_callback_parameterized;
 
 typedef struct heuristic_solver_config {
     GArray *methods;

@@ -11,6 +11,7 @@ void local_search_params_default(local_search_params *params) {
 
 void local_search(heuristic_solver_state *state, void *arg) {
     local_search_params *params = (local_search_params *) arg;
+    debug("LS.steepest = %d", params->steepest);
 
     bool improved;
 
@@ -33,12 +34,11 @@ void local_search(heuristic_solver_state *state, void *arg) {
                          &swap_result);
 
             if (swap_result.feasible && swap_result.delta.cost < best_swap_cost) {
-                debug("LS: best swap move candidate of cost %d", swap_result.delta.cost);
                 best_swap_cost = swap_result.delta.cost;
                 best_swap_mv = swap_mv;
                 if (swap_result.delta.cost < 0 && params->steepest) {
-                    // Perform an improving move without evaluating
-                    // all the neighbours
+                    // Perform an improving move without
+                    // evaluating all the neighbours
                     break;
                 }
             }

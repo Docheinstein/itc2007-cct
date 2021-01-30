@@ -10,6 +10,11 @@ runs_per_dataset = 10
 seconds_per_run = 168
 
 LS_OPTIONS = ["solver.methods=ls", "solver.multistart=true"]
+HC_OPTIONS = ["solver.methods=hc",
+              "solver.multistart=true",
+              "hc.max_idle=80000",
+              "hc.intensification_threshold=1.1",
+              "hc.intensification_coeff=1.5"]
 
 benchmarks = [
     ("comp01-ls", "datasets/comp01.ctt", "benchmarks/ls/comp01.out", LS_OPTIONS),
@@ -19,12 +24,20 @@ benchmarks = [
     ("comp05-ls", "datasets/comp05.ctt", "benchmarks/ls/comp05.out", LS_OPTIONS),
     ("comp06-ls", "datasets/comp06.ctt", "benchmarks/ls/comp06.out", LS_OPTIONS),
     ("comp07-ls", "datasets/comp07.ctt", "benchmarks/ls/comp07.out", LS_OPTIONS),
+
+    ("comp01-hc", "datasets/comp01.ctt", "benchmarks/hc/comp01.out", HC_OPTIONS),
+    ("comp02-hc", "datasets/comp02.ctt", "benchmarks/hc/comp02.out", HC_OPTIONS),
+    ("comp03-hc", "datasets/comp03.ctt", "benchmarks/hc/comp03.out", HC_OPTIONS),
+    ("comp04-hc", "datasets/comp04.ctt", "benchmarks/hc/comp04.out", HC_OPTIONS),
+    ("comp05-hc", "datasets/comp05.ctt", "benchmarks/hc/comp05.out", HC_OPTIONS),
+    ("comp06-hc", "datasets/comp06.ctt", "benchmarks/hc/comp06.out", HC_OPTIONS),
+    ("comp07-hc", "datasets/comp07.ctt", "benchmarks/hc/comp07.out", HC_OPTIONS),
 ]
 
 # -----------------------------------
 
 if __name__ == "__main__":
-    bench_filter = sys.argv[1] if len(sys.argv) > 1 else None
+    bench_filter = sys.argv[1:] if len(sys.argv) > 1 else None
 
     if not executable.exists():
         print(f"'{executable.absolute()}' not found: please build itc2007-cct",
@@ -34,7 +47,7 @@ if __name__ == "__main__":
     filtered_benchmarks = []
     for bench in benchmarks:
         bench_name = bench[0]
-        if bench_filter and bench_name.find(bench_filter) == -1:
+        if bench_filter and bench_name not in bench_filter:
             continue
         filtered_benchmarks.append(bench)
 
@@ -70,7 +83,6 @@ if __name__ == "__main__":
             out.write(f"# Options:\n")
             for opt in options:
                 out.write(f"#   {opt}\n")
-            out.write("#\n")
             out.write("# ---------------------------------------------------------\n")
             out.write("# seed  fingerprint  feasible  cost_rc  cost_mwd  cost_cc  cost_rs  cost\n")
             out.write("# ---------------------------------------------------------\n")

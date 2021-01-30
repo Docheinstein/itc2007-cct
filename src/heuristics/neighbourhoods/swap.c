@@ -383,7 +383,7 @@ static void swap_move_do(solution *sol, const swap_move *mv) {
         fileclear(MOVES_FILE);
     }
     char tmp[92];
-    snprintf(tmp, 92, "%*d:%s,%*d:%s,%*d,%*d | %*d:%s,%*d:%s,%*d,%*d\n",
+    snprintf(tmp, 92, "%*d:%s,%*d:%s,%*d,%*d  |  %*d:%s,%*d:%s,%*d,%*d\n",
         2, mv->helper.c1, mv->helper.c1 >= 0 ? sol->model->courses[mv->helper.c1].id : "-",
         2, mv->helper.r1, mv->helper.r1 >= 0 ? sol->model->rooms[mv->helper.r1].id : "-",
         2, mv->helper.d1, 2, mv->helper.s1,
@@ -429,9 +429,46 @@ static void swap_move_compute_helper(const solution *sol,
        mv->helper.l2, mv->helper.c2, mv->r2, mv->d2, mv->s2);
 }
 
-static bool swap_move_is_effective(const swap_move *mv) {
+
+bool swap_move_is_effective(const swap_move *mv) {
     return mv->helper.c1 != mv->helper.c2;
 }
+
+void swap_move_generate_random_raw(const solution *sol, swap_move *mv) {
+    MODEL(sol->model);
+    mv->l1 = rand_int_range(0, L);
+    mv->r2 = rand_int_range(0, R);
+    mv->d2 = rand_int_range(0, D);
+    mv->s2 = rand_int_range(0, S);
+    swap_move_compute_helper(sol, mv);
+}
+
+void swap_move_generate_random(const solution *sol, swap_move *mv, bool require_feasible) {
+    MODEL(sol->model);
+
+    swap_result result = {
+        .feasible = false
+    };
+
+    do {
+        do {
+            swap_move_generate_random_raw(sol, mv);
+        } while (!swap_move_is_effective(mv));
+
+        if (require_feasible)
+            swap_predict(sol, mv,
+                         NEIGHBOURHOOD_PREDICT_ALWAYS,
+                         NEIGHBOURHOOD_PREDICT_NEVER,
+                         &result);
+    } while(!(result.feasible || !require_feasible));
+
+    assert(result.feasible || !require_feasible);
+}
+
+void swap_move_copy(swap_move *dest, const swap_move *src) {
+    memcpy(dest, src, sizeof(swap_move));
+}
+
 
 static bool swap_iter_skip(const swap_iter *iter) {
     return iter->current.helper.c1 <= iter->current.helper.c2;
@@ -511,33 +548,4 @@ bool swap_extended(solution *sol, const swap_move *mv,
     return swap_perform(sol, mv, perform, result);
 }
 
-void swap_move_generate_random(const solution *sol, swap_move *mv, bool require_feasible) {
-    MODEL(sol->model);
-
-    swap_result result = {
-        .feasible = false
-    };
-
-    do {
-        do {
-            mv->l1 = rand_int_range(0, L);
-            mv->r2 = rand_int_range(0, R);
-            mv->d2 = rand_int_range(0, D);
-            mv->s2 = rand_int_range(0, S);
-            swap_move_compute_helper(sol, mv);
-        } while (!swap_move_is_effective(mv));
-
-        if (require_feasible)
-            swap_predict(sol, mv,
-                         NEIGHBOURHOOD_PREDICT_ALWAYS,
-                         NEIGHBOURHOOD_PREDICT_NEVER,
-                         &result);
-    } while(!(result.feasible || !require_feasible));
-
-    assert(result.feasible || !require_feasible);
-}
-
-void swap_move_copy(swap_move *dest, const swap_move *src) {
-    memcpy(dest, src, sizeof(swap_move));
-}
 

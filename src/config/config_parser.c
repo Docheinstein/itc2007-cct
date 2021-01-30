@@ -107,6 +107,10 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
 
     if (streq(key, "hc.max_idle"))
         return PARSE_INT(value, &cfg->hc.max_idle);
+    if (streq(key, "hc.intensification_threshold"))
+        return PARSE_DOUBLE(value, &cfg->hc.intensification_threshold);
+    if (streq(key, "hc.intensification_coeff"))
+        return PARSE_DOUBLE(value, &cfg->hc.intensification_coeff);
 
     if (streq(key, "ts.max_idle"))
         return PARSE_INT(value, &cfg->ts.max_idle);
@@ -120,6 +124,10 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
         return PARSE_BOOL(value, &cfg->ts.steepest);
     if (streq(key, "ts.clear_on_best"))
         return PARSE_BOOL(value, &cfg->ts.clear_on_best);
+    if (streq(key, "ts.intensification_threshold"))
+        return PARSE_DOUBLE(value, &cfg->ts.intensification_threshold);
+    if (streq(key, "ts.intensification_coeff"))
+        return PARSE_DOUBLE(value, &cfg->ts.intensification_coeff);
 
     if (streq(key, "sa.max_idle"))
         return PARSE_INT(value, &cfg->sa.max_idle);
@@ -131,6 +139,10 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
         return PARSE_DOUBLE(value, &cfg->sa.min_temperature);
     if (streq(key, "sa.temperature_length_coeff"))
         return PARSE_DOUBLE(value, &cfg->sa.temperature_length_coeff);
+    if (streq(key, "sa.intensification_threshold"))
+        return PARSE_DOUBLE(value, &cfg->sa.intensification_threshold);
+    if (streq(key, "sa.intensification_coeff"))
+        return PARSE_DOUBLE(value, &cfg->sa.intensification_coeff);
 
     print("WARN: unexpected key, skipping '%s'", key);
 

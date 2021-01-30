@@ -20,20 +20,20 @@ char *config_to_string(const config *cfg) {
         "solver.max_cycles = %d\n"
         "solver.multistart = %s\n"
         "solver.restore_best_after_cycles = %d\n"
-        "finder.ranking_randomness = %g\n"
+        "finder.ranking_randomness = %f\n"
         "ls.steepest = %s\n"
         "hc.max_idle = %d\n"
         "ts.max_idle = %d\n"
         "ts.tabu_tenure = %d\n"
-        "ts.frequency_penalty_coeff = %g\n"
+        "ts.frequency_penalty_coeff = %f\n"
         "ts.random_pick = %s\n"
         "ts.steepest = %s\n"
         "ts.clear_on_best = %s\n"
         "sa.max_idle = %d\n"
-        "sa.initial_temperature = %g\n"
-        "sa.cooling_rate = %g\n"
-        "sa.min_temperature = %g\n"
-        "sa.temperature_length_coeff = %g",
+        "sa.initial_temperature = %f\n"
+        "sa.cooling_rate = %f\n"
+        "sa.min_temperature = %f\n"
+        "sa.temperature_length_coeff = %f",
         solver_methods,
         cfg->solver.max_time,
         cfg->solver.max_cycles,

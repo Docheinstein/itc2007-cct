@@ -5,6 +5,9 @@
 
 typedef struct hill_climbing_params {
     int max_idle;
+
+    double intensification_threshold;
+    double intensification_coeff;
 } hill_climbing_params;
 
 void hill_climbing_params_default(hill_climbing_params *params);

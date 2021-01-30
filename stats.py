@@ -6,7 +6,7 @@ from statistics import stdev, mean
 benchmarks_folder = Path("benchmarks")
 
 
-def print_benchmark_stats(benchmark_file):
+def print_benchmark_stats(benchmark_file, width):
     if not benchmark_file.exists():
         return
     costs = []
@@ -22,7 +22,9 @@ def print_benchmark_stats(benchmark_file):
         return
     avg_cost = mean(costs)
     std = stdev(costs)
-    print(f"{benchmark_file}: avg_cost = {avg_cost:.2f} | std = {std:.2f}")
+    avg_cost_s = f"{avg_cost:.2f}".ljust(10)
+    std_s = f"{std:.2f}".ljust(10)
+    print(f"{str(benchmark_file).ljust(width)}   {avg_cost_s} {std_s}")
 
 
 if __name__ == "__main__":
@@ -31,6 +33,17 @@ if __name__ == "__main__":
               file=sys.stderr)
         exit(1)
 
+    longest = ("", 0)
+    for root, dirs, files in os.walk(benchmarks_folder):
+        for f in files:
+            if len(f) > longest[1]:
+                longest = (f, len(str(Path(root, f))))
+    longest = longest[1]
+    if not longest:
+        exit()
+
+    print(longest * " " + "    MEAN   |   STD")
+    print(longest * "-" + "--------------------")
     for root, dirs, files in os.walk(benchmarks_folder):
         for f in sorted(files):
-            print_benchmark_stats(Path(root, f))
+            print_benchmark_stats(Path(root, f), longest)

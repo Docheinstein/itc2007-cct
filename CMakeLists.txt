@@ -22,8 +22,8 @@ message("cairo libraries: ${CAIRO_LIBRARIES}")
 include_directories(src externals)
 link_directories("${CMAKE_SOURCE_DIR}/lib")
 
-add_executable(itc2007-cct ${sources} ${gurobi} "src/main.c")
-add_executable(itc2007-cct-tests ${sources} ${munit} "tests/main.c")
+add_executable(itc2007-cct ${sources} "src/main.c")
+add_executable(itc2007-cct-tests ${sources} "tests/main.c")
 add_executable(itc2007-cct-devtests ${sources} "devtests/main.c")
 add_executable(itc2007-cct-validator "validator/main.cpp")
 

@@ -1,5 +1,10 @@
 #include "time_utils.h"
-#include "time.h"
+
+long clk() {
+    struct timespec spec;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &spec);
+    return spec.tv_sec * 1000 + spec.tv_nsec / 1000000;
+}
 
 long ms() {
     struct timespec spec;

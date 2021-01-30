@@ -60,7 +60,7 @@ void test_finder(model *model, double ranking_randomness, int trials) {
     snprintf(tmp, 32, "(%d different)", g_hash_table_size(sols));
 #endif
 
-    print("%s(r=%5g)  %5g%%   %d/%d feasible solutions %s found in %ldms (%ld sol/ms)",
+    print("%s(r=%5f)  %5f%%   %d/%d feasible solutions %s found in %ldms (%ld sol/ms)",
           model->_filename, ranking_randomness, (double) 100 * successes / trials,
           successes, trials, tmp, end - start, trials / (end - start));
 
@@ -89,8 +89,15 @@ void test_finder_multi(const char **datasets, double r_from, double r_to, double
 }
 
 void tests() {
-    test_finder_single("datasets/comp03.ctt", 0.33, 0.33, 0.00, 100000);
+//    test_finder_single("datasets/comp03.ctt", 0.33, 0.33, 0.00, 100000);
 //    test_finder_multi(DATASETS, 0.20, 0.60, 0.02, 1000);
+    long start = clk();
+    long h = 0;
+    for (int i = 0; i < 10000000; i++) {
+        h += clk();
+    }
+    long end = clk();
+    print("%ld", end-start);
 }
 
 int main(int argc, char **argv) {
