@@ -21,6 +21,7 @@
 #define GLIB_ADD_TEST_ARG(test_name, func_name, arg) g_test_add_data_func(test_name, arg, func_name)
 
 #define g_assert_eqstr(a, b) g_assert_cmpstr(a, ==, b)
+#define g_assert_cmpbool(a, op, b) g_assert_cmpint(a, op, b)
 
 #define BUFLEN 256
 
@@ -414,25 +415,24 @@ GLIB_TEST_ARG(test_swap_iter_next) {
     swap_iter iter;
     swap_iter_init(&iter, &s);
 
-    swap_move mv;
-
-    while (swap_iter_next(&iter, &mv))
+    while (swap_iter_next(&iter)) {
         g_assert_true(s.timetable_crds[INDEX4(
-                mv.helper.c1, C, mv.helper.r1, R,
-                mv.helper.d1, D, mv.helper.s1, S)]);
-
+                iter.move.helper.c1, C, iter.move.helper.r1, R,
+                iter.move.helper.d1, D, iter.move.helper.s1, S)]);
+        g_assert_true(swap_move_is_effective(&iter.move));
+    }
 
     EPILOGUE();
 }
 
-typedef struct test_swap_effectivness_params {
+typedef struct test_swap_effectiveness_params {
     const char *model_file;
     int trials;
-} test_swap_effectivness_params;
+} test_swap_effectiveness_params;
 
 
-GLIB_TEST_ARG(test_swap_effectivness) {
-    test_swap_effectivness_params *params = (test_swap_effectivness_params *) arg;
+GLIB_TEST_ARG(test_swap_effectiveness) {
+    test_swap_effectiveness_params *params = (test_swap_effectiveness_params *) arg;
     PROLOGUE(params->model_file);
 
     swap_move mv;
@@ -443,16 +443,14 @@ GLIB_TEST_ARG(test_swap_effectivness) {
     for (int i = 0; i < params->trials; i++) {
         swap_move_generate_random_raw(&s, &mv);
         swap_predict(&s, &mv,
-                     NEIGHBOURHOOD_PREDICT_ALWAYS,
-                     NEIGHBOURHOOD_PREDICT_NEVER,
+                     NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
+                     NEIGHBOURHOOD_PREDICT_COST_NEVER,
                      &result);
 
         if (!result.feasible)
             continue;
 
-//        render_solution_overview(&s, "/tmp/before.png");
         swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
-//        render_solution_overview(&s, "/tmp/after.png");
 
         unsigned long long h2 = solution_fingerprint(&s);
 
@@ -461,6 +459,117 @@ GLIB_TEST_ARG(test_swap_effectivness) {
         else
             g_assert_cmpuint(h, ==, h2);
         h = h2;
+    }
+
+    EPILOGUE();
+}
+
+
+typedef struct test_swap_reverse_params {
+    const char *model_file;
+    int trials;
+} test_swap_reverse_params;
+
+
+GLIB_TEST_ARG(test_swap_reverse) {
+    test_swap_reverse_params *params = (test_swap_reverse_params *) arg;
+    PROLOGUE(params->model_file);
+
+    swap_move mv;
+    swap_result result;
+
+    unsigned long long h = solution_fingerprint(&s);
+
+    for (int i = 0; i < params->trials; i++) {
+        swap_move_generate_random_extended(&s, &mv, true, false);
+        swap_predict(&s, &mv,
+                     NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
+                     NEIGHBOURHOOD_PREDICT_COST_NEVER,
+                     &result);
+        swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
+        swap_move mv_back;
+        swap_move_reverse(&mv, &mv_back);
+        swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
+        unsigned long long h2 = solution_fingerprint(&s);
+        g_assert_cmpint(h, ==, h2);
+
+    }
+
+    EPILOGUE();
+}
+
+
+typedef struct test_swap_feasibility_params {
+    const char *model_file;
+    int trials;
+} test_swap_feasibility_params;
+
+
+GLIB_TEST_ARG(test_swap_feasibility) {
+    test_swap_feasibility_params *params = (test_swap_feasibility_params *) arg;
+    PROLOGUE(params->model_file);
+
+    swap_move mv;
+    swap_result result;
+
+    for (int i = 0; i < params->trials; i++) {
+        swap_move_generate_random_extended(&s, &mv, true, false);
+        swap_predict(&s, &mv,
+                     NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
+                     NEIGHBOURHOOD_PREDICT_COST_NEVER,
+                     &result);
+        swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
+
+        bool h1 = solution_satisfy_lectures(&s);
+        bool h2 = solution_satisfy_room_occupancy(&s);
+        bool h3 = solution_satisfy_conflicts(&s);
+        bool h4 = solution_satisfy_availabilities(&s);
+        if (result.feasible)
+            g_assert_true(h1 && h2 && h3 && h4);
+        else
+            g_assert_false(h1 && h2 && h3 && h4);
+
+        swap_move mv_back;
+        swap_move_reverse(&mv, &mv_back);
+        swap_perform(&s, &mv_back, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
+    }
+
+    EPILOGUE();
+}
+
+typedef struct test_swap_cost_params {
+    const char *model_file;
+    int trials;
+} test_swap_cost_params;
+
+
+GLIB_TEST_ARG(test_swap_cost) {
+    test_swap_cost_params *params = (test_swap_cost_params *) arg;
+    PROLOGUE(params->model_file);
+
+    swap_move mv;
+    swap_result result;
+
+    int rc = solution_room_capacity_cost(&s);
+    int mwd = solution_min_working_days_cost(&s);
+    int cc = solution_curriculum_compactness_cost(&s);
+    int rs = solution_room_stability_cost(&s);
+
+    for (int i = 0; i < params->trials; i++) {
+        swap_move_generate_random_feasible_effective(&s, &mv);
+        swap_predict(&s, &mv,
+                     NEIGHBOURHOOD_PREDICT_FEASIBILITY_NEVER,
+                     NEIGHBOURHOOD_PREDICT_COST_ALWAYS,
+                     &result);
+        swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
+        g_assert_cmpint(rc + result.delta.room_capacity_cost, ==, solution_room_capacity_cost(&s));
+        g_assert_cmpint(mwd + result.delta.min_working_days_cost, ==, solution_min_working_days_cost(&s));
+        g_assert_cmpint(cc + result.delta.curriculum_compactness_cost, ==, solution_curriculum_compactness_cost(&s));
+        g_assert_cmpint(rs + result.delta.room_stability_cost, ==, solution_room_stability_cost(&s));
+        rc += result.delta.room_capacity_cost;
+        mwd += result.delta.min_working_days_cost;
+        cc += result.delta.curriculum_compactness_cost;
+        rs += result.delta.room_stability_cost;
     }
 
     EPILOGUE();
@@ -521,23 +630,59 @@ int main(int argc, char *argv[]) {
 
     GLIB_ADD_TEST_ARG("/itc/swap_iter_next/comp01", test_swap_iter_next, "datasets/comp01.ctt");
 
-    test_swap_effectivness_params _5 = {
+    test_swap_effectiveness_params _5 = {
         .model_file = "datasets/toy.ctt",
         .trials = 10000
     };
-    GLIB_ADD_TEST_ARG("/itc/swap_effectivness/toy", test_swap_effectivness, &_5);
+    GLIB_ADD_TEST_ARG("/itc/swap_effectiveness/toy", test_swap_effectiveness, &_5);
 
-    test_swap_effectivness_params _6 = {
+    test_swap_effectiveness_params _6 = {
         .model_file = "datasets/comp01.ctt",
         .trials = 5000
     };
-    GLIB_ADD_TEST_ARG("/itc/swap_effectivness/comp01", test_swap_effectivness, &_6);
+    GLIB_ADD_TEST_ARG("/itc/swap_effectiveness/comp01", test_swap_effectiveness, &_6);
 
-    test_swap_effectivness_params _7 = {
+    test_swap_effectiveness_params _7 = {
         .model_file = "datasets/comp03.ctt",
         .trials = 2000
     };
-    GLIB_ADD_TEST_ARG("/itc/swap_effectivness/comp03", test_swap_effectivness, &_7);
+    GLIB_ADD_TEST_ARG("/itc/swap_effectiveness/comp03", test_swap_effectiveness, &_7);
+
+    test_swap_feasibility_params _8 = {
+        .model_file = "datasets/comp01.ctt",
+        .trials = 10000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_reverse/comp01", test_swap_reverse, &_8);
+
+    test_swap_feasibility_params _9 = {
+        .model_file = "datasets/comp01.ctt",
+        .trials = 10000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_feasibility/comp01", test_swap_feasibility, &_9);
+
+    test_swap_feasibility_params _10 = {
+        .model_file = "datasets/comp03.ctt",
+        .trials = 5000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_feasibility/comp03", test_swap_feasibility, &_10);
+
+    test_swap_cost_params _11 = {
+        .model_file = "datasets/comp01.ctt",
+        .trials = 50000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_cost/comp01", test_swap_cost, &_11);
+
+    test_swap_cost_params _12 = {
+        .model_file = "datasets/comp03.ctt",
+        .trials = 50000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_cost/comp03", test_swap_cost, &_12);
+
+    test_swap_cost_params _13 = {
+        .model_file = "datasets/comp04.ctt",
+        .trials = 50000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_cost/comp04", test_swap_cost, &_13);
 
     g_test_run();
 }

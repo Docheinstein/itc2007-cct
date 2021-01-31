@@ -1,6 +1,6 @@
+#include "verbose.h"
 #include <stdarg.h>
 #include <stdio.h>
-#include "verbose.h"
 
 static int verbosity;
 
@@ -14,6 +14,7 @@ void set_verbosity(int level) {
 
 void verbose_lv(int level, const char *fmt, ...) {
 #ifndef DEBUG
+    // In DEBUG mode, always show verbose messages
     if (level > verbosity)
         return;
 #endif

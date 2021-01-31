@@ -1,13 +1,17 @@
 #ifndef ARGS_H
 #define ARGS_H
 
-#include <glib.h>
-#include <heuristics/methods/heuristic_method.h>
 #include <stdbool.h>
+#include <glib.h>
+
+/* Arguments given at the command line. */
 
 typedef struct args {
+    // Positional
     char *input_file;
     char *output_file;
+
+    // Options
     int verbosity;
     unsigned int seed;
     int max_time;

@@ -53,7 +53,7 @@ static const char *argp_doc =
     "# Whether perform immediately a move with delta < 0,\n"
     "# without evaluating all the neighbourhood for the best one.\n"
     "# Default: true\n"
-    "ls.steepest=true\n"
+    "ls.greedy=true\n"
     "\n"
     "# Maximum non-improving iterations number.\n"
     "# Default: 120000\n"
@@ -90,7 +90,7 @@ static const char *argp_doc =
     "# Whether perform immediately a move with delta < 0,\n"
     "# without evaluating all the neighbourhood for the best one.\n"
     "# Default: true\n"
-    "ts.steepest=true\n"
+    "ts.greedy=true\n"
     "\n"
     "# Whether clear the tabu list when a new global best is found.\n"
     "# Default: true\n"
@@ -155,7 +155,7 @@ typedef enum itc2007_option {
 
 static struct argp_option options[] = {
   { "verbose", OPTION_VERBOSE, NULL, 0,
-        "Print more information" },
+        "Print more information (-vv for print even more)." },
   { "seed", OPTION_SEED, "N", 0,
         "Seed to use for random number generator" },
   { "time", OPTION_MAX_TIME, "SECONDS", 0,
@@ -175,7 +175,7 @@ static struct argp_option options[] = {
   { "solution", OPTION_INPUT_SOLUTION, "FILE", 0,
         "Load the initial solution from FILE instead of find it.\n"
         "Can be useful to continue the computation from a certain solution, eventually using another method.\n"
-        "Can be also useful with -0 and/or -d to print the cost of a previously computed solution and/or to render its timetable.ls " },
+        "Can be also useful with -0 and/or -d to print the cost of a previously computed solution and/or to render its timetable." },
   { NULL }
 };
 
@@ -200,8 +200,11 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
 #define PARSE_UINT(str, var) PARSE_X(strtouint, str, var, "integer conversion failed ('%s')", str)
 #define PARSE_DOUBLE(str, var) PARSE_X(strtodouble, str, var, "double conversion failed ('%s')", str)
 
-    debug_if(isascii(key), "Parsing argument %s%c%s%s",
-             key ? "-" : "", key ? key : ' ' , arg ? " " : "", arg ? arg : "");
+#ifdef DEBUG
+    if (isascii(key))
+        debug("Parsing argument %s%c%s%s",
+              key ? "-" : "", key ? key : ' ' , arg ? " " : "", arg ? arg : "");
+#endif
 
     switch (key) {
     case OPTION_VERBOSE:

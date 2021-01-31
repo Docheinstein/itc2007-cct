@@ -1,15 +1,13 @@
 #include "config_parser.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <log/debug.h>
-#include <log/verbose.h>
-#include <utils/str_utils.h>
-#include <utils/mem_utils.h>
 #include <string.h>
+#include "log/debug.h"
+#include "log/verbose.h"
+#include "utils/str_utils.h"
+#include "utils/mem_utils.h"
 #include "utils/io_utils.h"
-#include "config.h"
 
-static const int MAX_METHODS = 10;
 
 bool parse_config_file(config *config, const char *filename) {
     config_parser parser;
@@ -53,7 +51,7 @@ void config_parser_destroy(config_parser *parser) {
 }
 
 static void config_parser_add_method(config *cfg, const char *method) {
-    debug("Adding method: '%s'", method);
+    debug("Adding method '%s' to config", method);
     heuristic_method m;
 
     if (streq(method, "ls"))
@@ -74,6 +72,7 @@ static void config_parser_add_method(config *cfg, const char *method) {
 
 static char * config_parser_key_value_handler(config *cfg, char *key, char *value) {
 
+#define PARSE_LONG(str, var) strtolong(str, var) ? NULL: strmake("long conversion failed ('%s')", str)
 #define PARSE_INT(str, var) strtoint(str, var) ? NULL: strmake("integer conversion failed ('%s')", str)
 #define PARSE_DOUBLE(str, var) strtodouble(str, var) ? NULL: strmake("double conversion failed ('%s')", str)
 #define PARSE_BOOL(str, var) strtobool(str, var) ? NULL: strmake("boolean conversion failed ('%s')", str)
@@ -82,6 +81,7 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
 
     if (streq(key, "solver.methods")) {
         g_array_remove_range(cfg->solver.methods, 0, cfg->solver.methods->len);
+        static const int MAX_METHODS = 10;
         char **methods_strings = mallocx(MAX_METHODS, sizeof(char *));
         int n_methods = strsplit(value, ",", methods_strings, MAX_METHODS);
         for (int i = 0; i < n_methods; i++)
@@ -102,35 +102,18 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
     if (streq(key, "finder.ranking_randomness"))
         return PARSE_DOUBLE(value, &cfg->finder.ranking_randomness);
 
-    if (streq(key, "ls.steepest"))
-        return PARSE_BOOL(value, &cfg->ls.steepest);
-
     if (streq(key, "hc.max_idle"))
-        return PARSE_INT(value, &cfg->hc.max_idle);
-    if (streq(key, "hc.intensification_threshold"))
-        return PARSE_DOUBLE(value, &cfg->hc.intensification_threshold);
-    if (streq(key, "hc.intensification_coeff"))
-        return PARSE_DOUBLE(value, &cfg->hc.intensification_coeff);
+        return PARSE_LONG(value, &cfg->hc.max_idle);
 
     if (streq(key, "ts.max_idle"))
-        return PARSE_INT(value, &cfg->ts.max_idle);
+        return PARSE_LONG(value, &cfg->ts.max_idle);
     if (streq(key, "ts.tabu_tenure"))
         return PARSE_INT(value, &cfg->ts.tabu_tenure);
     if (streq(key, "ts.frequency_penalty_coeff"))
         return PARSE_DOUBLE(value, &cfg->ts.frequency_penalty_coeff);
-    if (streq(key, "ts.random_pick"))
-        return PARSE_BOOL(value, &cfg->ts.random_pick);
-    if (streq(key, "ts.steepest"))
-        return PARSE_BOOL(value, &cfg->ts.steepest);
-    if (streq(key, "ts.clear_on_best"))
-        return PARSE_BOOL(value, &cfg->ts.clear_on_best);
-    if (streq(key, "ts.intensification_threshold"))
-        return PARSE_DOUBLE(value, &cfg->ts.intensification_threshold);
-    if (streq(key, "ts.intensification_coeff"))
-        return PARSE_DOUBLE(value, &cfg->ts.intensification_coeff);
 
     if (streq(key, "sa.max_idle"))
-        return PARSE_INT(value, &cfg->sa.max_idle);
+        return PARSE_LONG(value, &cfg->sa.max_idle);
     if (streq(key, "sa.initial_temperature"))
         return PARSE_DOUBLE(value, &cfg->sa.initial_temperature);
     if (streq(key, "sa.cooling_rate"))
@@ -139,13 +122,10 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
         return PARSE_DOUBLE(value, &cfg->sa.min_temperature);
     if (streq(key, "sa.temperature_length_coeff"))
         return PARSE_DOUBLE(value, &cfg->sa.temperature_length_coeff);
-    if (streq(key, "sa.intensification_threshold"))
-        return PARSE_DOUBLE(value, &cfg->sa.intensification_threshold);
-    if (streq(key, "sa.intensification_coeff"))
-        return PARSE_DOUBLE(value, &cfg->sa.intensification_coeff);
 
     print("WARN: unexpected key, skipping '%s'", key);
 
+#undef PARSE_LONG
 #undef PARSE_INT
 #undef PARSE_BOOL
 #undef PARSE_DOUBLE

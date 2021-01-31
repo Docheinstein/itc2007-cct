@@ -21,7 +21,7 @@ def print_benchmark_stats(benchmark_file, width):
     if not costs:
         return
     avg_cost = mean(costs)
-    std = stdev(costs)
+    std = stdev(costs) if len(costs) >= 2 else 0
     avg_cost_s = f"{avg_cost:.2f}".ljust(10)
     std_s = f"{std:.2f}".ljust(10)
     print(f"{str(benchmark_file).ljust(width)}   {avg_cost_s} {std_s}")

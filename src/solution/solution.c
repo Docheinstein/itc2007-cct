@@ -142,18 +142,15 @@ static void solution_update(solution *sol, int l, int c, int r, int d, int s, bo
     int *curriculas = model_curriculas_of_course(sol->model, c, &n_curriculas);
     int t = sol->model->courses[c].teacher->index;
 
-
     sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)] = yes;
 
     sol->c_rds[INDEX3(r, R, d, D, s, S)] = yes ? c : -1;
     sol->r_cds[INDEX3(c, C, d, D, s, S)] = yes ? r : -1;
     sol->l_rds[INDEX3(r, R, d, D, s, S)] = yes ? l : -1;
 
-    debug2("tt_crds[%d][%d][%d][%d]=%d", c, r, d, s, sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
-    debug2("c_rds[%d][%d][%d]=%d", r, d, s, sol->c_rds[INDEX3(r, R, d, D, s, S)]);
 
     sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)] = yes;
-    sol->timetable_rdsc[INDEX4(r, r, d, D, s, S, c, C)] = yes;
+    sol->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)] = yes;
     sol->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)] = yes;
 
     sol->sum_cr[INDEX2(c, C, r, R)] += yes ? 1 : -1;
@@ -166,7 +163,14 @@ static void solution_update(solution *sol, int l, int c, int r, int d, int s, bo
         int q = curriculas[i];
         sol->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)] = yes;
         sol->sum_qds[INDEX3(q, Q, d, D, s, S)] += yes ? 1 : -1;
+        debug2("sum_qds[%d][%d][%d]=%d", q, d, s, sol->sum_qds[INDEX3(q, Q, d, D, s, S)]);
     }
+
+    debug2("tt_crds[%d][%d][%d][%d]=%d", c, r, d, s, sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+    debug2("tt_cdsr[%d][%d][%d][%d]=%d", c, d, s, r, sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)]);
+    debug2("c_rds[%d][%d][%d]=%d", r, d, s, sol->c_rds[INDEX3(r, R, d, D, s, S)]);
+    debug2("r_cds[%d][%d][%d]=%d", c, d, s, sol->r_cds[INDEX3(c, c, d, D, s, S)]);
+    debug2("sum_rds[%d][%d][%d]=%d", r, d, s, sol->sum_rds[INDEX3(r, R, d, D, s, S)]);
 }
 
 //
@@ -219,7 +223,7 @@ void solution_assign_lecture(solution *sol, int l1, int r2, int d2, int s2) {
 
     debug2("Updating solution {%d}: assigning [lecture %d (%d:%s)] to (r=%d:%s, d=%d, s=%d)",
            sol->_id,
-           c1, c1, sol->model->courses[c1].id,
+           l1, c1, sol->model->courses[c1].id,
            r2, r2 >= 0 ? sol->model->rooms[r2].id : "-",
            d2, s2);
 
@@ -237,9 +241,9 @@ void solution_unassign_lecture(solution *sol, int l) {
     int c = sol->model->lectures[l].course->index;
     assignment *a = &sol->assignments[l];
 
-    debug2("Updating solution {%d}: unassign [lecture %d (%d:%s)] previously in (r=%d:%s, d=%d, s=%d)",
+    debug2("Updating solution {%d}: unassigning [lecture %d (%d:%s)] previously in (r=%d:%s, d=%d, s=%d)",
            sol->_id,
-           c, c, sol->model->courses[c].id,
+           l, c, sol->model->courses[c].id,
            a->r, a->r >= 0 ? sol->model->rooms[a->r].id : "-",
            a->d, a->s);
 
@@ -815,8 +819,12 @@ unsigned long long solution_fingerprint(const solution *sol) {
 
 void solution_assert_consistency(const solution *sol) {
 #ifdef ASSERT
+    solution_assert_consistency_real(sol);
+#endif
+}
+
+void solution_assert_consistency_real(const solution *sol) {
     MODEL(sol->model);
-//    render_solution_overview(sol, "/tmp/sol.png");
 
     // timetable_crds;
     // timetable_cdsr;
@@ -828,8 +836,8 @@ void solution_assert_consistency(const solution *sol) {
                     bool b1 = sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)];
                     bool b2 = sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)];
                     bool b3 = sol->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)];
-                    assert(b1 == b2);
-                    assert(b2 == b3);
+                    assert_real(b1 == b2);
+                    assert_real(b2 == b3);
                 }
             }
         }
@@ -842,7 +850,7 @@ void solution_assert_consistency(const solution *sol) {
                 FOR_D {
                     FOR_S {
                         if (sol->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)])
-                            assert(sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                            assert_real(sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
                     }
                 }
             }
@@ -856,7 +864,7 @@ void solution_assert_consistency(const solution *sol) {
                 FOR_D {
                     FOR_S {
                         if (sol->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)])
-                            assert(sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                            assert_real(sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
                     }
                 }
             }
@@ -868,8 +876,9 @@ void solution_assert_consistency(const solution *sol) {
         FOR_R {
             FOR_D {
                 FOR_S {
-                    if (sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)])
-                        assert(sol->c_rds[INDEX3(r, R, d, D, s, S)] == c);
+                    if (sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]) {
+                        assert_real(sol->c_rds[INDEX3(r, R, d, D, s, S)] == c);
+                    }
                 }
             }
         }
@@ -879,12 +888,44 @@ void solution_assert_consistency(const solution *sol) {
     FOR_R {
         FOR_D {
             FOR_S {
-                int c = sol->c_rds[INDEX3(r, R, d, D, s, S)];
-                if (c >= 0)
-                    assert(sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                int cc = sol->c_rds[INDEX3(r, R, d, D, s, S)];
+                if (cc >= 0)
+                    assert_real(sol->timetable_crds[INDEX4(cc, C, r, R, d, D, s, S)]);
                 else {
                     FOR_C {
-                        assert(!sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                        assert_real(!sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                    }
+                }
+            }
+        }
+    }
+
+
+    // r_cds (1)
+    FOR_C {
+        FOR_R {
+            FOR_D {
+                FOR_S {
+                    if (sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]) {
+                        assert_real(sol->c_rds[INDEX3(r, R, d, D, s, S)] == c);
+                    }
+                }
+            }
+        }
+    }
+
+    // r_cds (2)
+    FOR_C {
+        FOR_D {
+            FOR_S {
+                int rr = sol->r_cds[INDEX3(c, C, d, D, s, S)];
+//                print("r %d %d %d = %d", c, d, s, rr);
+                if (rr >= 0)
+                    assert_real(sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, rr, R)]);
+                else {
+                    FOR_R {
+//                        print("sol->timetable_cdsr[%d %d %d %d])=%d", c, d, s, r, sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)]);
+                        assert_real(!sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)]);
                     }
                 }
             }
@@ -898,11 +939,11 @@ void solution_assert_consistency(const solution *sol) {
                 FOR_S {
                     if (sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]) {
                         int l = sol->l_rds[INDEX3(r, R, d, D, s, S)];
-                        assert(l >= 0);
+                        assert_real(l >= 0);
                         assignment *a = &sol->assignments[l];
-                        assert(a->r == r);
-                        assert(a->d == d);
-                        assert(a->s == s);
+                        assert_real(a->r == r);
+                        assert_real(a->d == d);
+                        assert_real(a->s == s);
                     }
                 }
             }
@@ -915,16 +956,98 @@ void solution_assert_consistency(const solution *sol) {
             FOR_S {
                 int l = sol->l_rds[INDEX3(r, R, d, D, s, S)];
                 if (l >= 0) {
-                    assert(sol->timetable_crds[INDEX4(model->lectures[l].course->index, C, r, R, d, D, s, S)]);
+                    assert_real(sol->timetable_crds[INDEX4(model->lectures[l].course->index, C, r, R, d, D, s, S)]);
                 }
                 else {
                     FOR_C {
-                        assert(!sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
+                        assert_real(!sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)]);
                     }
                 }
             }
         }
     }
+
+    // sum_cr
+    FOR_C {
+        FOR_R {
+            int sum = 0;
+            FOR_D {
+                FOR_S {
+                    sum += sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)];
+                }
+            }
+            assert_real(sum == sol->sum_cr[INDEX2(c, C, r, R)]);
+        }
+    };
+
+    // sum_cds
+    FOR_C {
+        FOR_D {
+            FOR_S {
+                int sum = 0;
+                FOR_R {
+                    sum += sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)];
+                }
+                assert_real(sum == sol->sum_cds[INDEX3(c, C, d, D, s, S)]);
+            }
+        }
+    };
+
+    // sum_cd
+    FOR_C {
+        FOR_D {
+            int sum = 0;
+            FOR_S {
+                FOR_R {
+                    sum += sol->timetable_cdsr[INDEX4(c, C, d, D, s, S, r, R)];
+                }
+            }
+            assert_real(sum == sol->sum_cd[INDEX2(c, C, d, D)]);
+        }
+    };
+
+    // sum_rds
+    FOR_R {
+        FOR_D {
+            FOR_S {
+                int sum = 0;
+                FOR_C {
+                    sum += sol->timetable_rdsc[INDEX4(r, R, d, D, s, S, c, C)];
+                }
+                assert_real(sum == sol->sum_rds[INDEX3(r, R, d, D, s, S)]);
+            }
+        }
+    };
+
+    // sum_qds
+    FOR_Q {
+        FOR_D {
+            FOR_S {
+                int sum = 0;
+                FOR_C {
+                    FOR_R {
+                        sum += sol->timetable_qdscr[INDEX5(q, Q, d, D, s, S, c, C, r, R)];
+                    }
+                }
+                assert_real(sum == sol->sum_qds[INDEX3(q, Q, d, D, s, S)]);
+            }
+        }
+    };
+
+    // sum_tds
+    FOR_T {
+        FOR_D {
+            FOR_S {
+                int sum = 0;
+                FOR_C {
+                    FOR_R {
+                        sum += sol->timetable_tdscr[INDEX5(t, T, d, D, s, S, c, C, r, R)];
+                    }
+                }
+                assert_real(sum == sol->sum_tds[INDEX3(t, T, d, D, s, S)]);
+            }
+        }
+    };
 
     // assignments
     FOR_L {
@@ -932,17 +1055,21 @@ void solution_assert_consistency(const solution *sol) {
         const int c = ll->course->index;
         const assignment *a = &sol->assignments[l];
         if (a->r >= 0 && a->d >= 0 && a->s >= 0) {
-            assert(sol->timetable_crds[INDEX4(c, C, a->r, R, a->d, D, a->s, S)]);
-            assert(sol->l_rds[INDEX3(a->r, R, a->d, D, a->s, S)] == l);
+            assert_real(sol->timetable_crds[INDEX4(c, C, a->r, R, a->d, D, a->s, S)]);
+            assert_real(sol->l_rds[INDEX3(a->r, R, a->d, D, a->s, S)] == l);
         }
     }
-
-#endif
 }
 
 void solution_assert(const solution *sol, bool expected_feasibility, int expected_cost) {
-    solution_assert_consistency(sol);
-    assert(expected_feasibility == solution_satisfy_hard_constraints(sol));
+#ifdef ASSERT
+    solution_assert_real(sol, expected_feasibility, expected_cost);
+#endif
+}
+
+void solution_assert_real(const solution *sol, bool expected_feasibility, int expected_cost) {
+    solution_assert_consistency_real(sol);
+    assert_real(expected_feasibility == solution_satisfy_hard_constraints(sol));
     if (expected_cost >= 0)
-        assert(expected_cost == solution_cost(sol));
+        assert_real(expected_cost == solution_cost(sol));
 }

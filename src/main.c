@@ -108,7 +108,7 @@ int main (int argc, char **argv) {
     unsigned int seed = args.seed;
     if (!seed) {
         struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+        clock_gettime(CLOCK_REALTIME, &ts);
         seed = ts.tv_nsec ^ ts.tv_sec;
     }
 
@@ -233,11 +233,12 @@ int main (int argc, char **argv) {
                 free(sol_str);
             }
 
-            char *sol_quality_str = solution_quality_to_string(&sol, get_verbosity());
+            char *sol_quality_str = solution_quality_to_string(&sol, get_verbosity() || args.solution_input_file);
             print("%s", sol_quality_str);
             free(sol_quality_str);
 
-            verbose("Solution fingerprint: %llu", fingerprint);
+            verbose("\n"
+                    "Solution fingerprint: %llu", fingerprint);
             if (args.output_file)
                 write_solution(&sol, args.output_file);
         }
@@ -255,6 +256,6 @@ int main (int argc, char **argv) {
     config_destroy(&cfg);
     args_destroy(&args);
 
-    debug("(seed was %u)", rand_get_seed());
+    verbose("Seed was: %u", rand_get_seed());
     return 0;
 }

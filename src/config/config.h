@@ -2,12 +2,15 @@
 #define CONFIG_H
 
 #include <stdbool.h>
-#include <heuristics/methods/heuristic_method.h>
-#include <heuristics/heuristic_solver.h>
-#include <heuristics/methods/local_search.h>
-#include <heuristics/methods/hill_climbing.h>
-#include <heuristics/methods/tabu_search.h>
-#include <heuristics/methods/simulated_annealing.h>
+#include <glib.h>
+#include "heuristics/methods/heuristic_method.h"
+#include "heuristics/heuristic_solver.h"
+#include "heuristics/methods/local_search.h"
+#include "heuristics/methods/hill_climbing.h"
+#include "heuristics/methods/tabu_search.h"
+#include "heuristics/methods/simulated_annealing.h"
+
+/* Options: either of a config file or given at the command line with -o */
 
 typedef struct config {
     struct solver {

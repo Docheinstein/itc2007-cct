@@ -1,8 +1,6 @@
 #ifndef VERBOSE_H
 #define VERBOSE_H
 
-#include <stdbool.h>
-
 int get_verbosity();
 void set_verbosity(int level);
 

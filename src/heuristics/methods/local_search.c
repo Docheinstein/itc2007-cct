@@ -1,17 +1,13 @@
-#include <log/verbose.h>
-#include <utils/mem_utils.h>
-#include <heuristics/neighbourhoods/swap.h>
-#include <log/debug.h>
-#include "hill_climbing.h"
 #include "local_search.h"
+#include "log/verbose.h"
+#include "utils/mem_utils.h"
+#include "heuristics/neighbourhoods/swap.h"
+#include "timeout/timeout.h"
 
-void local_search_params_default(local_search_params *params) {
-    params->steepest = true;
-}
+void local_search_params_default(local_search_params *params) {}
 
 void local_search(heuristic_solver_state *state, void *arg) {
     local_search_params *params = (local_search_params *) arg;
-    debug("LS.steepest = %d", params->steepest);
 
     bool improved;
 
@@ -27,18 +23,17 @@ void local_search(heuristic_solver_state *state, void *arg) {
         swap_move best_swap_mv;
         int best_swap_cost = INT_MAX;
 
-        while (swap_iter_next(&swap_iter, &swap_mv)) {
-            swap_predict(state->current_solution, &swap_mv,
-                         NEIGHBOURHOOD_PREDICT_ALWAYS,
-                         NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+        while (swap_iter_next(&swap_iter)) {
+            swap_predict(state->current_solution, &swap_iter.move,
+                         NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
+                         NEIGHBOURHOOD_PREDICT_COST_IF_FEASIBLE,
                          &swap_result);
 
             if (swap_result.feasible && swap_result.delta.cost < best_swap_cost) {
                 best_swap_cost = swap_result.delta.cost;
-                best_swap_mv = swap_mv;
-                if (swap_result.delta.cost < 0 && params->steepest) {
-                    // Perform an improving move without
-                    // evaluating all the neighbours
+                best_swap_mv = swap_iter.move;
+                if (swap_result.delta.cost < 0) {
+                    // Perform the move without evaluating all the neighbours
                     break;
                 }
             }
@@ -53,6 +48,5 @@ void local_search(heuristic_solver_state *state, void *arg) {
             heuristic_solver_state_update(state);
             improved = true;
         }
-
-    } while (improved);
+    } while(!timeout && improved);
 }

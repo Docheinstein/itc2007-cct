@@ -3,11 +3,17 @@
 
 #include "heuristics/heuristic_solver.h"
 
-typedef struct hill_climbing_params {
-    int max_idle;
+/*
+ * Hill Climbing.
+ * Generates a random move and performs it only if is does not
+ * increase the cost of the current solution.
+ *
+ * `max_idle` defines after how many iterations of non-decreasing
+ *      cost (side moves) the method quits.
+ */
 
-    double intensification_threshold;
-    double intensification_coeff;
+typedef struct hill_climbing_params {
+    long max_idle;
 } hill_climbing_params;
 
 void hill_climbing_params_default(hill_climbing_params *params);

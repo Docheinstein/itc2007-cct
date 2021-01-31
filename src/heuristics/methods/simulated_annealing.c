@@ -1,65 +1,54 @@
-#include <heuristics/neighbourhoods/swap.h>
-#include <math.h>
-#include <utils/random_utils.h>
 #include "simulated_annealing.h"
+#include <math.h>
+#include "heuristics/neighbourhoods/swap.h"
+#include "utils/random_utils.h"
+#include "timeout/timeout.h"
+#include "log/debug.h"
 #include "log/verbose.h"
 
+// p(move) = e^(-delta(move)/temperature)
 #define SA_ACCEPTANCE(delta, t) pow(M_E, - (double) (delta) / (t))
 
 
 void simulated_annealing_params_default(simulated_annealing_params *params) {
-    params->max_idle = 80000;
+    params->max_idle = -1;
     params->initial_temperature = 1.5;
-    params->cooling_rate = 0.96;
-    params->min_temperature = 0.08;
+    params->cooling_rate = 0.9995;
+    params->min_temperature = 0.10;
     params->temperature_length_coeff = 1;
-
-    params->intensification_threshold = 1.1;
-    params->intensification_coeff = 1.5;
 }
-
 
 static bool simulated_annealing_accept(heuristic_solver_state *state,
                                        swap_result *swap_result,
                                        double temperature) {
     if (state->current_cost + swap_result->delta.cost < state->best_cost)
-        return true; // always accept best solutions
-
-    double p = SA_ACCEPTANCE(swap_result->delta.cost, temperature);
-    double r = rand_uniform(0, 1);
-    return r < p;
+        return true; // always accept new best solutions
+    return rand_uniform(0, 1) < SA_ACCEPTANCE(swap_result->delta.cost, temperature);
 }
 
 void simulated_annealing(heuristic_solver_state *state, void *arg) {
-    MODEL(state->model);
     simulated_annealing_params *params = (simulated_annealing_params *) arg;
+    MODEL(state->model);
+    bool collect_sa_stats = get_verbosity() >= 2;
+
+    long max_idle = params->max_idle >= 0 ? params->max_idle : LONG_MAX;
     int temperature_length = (int) (state->model->n_lectures * params->temperature_length_coeff);
-    verbose("SA.max_idle = %d", params->max_idle);
-    verbose("SA.initial_temperature = %f", params->initial_temperature);
-    verbose("SA.cooling_rate = %f", params->cooling_rate);
-    verbose("SA.min_temperature = %f", params->min_temperature);
-    verbose("SA.temperature_length_coeff = %f (=> temperature_length = %d)",
-            params->temperature_length_coeff, temperature_length);
 
     int local_best_cost = state->current_cost;
-    int idle = 0;
-    int iter = 0;
-
+    long idle = 0;
+    long iter = 0;
     double t = params->initial_temperature;
 
-    while (t > params->min_temperature && idle < params->max_idle) {
-        if (iter % (temperature_length * 5) == 0)
-            verbose2("temperature = %f | p(+1) = %f  p(+5) = %f  p(+10) = %f",
-                     t, SA_ACCEPTANCE(1, t), SA_ACCEPTANCE(5, t), SA_ACCEPTANCE(10, t));
-
+    while (!timeout && idle < max_idle && t > params->min_temperature) {
+        // Perform temperature_length iters with the same temperature
         for (int it = 0; it < temperature_length; it++) {
             swap_move swap_mv;
             swap_result swap_result;
 
-            swap_move_generate_random(state->current_solution, &swap_mv, true);
+            swap_move_generate_random_feasible_effective(state->current_solution, &swap_mv);
             swap_predict(state->current_solution, &swap_mv,
-                         NEIGHBOURHOOD_PREDICT_NEVER,
-                         NEIGHBOURHOOD_PREDICT_ALWAYS,
+                         NEIGHBOURHOOD_PREDICT_FEASIBILITY_NEVER,
+                         NEIGHBOURHOOD_PREDICT_COST_ALWAYS,
                          &swap_result);
 
             if (simulated_annealing_accept(state, &swap_result, t)) {
@@ -76,21 +65,24 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
             else
                 idle++;
 
-            if (get_verbosity() >= 2 &&
-                    idle > 0 && idle % (params->max_idle / 10) == 0) {
-                verbose2("current = %d | local best = %d | global best = %d\n"
-                     "iter = %d | idle progress = %d/%d (%f%%)\n"
-                     "temperature = %f | p(+1) = %f  p(+5) = %f  p(+10) = %f",
+            if (collect_sa_stats &&
+                ((idle > 0 && idle % (params->max_idle > 0 ? (params->max_idle / 10) : 10000) == 0)
+                || iter % (temperature_length * 5) == 0)) {
+                verbose2("%s: Iter = %ld | Idle progress = %ld/%ld (%.2f%%) | "
+                         "Current = %d | Local best = %d | Global best = %d | "
+                         "Temperature = %.5f | p(+1) = %g  p(+5) = %g  p(+10) = %g",
+                     state->methods_name[state->method],
+                     iter, idle,
+                     params->max_idle > 0 ? params->max_idle : 0,
+                     params->max_idle > 0 ? (double) 100 * idle / params->max_idle : 0,
                      state->current_cost, local_best_cost, state->best_cost,
-                     iter, idle, params->max_idle, (double) 100 * idle / params->max_idle,
                      t, SA_ACCEPTANCE(1, t), SA_ACCEPTANCE(5, t), SA_ACCEPTANCE(10, t));
             }
 
             iter++;
         }
 
+        // Decrease the temperature by cooling rate
         t *= params->cooling_rate;
     }
-
-#undef PRINT_STATS
 }

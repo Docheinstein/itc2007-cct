@@ -1,6 +1,8 @@
 #ifndef HEURISTIC_METHOD_H
 #define HEURISTIC_METHOD_H
 
+/* Metaheuristics methods */
+
 typedef enum heuristic_method {
     HEURISTIC_METHOD_NONE,
     HEURISTIC_METHOD_LOCAL_SEARCH,

@@ -284,7 +284,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
             verbosef2("\n");
 
             verbose2("--- TREND OF BEST ---");
-            int *trend_best = (int *) state->stats.trend_current->data;
+            int *trend_best = (int *) state->stats.trend_best->data;
             for (int i = 0; i < state->stats.trend_best->len; i++) {
                 if (i && i % 10 == 0)
                     verbosef2("\n");

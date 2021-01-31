@@ -13,11 +13,14 @@
 #  define UNUSED
 #endif
 
-#ifdef ASSERT
-#define assert(cond) do { \
+
+#define assert_real(cond) do { \
     if LIKELY(cond); \
     else assertion_message(__FILE__, __LINE__, __func__, #cond); \
 } while(0)
+
+#ifdef ASSERT
+#define assert(cond) assert_real(cond)
 #else
 #define assert(cond) do { } while(0)
 #endif

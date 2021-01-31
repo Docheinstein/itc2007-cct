@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include "config.h"
 
+/* Parser of options of a config file or given at the command line with -o */
+
 typedef struct config_parser {
     char *error;
 } config_parser;

@@ -3,8 +3,13 @@
 
 #include "heuristics/heuristic_solver.h"
 
+/*
+ * Local Search.
+ * Performs the first seen improving move of the neighbourhood
+ * until such a move exists, therefore reaches a local minimum.
+ */
+
 typedef struct local_search_params {
-    bool steepest;
 } local_search_params;
 
 void local_search_params_default(local_search_params *params);

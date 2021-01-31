@@ -71,15 +71,13 @@ a period unavailable for that course_id is one violation.
 **RoomStability**: All lectures of a course_id should be given in the same room. Each distinct
         room used for the lectures of a course_id, but the first, counts as 1 point of penalty.
 
+## Dependencies
+* glib2
+* cairo
+
 ## Building
 ```
-./build.sh
-```
-
-Alternatively:
-
-```
-mkdir build
+mkdir -p build
 cd build
 cmake ..
 make

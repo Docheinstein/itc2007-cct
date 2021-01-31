@@ -1,9 +1,7 @@
-#include <stdlib.h>
-#include <utils/mem_utils.h>
-#include <string.h>
 #include "config.h"
+#include <stdlib.h>
+#include <string.h>
 #include "utils/str_utils.h"
-#include "config_parser.h"
 
 char *config_to_string(const config *cfg) {
     char *methods_str[cfg->solver.methods->len];
@@ -20,20 +18,16 @@ char *config_to_string(const config *cfg) {
         "solver.max_cycles = %d\n"
         "solver.multistart = %s\n"
         "solver.restore_best_after_cycles = %d\n"
-        "finder.ranking_randomness = %f\n"
-        "ls.steepest = %s\n"
-        "hc.max_idle = %d\n"
-        "ts.max_idle = %d\n"
+        "finder.ranking_randomness = %.2f\n"
+        "hc.max_idle = %ld\n"
+        "ts.max_idle = %ld\n"
         "ts.tabu_tenure = %d\n"
-        "ts.frequency_penalty_coeff = %f\n"
-        "ts.random_pick = %s\n"
-        "ts.steepest = %s\n"
-        "ts.clear_on_best = %s\n"
-        "sa.max_idle = %d\n"
-        "sa.initial_temperature = %f\n"
-        "sa.cooling_rate = %f\n"
-        "sa.min_temperature = %f\n"
-        "sa.temperature_length_coeff = %f",
+        "ts.frequency_penalty_coeff = %.2f\n"
+        "sa.max_idle = %ld\n"
+        "sa.initial_temperature = %.2f\n"
+        "sa.cooling_rate = %.2f\n"
+        "sa.min_temperature = %.2f\n"
+        "sa.temperature_length_coeff = %.2f",
         solver_methods,
         cfg->solver.max_time,
         cfg->solver.max_cycles,
@@ -42,16 +36,11 @@ char *config_to_string(const config *cfg) {
         // ---
         cfg->finder.ranking_randomness,
         // ---
-        booltostr(cfg->ls.steepest),
-        // ---
         cfg->hc.max_idle,
         // ---
         cfg->ts.max_idle,
         cfg->ts.tabu_tenure,
         cfg->ts.frequency_penalty_coeff,
-        booltostr(cfg->ts.random_pick),
-        booltostr(cfg->ts.steepest),
-        booltostr(cfg->ts.clear_on_best),
         // ---
         cfg->sa.max_idle,
         cfg->sa.initial_temperature,

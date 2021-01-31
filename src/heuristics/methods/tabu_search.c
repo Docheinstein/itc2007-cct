@@ -1,36 +1,26 @@
-#include <heuristics/neighbourhoods/swap.h>
-#include <renderer/renderer.h>
-#include <utils/random_utils.h>
-#include <utils/str_utils.h>
 #include "tabu_search.h"
+#include "heuristics/neighbourhoods/swap.h"
+#include "log/verbose.h"
+#include "timeout/timeout.h"
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
-#include "math.h"
-#include "log/debug.h"
-#include "log/verbose.h"
+#include "utils/random_utils.h"
 
 
 void tabu_search_params_default(tabu_search_params *params) {
-    params->max_idle = 400;
-    params->tabu_tenure = 120;
-    params->frequency_penalty_coeff = 1.2;
-    params->random_pick = true;
-    params->steepest = true;
-    params->clear_on_best = true;
-
-    params->intensification_threshold = 1.1;
-    params->intensification_coeff = 1.5;
+    params->max_idle = -1;
+    params->tabu_tenure = 80;
+    params->frequency_penalty_coeff = 0;
 }
 
 typedef struct tabu_list_entry {
-    int time;
-    int count;
-    int delta_cost_sum;
+    long time; // iteration of the last ban
+    int count; // frequency of the ban
 } tabu_list_entry;
 
 typedef struct tabu_list {
     const model *model;
-    tabu_list_entry *banned;
+    tabu_list_entry *banned; // tabu list: implemented as a matrix of `tabu_list_entry`
     int tenure;
     double frequency_penalty_coeff;
 } tabu_list;
@@ -48,24 +38,29 @@ static void tabu_list_destroy(tabu_list *tabu) {
     free(tabu->banned);
 }
 
-static bool tabu_list_lecture_is_allowed(tabu_list *tabu, int c, int r, int d, int s, int time) {
+static bool tabu_list_lecture_is_allowed(tabu_list *tabu, int c, int r, int d, int s, long time) {
     if (c < 0)
         return true;
     MODEL(tabu->model);
     tabu_list_entry *entry = &tabu->banned[INDEX4(c, C, r, R, d, D, s, S)];
     if (!entry->count)
-        return true;
-    return entry->time + tabu->tenure * pow(tabu->frequency_penalty_coeff, entry->count) < time;
-//    return entry->time + tabu->tenure + tabu->frequency_penalty_coeff * entry->count < time;
+        return true; // allowed: not in the tabu list
+
+    // The move is allowed after `tt + coeff * count(move)` iteration
+    return entry->time + tabu->tenure + (long) (tabu->frequency_penalty_coeff * entry->count) < time;
 }
 
-static bool tabu_list_move_is_allowed(tabu_list *tabu, swap_move *mv, int time) {
+static bool tabu_list_move_is_allowed(tabu_list *tabu, const swap_move *mv, long time) {
+    /*
+     * A move is allowed if the course c1 does not came back to (r2, d2, s2)
+     * and if the course c2 does not came back to (r1, d1, s1) within tt iterations.
+     */
     return
         tabu_list_lecture_is_allowed(tabu, mv->helper.c1, mv->r2, mv->d2, mv->s2, time) &&
         tabu_list_lecture_is_allowed(tabu, mv->helper.c2, mv->helper.r1, mv->helper.d1, mv->helper.s1, time);
 }
 
-static void tabu_list_insert_lecture(tabu_list *tabu, int c, int r, int d, int s, int time) {
+static void tabu_list_ban_assignment(tabu_list *tabu, int c, int r, int d, int s, long time) {
     if (c < 0)
         return;
     MODEL(tabu->model);
@@ -79,136 +74,113 @@ static void tabu_list_clear(tabu_list *tabu) {
     memset(tabu->banned, 0, C * R * D * S * sizeof(tabu_list_entry));
 }
 
-static void tabu_list_insert_move(tabu_list *tabu, swap_move *mv,
-                                  int time) {
-    tabu_list_insert_lecture(tabu, mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1, time);
-    tabu_list_insert_lecture(tabu, mv->helper.c2, mv->r2, mv->d2, mv->s2, time);
-}
-
-static void tabu_list_dump(tabu_list *tabu) {
-#if DEBUG
-    MODEL(tabu->model);
-    FOR_C {
-        FOR_R {
-            FOR_D {
-                FOR_S {
-                    tabu_list_entry *entry = &tabu->banned[INDEX4(c, C, r, R, d, D, s, S)];
-                    debug2("Tabu[%d][%d][%d][%d] = {time=%d, count=%d, delta_sum=%d (mean=%f)}",
-                          c, r, d, s, entry->time, entry->count, entry->delta_cost_sum, (double) entry->delta_cost_sum / entry->count);
-                }
-            }
-        }
-    };
-#endif
+static void tabu_list_ban_move(tabu_list *tabu, swap_move *mv, long time) {
+    tabu_list_ban_assignment(tabu, mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1, time);
+    tabu_list_ban_assignment(tabu, mv->helper.c2, mv->r2, mv->d2, mv->s2, time);
 }
 
 void tabu_search(heuristic_solver_state *state, void *arg) {
-    MODEL(state->model);
-
     tabu_search_params *params = (tabu_search_params *) arg;
-    verbose("TS.max_idle = %d", params->max_idle);
-    verbose("TS.tabu_tenure = %d", params->tabu_tenure);
-    verbose("TS.frequency_penalty_coeff = %f", params->frequency_penalty_coeff);
-    verbose("TS.random_pick = %s", booltostr(params->random_pick));
-    verbose("TS.clear_on_best = %s", booltostr(params->clear_on_best));
+    MODEL(state->model);
+    bool ts_stats = get_verbosity() >= 2;
+
+    long max_idle = params->max_idle >= 0 ? params->max_idle : LONG_MAX;
+    int local_best_cost = state->current_cost;
+    long idle = 0;
+    long iter = 0;
 
     tabu_list tabu;
     tabu_list_init(&tabu, state->model,
                    params->tabu_tenure, params->frequency_penalty_coeff);
 
-    int local_best_cost = state->current_cost;
+    swap_move *moves = mallocx(tabu.model->n_lectures * R * D * S, sizeof(swap_move));
+    struct {
+        int n_banned_moves;
+        int n_side_moves;
+        int n_side_banned_moves;
+    } stats = {0, 0, 0};
 
-    int idle = 0;
-    int iter = 0;
-
-    swap_move *moves = mallocx(
-            params->random_pick ? (tabu.model->n_lectures * R * D * S) : 1,
-            sizeof(swap_move));
-
-    while (idle < params->max_idle) {
+    while (!timeout && idle < max_idle) {
         swap_iter swap_iter;
         swap_iter_init(&swap_iter, state->current_solution);
 
-        swap_move swap_mv;
         swap_result swap_result;
+
+        int move_cursor = 0;
+        if (ts_stats)
+            stats.n_side_moves = stats.n_banned_moves = stats.n_side_banned_moves = 0;
 
         int best_swap_cost = INT_MAX;
 
-        struct {
-            int n_banned_moves;
-            int n_side_moves;
-            int n_side_banned_moves;
-        } stats = {0, 0, 0};
-
-        int move_cursor = 0;
-
-        while (swap_iter_next(&swap_iter, &swap_mv)) {
-            swap_predict(state->current_solution, &swap_mv,
-                         NEIGHBOURHOOD_PREDICT_ALWAYS,
-                         NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
+        while (swap_iter_next(&swap_iter/*, &swap_mv*/)) {
+            swap_predict(state->current_solution, &swap_iter.move,
+                         NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
+                         NEIGHBOURHOOD_PREDICT_COST_IF_FEASIBLE,
                          &swap_result);
 
-            if (swap_result.feasible &&
-                    swap_result.delta.cost <= best_swap_cost &&
-                    (state->current_cost + swap_result.delta.cost < state->best_cost ||
-                            tabu_list_move_is_allowed(&tabu, &swap_mv, iter))) {
+            if (!swap_result.feasible)
+                continue;
+
+            if (ts_stats) {
+                bool banned = !tabu_list_move_is_allowed(&tabu, &swap_iter.move, iter);
+                bool side = swap_result.delta.cost == 0;
+                stats.n_banned_moves += banned;
+                stats.n_side_moves += side;
+                stats.n_side_banned_moves += (banned && side);
+            }
+
+            if (swap_result.delta.cost <= best_swap_cost &&
+                // Accept only if does not belong to the tabu banned
+                (tabu_list_move_is_allowed(&tabu, &swap_iter.move, iter) ||
+                 // exception: aspiration criteria
+                 state->current_cost + swap_result.delta.cost < state->best_cost)) {
 
                 if (swap_result.delta.cost < best_swap_cost) {
-                    move_cursor = 0;
+                    move_cursor = 0; // "clear" the best moves array
                     best_swap_cost = swap_result.delta.cost;
                 }
 
-                moves[move_cursor] = swap_mv;
-
-                if (params->random_pick)
-                    move_cursor++;
-
-                if (swap_result.delta.cost < 0 && params->steepest) {
-                    // Perform an improving move without
-                    // evaluating all the neighbours
-                    break;
-                }
+                moves[move_cursor++] = swap_iter.move;
             }
-
-            bool banned = !tabu_list_move_is_allowed(&tabu, &swap_mv, iter);
-            bool side = swap_result.delta.cost == 0;
-            stats.n_banned_moves +=  banned;
-            stats.n_side_moves += side;
-            stats.n_side_banned_moves += (banned && side);
         }
 
         swap_iter_destroy(&swap_iter);
 
         if (best_swap_cost != INT_MAX) {
-            int pick = params->random_pick ? rand_int_range(0, move_cursor) : 0;
-            swap_mv = moves[pick];
-            swap_perform(state->current_solution, &swap_mv,
+            // Pick a random move among the best ones
+            swap_move *mv = &moves[rand_int_range(0, move_cursor)];
+            swap_perform(state->current_solution, mv,
                          NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
 
             state->current_cost += best_swap_cost;
-            bool new_best = heuristic_solver_state_update(state);
-            if (new_best && params->clear_on_best)
-                tabu_list_clear(&tabu);
-            tabu_list_insert_move(&tabu, &swap_mv, iter);
+            heuristic_solver_state_update(state);
+//            bool new_best = heuristic_solver_state_update(state);
+//            if (new_best)
+//                tabu_list_clear(&tabu);
+            tabu_list_ban_move(&tabu, mv, iter);
         }
-
 
         if (state->current_cost < local_best_cost) {
             local_best_cost = state->current_cost;
             idle = 0;
         }
-        else
+        else {
             idle++;
+        }
 
-        if (get_verbosity() >= 2 &&
-            (idle > 0 && idle % (params->max_idle / 10) == 0)) {
-            verbose2("current = %d | local best = %d | global best = %d\n"
-                     "iter = %d | idle progress = %d/%d (%f%%)\n"
-                     "# banned = %d/%d | # side = %d/%d (%d/%d banned)",
+        if (ts_stats &&
+            (idle > 0 && idle % (params->max_idle > 0 ? (params->max_idle / 10) : 100) == 0)) {
+            verbose2("%s: Iter = %ld | Idle progress = %ld/%ld (%.2f%%) | "
+                     "Current = %d | Local best = %d | Global best = %d | "
+                     "# Banned = %d/%d | # Side = %d/%d (%d/%d banned) | "
+                     "# Elite = %d (cost = %d)",
+                     state->methods_name[state->method],
+                     iter, idle,
+                     params->max_idle > 0 ? params->max_idle : 0,
+                     params->max_idle > 0 ? (double) 100 * idle / params->max_idle : 0,
                      state->current_cost, local_best_cost, state->best_cost,
-                     iter, idle, params->max_idle, (double) 100 * idle / params->max_idle,
                      stats.n_banned_moves, swap_iter.i, stats.n_side_moves, swap_iter.i,
-                     stats.n_side_banned_moves, stats.n_side_moves);
+                     stats.n_side_banned_moves, stats.n_side_moves, move_cursor, best_swap_cost);
         }
 
         iter++;

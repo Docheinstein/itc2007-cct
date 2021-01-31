@@ -1,12 +1,21 @@
-#include <log/debug.h>
-#include <utils/io_utils.h>
-#include <utils/random_utils.h>
 #include "swap.h"
+#include "log/debug.h"
+#include "utils/io_utils.h"
+#include "utils/random_utils.h"
 #include "utils/array_utils.h"
+#include "utils/assert_utils.h"
 #include "solution/solution.h"
 #include "model/model.h"
-#include "utils/assert_utils.h"
 
+
+/*
+ * Returns 'true' if course c1 can be assigned
+ * - from (day=d2, slot=s1)
+ * - to (day=d2, slot=s2) (previously occupied by c2)
+ * without breaking 'Lectures' constraint.
+ *
+ * [All lectures of a course must be assigned to distinct periods]
+ */
 static bool check_lectures_constraint(
         const solution *sol, int c1, int d1, int s1, int c2, int d2, int s2) {
     MODEL(sol->model);
@@ -14,7 +23,7 @@ static bool check_lectures_constraint(
     const bool same_course = c1 == c2;
 
     if (c1 >= 0) {
-        debug2("Check H1b (Lectures) (c=%d, d=%d, s=%d)", c1, d2, s2);
+        debug2("Check H1b (Lectures) (c=%d, d=%d, s=%d) -> %d", c1, d2, s2, sol->sum_cds[INDEX3(c1, C, d2, D, s2, S)]);
         if (sol->sum_cds[INDEX3(c1, C, d2, D, s2, S)] - same_period - same_course > 0)
             return false;
     }
@@ -22,6 +31,14 @@ static bool check_lectures_constraint(
     return true;
 }
 
+/*
+ * Returns 'true' if course c1 can be assigned
+ * - from (day=d2, slot=s1)
+ * - to (day=d2, slot=s2) (previously occupied by c2)
+ * without breaking 'Curriculum Conflicts' constraint.
+ *
+ * [Lectures of courses in the same curriculum must be all scheduled in different periods]
+ */
 static bool check_conflicts_curriculum_constraint(
         const solution *sol, int c1, int d1, int s1, int c2, int d2, int s2) {
     MODEL(sol->model);
@@ -42,6 +59,14 @@ static bool check_conflicts_curriculum_constraint(
     return true;
 }
 
+/*
+ * Returns 'true' if course c1 can be assigned
+ * - from (day=d2, slot=s1)
+ * - to (day=d2, slot=s2) (previously occupied by c2)
+ * without breaking 'Teacher Conflicts' constraint.
+ *
+ * [Lectures of courses taught by the same teacher must be all scheduled in different periods]
+ */
 static bool check_conflicts_teacher_constraint(
         const solution *sol, int c1, int d1, int s1, int c2, int d2, int s2) {
     MODEL(sol->model);
@@ -58,6 +83,14 @@ static bool check_conflicts_teacher_constraint(
     return true;
 }
 
+/*
+ * Returns 'true' if course c1 can be assigned
+ * - to (day=d2, slot=s2)
+ * without breaking 'Availabilities' constraint.
+ *
+ * [If the teacher of the course is not available to teach that course at a given period,
+ *  then no lectures of the course can be scheduled at that period]
+ */
 static bool check_availabilities_constraint(
         const solution *sol, int c1, int d2, int s2) {
     if (c1 >= 0) {
@@ -69,37 +102,52 @@ static bool check_availabilities_constraint(
     return true;
 }
 
-
+/*
+ * Compute 'RoomCapacity' cost of assigning c1
+ * - to (day=d2, slot=s2)
+ *
+ * [For each lecture, the number of students that attend the course must be
+ *  less or equal than the number of seats of all the rooms that host its lectures.
+ *  Each student above the capacity counts as 1 point of penalty]
+ */
 static int compute_room_capacity_cost(
-        const solution *sol, int c, int r_from, int r_to) {
-    if (c < 0)
+        const solution *sol, int c1, int r1, int r2) {
+    if (c1 < 0)
         return 0;
 
     int cost =
-        MIN(0, sol->model->rooms[r_from].capacity - sol->model->courses[c].n_students) +
-        MAX(0, sol->model->courses[c].n_students - sol->model->rooms[r_to].capacity);
+        MIN(0, sol->model->rooms[r1].capacity - sol->model->courses[c1].n_students) +
+        MAX(0, sol->model->courses[c1].n_students - sol->model->rooms[r2].capacity);
     cost *= ROOM_CAPACITY_COST_FACTOR;
 
     debug2("RoomCapacity delta cost: %d", cost);
     return cost;
 }
 
+/*
+ * Compute 'MinimumWorkingDays' cost of assigning c1
+ * - from day d2
+ * - to day d2 (previously occupied by c2)
+ *
+ * [The lectures of each course must be spread into the given mini-
+ *  mum number of days. Each day below the minimum counts as 5 points of penalty]
+ */
 static int compute_min_working_days_cost(
-        const solution *sol, int c_from, int d_from, int c_to, int d_to) {
+        const solution *sol, int c1, int d1, int c2, int d2) {
 
-    if (c_from < 0)
+    if (c1 < 0)
         return 0;
-    if (c_from == c_to)
+    if (c1 == c2)
         return 0;
 
     MODEL(sol->model);
 
-    int min_working_days = sol->model->courses[c_from].min_working_days;
+    int min_working_days = sol->model->courses[c1].min_working_days;
     int prev_working_days = 0;
     int cur_working_days = 0;
     FOR_D {
-        prev_working_days += MIN(1, sol->sum_cd[INDEX2(c_from, C, d, D)]);
-        cur_working_days += MIN(1, sol->sum_cd[INDEX2(c_from, C, d, D)] - (d == d_from) + (d == d_to));
+        prev_working_days += MIN(1, sol->sum_cd[INDEX2(c1, C, d, D)]);
+        cur_working_days += MIN(1, sol->sum_cd[INDEX2(c1, C, d, D)] - (d == d1) + (d == d2));
     }
 
     int cost =
@@ -111,13 +159,21 @@ static int compute_min_working_days_cost(
     return cost;
 }
 
+/*
+ * Compute 'RoomStability' cost of assigning c1
+ * - from room r1
+ * - to room r2 (previously occupied by c2)
+ *
+ * [All lectures of a course should be given in the same room. Each distinct
+ *  room used for the lectures of a course, but the first, counts as 1 point of penalty]
+ */
 static int compute_room_stability_cost(
-        const solution *sol, int c_from, int r_from, int c_to, int r_to) {
-    if (c_from < 0)
+        const solution *sol, int c1, int r1, int c2, int r2) {
+    if (c1 < 0)
         return 0;
-    if (r_from == r_to)
+    if (r1 == r2)
         return 0;
-    if (c_from == c_to)
+    if (c1 == c2)
         return 0;
 
     MODEL(sol->model);
@@ -125,8 +181,8 @@ static int compute_room_stability_cost(
     int prev_rooms = 0;
     int cur_rooms = 0;
     FOR_R {
-        prev_rooms += MIN(1, sol->sum_cr[INDEX2(c_from, C, r, R)]);
-        cur_rooms += MIN(1, sol->sum_cr[INDEX2(c_from, C, r, R)] - (r == r_from) + (r == r_to));
+        prev_rooms += MIN(1, sol->sum_cr[INDEX2(c1, C, r, R)]);
+        cur_rooms += MIN(1, sol->sum_cr[INDEX2(c1, C, r, R)] - (r == r1) + (r == r2));
     };
 
     int cost = MAX(0, cur_rooms - 1) - MAX(0, prev_rooms - 1);
@@ -136,41 +192,39 @@ static int compute_room_stability_cost(
     return cost;
 }
 
+/*
+ * Compute 'CurriculumCompactness' cost of assigning c1
+ * - from (day=d1, slot=s1)
+ * - to (day=d2, slot=s2) (previously occupied by c2)
+ *
+ * [Lectures belonging to a curriculum should be adjacent to each
+ *  other (i.e., in consecutive periods). For a given curriculum we account for a violation
+ *  every time there is one lecture not adjacent to any other lecture within the same day.
+ *  Each isolated lecture in a curriculum counts as 2 points of penalty]
+ */
 static int compute_curriculum_compactness_cost(
-     const solution *sol, int c_from, int d_from, int s_from, int c_to, int d_to, int s_to) {
-    if (c_from < 0)
+        const solution *sol, int c1, int d1, int s1, int c2, int d2, int s2) {
+    if (c1 < 0)
         return 0;
-    if (c_from == c_to)
+    if (c1 == c2)
         return 0;
 
     MODEL(sol->model);
-
-    int cost = 0;
-
-    int c_n_curriculas;
-    int *c_curriculas = model_curriculas_of_course(model, c_from, &c_n_curriculas);
-
-    for (int cq = 0; cq < c_n_curriculas; cq++) {
-        int q = c_curriculas[cq];
-
-        if (c_to >= 0 && model_share_curricula(model, c_to, c_from, q)) {
-            continue; // swap of courses of the same curriculum has no cost
-        }
 
 #define Z(q, d, s) \
     ((s) >= 0 && (s) < S && sol->sum_qds[INDEX3(q, Q, d, D, s, S)])
 
 #define Z_OUT_AFTER(q, d, s) \
-    (!((d) == d_from && (s) == s_from) && \
+    (!((d) == d1 && (s) == s1) && \
     ((Z(q, d, s))))
 
 #define Z_IN_BEFORE(q, d, s) \
-    (!((d) == d_from && (s) == s_from) && \
+    (!((d) == d1 && (s) == s1) && \
     ((Z(q, d, s))))
 
 #define Z_IN_AFTER(q, d, s) \
-    (((s) == s_to && (d) == d_to) || \
-    (!((d) == d_from && (s) == s_from) && \
+    (((s) == s2 && (d) == d2) || \
+    (!((d) == d1 && (s) == s1) && \
     ((Z(q, d, s)))))
 
 #define ALONE_OUT_BEFORE(q, d, s) \
@@ -184,20 +238,44 @@ static int compute_curriculum_compactness_cost(
 
 #define ALONE_IN_AFTER(q, d, s) \
     (Z_IN_AFTER(q, d, s) && !Z_IN_AFTER(q, d, (s) - 1) && !Z_IN_AFTER(q, d, (s) + 1))
+    
+    
+    int cost = 0;
 
-        int out_prev_cost_before = ALONE_OUT_BEFORE(q, d_from, s_from - 1);
-        int out_itself_cost = ALONE_OUT_BEFORE(q, d_from, s_from);
-        int out_next_cost_before = ALONE_OUT_BEFORE(q, d_from, s_from + 1);
+    int c_n_curriculas;
+    int *c_curriculas = model_curriculas_of_course(model, c1, &c_n_curriculas);
 
-        int out_prev_cost_after = ALONE_OUT_AFTER(q, d_from, s_from - 1);
-        int out_next_cost_after = ALONE_OUT_AFTER(q, d_from, s_from + 1);
+    /*
+     * The logic for compute the compactness cost is the following:
+     * for each curricula the course c1 belongs to:
+     * - if c2 share a curriculum with c1, no cost is introduced
+     * - otherwise:
+     *      the cost is given by summing the cost of taking c1 out
+     *      of (d1, s1), minus the bonus of placing c1 into (d2, s2);
+     *      the costs depend on whether the curriculum has any adjacent
+     *      lecture or not.
+     *  It might seems a little bit messy: it is.
+     *  By the way, what follows works, if the current solution if feasible.
+     */
+    for (int cq = 0; cq < c_n_curriculas; cq++) {
+        int q = c_curriculas[cq];
 
-        int in_prev_cost_before = ALONE_IN_BEFORE(q, d_to, s_to - 1);
-        int in_next_cost_before = ALONE_IN_BEFORE(q, d_to, s_to + 1);
-        int in_prev_cost_after = ALONE_IN_AFTER(q, d_to, s_to - 1);
-        int in_next_cost_after = ALONE_IN_AFTER(q, d_to, s_to + 1);
+        if (c2 >= 0 && model_share_curricula(model, c2, c1, q))
+            continue; // swap of courses of the same curriculum has no cost
 
-        int in_itself_cost = ALONE_IN_AFTER(q, d_to, s_to);
+        int out_prev_cost_before = ALONE_OUT_BEFORE(q, d1, s1 - 1);
+        int out_itself_cost = ALONE_OUT_BEFORE(q, d1, s1);
+        int out_next_cost_before = ALONE_OUT_BEFORE(q, d1, s1 + 1);
+
+        int out_prev_cost_after = ALONE_OUT_AFTER(q, d1, s1 - 1);
+        int out_next_cost_after = ALONE_OUT_AFTER(q, d1, s1 + 1);
+
+        int in_prev_cost_before = ALONE_IN_BEFORE(q, d2, s2 - 1);
+        int in_next_cost_before = ALONE_IN_BEFORE(q, d2, s2 + 1);
+        int in_prev_cost_after = ALONE_IN_AFTER(q, d2, s2 - 1);
+        int in_next_cost_after = ALONE_IN_AFTER(q, d2, s2 + 1);
+
+        int in_itself_cost = ALONE_IN_AFTER(q, d2, s2);
 
         int q_cost =
             (out_prev_cost_after - out_prev_cost_before) +
@@ -207,47 +285,27 @@ static int compute_curriculum_compactness_cost(
             (in_itself_cost - out_itself_cost);
 
         debug2("compute_curriculum_compactness_cost q=%d:%s\n"
-                "   c_from=%d, d_from=%d, s_from=%d, c_to=%d, d_to=%d, s_to=%d\n"
+                "   c1=%d, d1=%d, s1=%d, c2=%d, d2=%d, s2=%d\n"
                 "   (out_prev_cost_after %d   -  out_prev_cost_before %d) +\n"
                 "   (out_next_cost_after %d   -  out_next_cost_before %d) +\n"
                 "   (in_prev_cost_after  %d   -  in_prev_cost_before  %d) +\n"
                 "   (in_next_cost_after  %d   -  out_prev_cost_before %d) +\n"
                 "   (in_itself_cost      %d   -  out_itself_cost      %d) = %d",
-                q, model->curriculas[q].id,
-                c_from, d_from, s_from, c_to, d_to, s_to,
-                out_prev_cost_after, out_prev_cost_before,
-                out_next_cost_after, out_next_cost_before,
-                in_prev_cost_after, in_prev_cost_before,
-                in_next_cost_after, in_next_cost_before,
-                in_itself_cost, out_itself_cost,
-                q_cost
+               q, model->curriculas[q].id,
+               c1, d1, s1, c2, d2, s2,
+               out_prev_cost_after, out_prev_cost_before,
+               out_next_cost_after, out_next_cost_before,
+               in_prev_cost_after, in_prev_cost_before,
+               in_next_cost_after, in_next_cost_before,
+               in_itself_cost, out_itself_cost,
+               q_cost
         );
+        cost += q_cost;
+    }
 
+    cost *= CURRICULUM_COMPACTNESS_COST_FACTOR;
 
-        if (s_from > 0)
-            debug2("sol->sum_qds[INDEX3(q=%d, Q, d_from=%d, D, s_from - 1=%d, S)]=%d",
-                  q, d_from, s_from - 1,
-                  sol->sum_qds[INDEX3(q, Q, d_from, D, s_from - 1, S)]);
-        debug2("sol->sum_qds[INDEX3(q=%d, Q, d_from=%d, D, s_from=%d, S)]=%d",
-              q, d_from, s_from ,
-              sol->sum_qds[INDEX3(q, Q, d_from, D, s_from, S)]);
-        if (s_from < S - 1)
-            debug2("sol->sum_qds[INDEX3(q=%d, Q, d_from=%d, D, s_from+1=%d, S)]=%d",
-                  q, d_from, s_from + 1,
-                  sol->sum_qds[INDEX3(q, Q, d_from, D, s_from + 1, S)]);
-        if (s_from < S - 2)
-            debug2("sol->sum_qds[INDEX3(q=%d, Q, d_from=%d, D, s_from+2=%d, S)]=%d",
-                  q, d_from, s_from + 2,
-                  sol->sum_qds[INDEX3(q, Q, d_from, D, s_from + 2, S)]);
-
-        debug2("out_next_cost_after\n"
-              "  Z_OUT_AFTER(q, d_from, s+1)=%d && !Z_OUT_AFTER(q, d_from, s)=%d && !Z_OUT_AFTER(q, d_from, s+2)=%d -> %d"
-              ,
-              Z_OUT_AFTER(q, d_from, s_from + 1), !Z_OUT_AFTER(q, d_from, (s_from)), !Z_OUT_AFTER(q, d_from, (s_from) + 2),
-              out_next_cost_after);
-
-        debug2("((Z(q, d_from, s_from+2))))= %d", Z(q, d_from, (s_from) + 2));
-        debug2("(!((d_from) == d_from && (s_from+2) == s_from)= %d", (!((d_from) == d_from && (s_from+2) == s_from)));
+    debug2("CurriculumCompactness delta cost: %d", cost);
 
 #undef Z
 #undef Z_OUT_AFTER
@@ -258,24 +316,24 @@ static int compute_curriculum_compactness_cost(
 #undef ALONE_IN_BEFORE
 #undef ALONE_IN_AFTER
 
-        cost += q_cost;
-    }
-
-    cost *= CURRICULUM_COMPACTNESS_COST_FACTOR;
-
-    debug2("CurriculumCompactness delta cost: %d", cost);
-
     return cost;
 }
 
 
 static bool swap_move_check_hard_constraints(const solution *sol,
                                              const swap_move *mv) {
-    debug2("Check hard constraints of (%d, %d %d, %d) <-> (%d, %d, %d, %d)",
-           mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1, mv->helper.c2, mv->r2, mv->d2, mv->s2);
+    debug2("Checking hard constraints of (%d, %d, %d, %d) <-> (%d, %d, %d, %d) // (%s, %s, %d, %d) <-> (%s, %s, %d, %d)",
+           mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1, mv->helper.c2, mv->r2, mv->d2, mv->s2,
+           mv->helper.c1 >= 0 ? sol->model->courses[mv->helper.c1].id : "-",
+           mv->helper.r1 >= 0 ? sol->model->rooms[mv->helper.r1].id : "-",
+           mv->helper.d1, mv->helper.s1,
+           mv->helper.c2 >= 0 ? sol->model->courses[mv->helper.c2].id : "-",
+           mv->r2 >= 0 ? sol->model->rooms[mv->r2].id : "-",
+           mv->d2, mv->s2
+           );
 
     if (mv->helper.c1 == mv->helper.c2)
-        return true; // nothing to do
+        return true; // swap two lectures of same course is always legal
 
     // Lectures
     if (!check_lectures_constraint(
@@ -365,55 +423,42 @@ static void swap_move_compute_cost(
     debug2("swap_move_compute_cost cost = %d", result->delta.cost);
 }
 
-#define DUMP_MOVES 0
-
 static void swap_move_do(solution *sol, const swap_move *mv) {
+    assert(sol->assignments[mv->l1].r == mv->helper.r1);
+    assert(sol->assignments[mv->l1].d == mv->helper.d1);
+    assert(sol->assignments[mv->l1].s == mv->helper.s1);
+
     solution_unassign_lecture(sol, mv->l1);
     if (mv->helper.l2 >= 0)
         solution_unassign_lecture(sol, mv->helper.l2);
     solution_assign_lecture(sol, mv->l1, mv->r2, mv->d2, mv->s2);
     if (mv->helper.l2 >= 0)
         solution_assign_lecture(sol, mv->helper.l2, mv->helper.r1, mv->helper.d1, mv->helper.s1);
-
-#if DUMP_MOVES
-    static bool clear = false;
-    static const char *MOVES_FILE = "/tmp/moves.txt";
-    if (!clear) {
-        clear = true;
-        fileclear(MOVES_FILE);
-    }
-    char tmp[92];
-    snprintf(tmp, 92, "%*d:%s,%*d:%s,%*d,%*d  |  %*d:%s,%*d:%s,%*d,%*d\n",
-        2, mv->helper.c1, mv->helper.c1 >= 0 ? sol->model->courses[mv->helper.c1].id : "-",
-        2, mv->helper.r1, mv->helper.r1 >= 0 ? sol->model->rooms[mv->helper.r1].id : "-",
-        2, mv->helper.d1, 2, mv->helper.s1,
-        2, mv->helper.c2, mv->helper.c2 >= 0 ? sol->model->courses[mv->helper.c2].id : "-",
-        2, mv->r2, mv->r2 >= 0 ? sol->model->rooms[mv->r2].id : "-",
-        2, mv->d2, 2, mv->s2
-    );
-    fileappend(MOVES_FILE, tmp);
-#endif
 }
 
 void swap_iter_init(swap_iter *iter, const solution *sol) {
     iter->solution = sol;
-    iter->current.l1 = iter->current.r2 = iter->current.d2 = iter->current.s2 = -1;
+    iter->move.l1 = iter->move.r2 = iter->move.d2 = iter->move.s2 = -1;
     iter->end = false;
-    iter->i = iter->ii = 0;
+    iter->i = 0;
 }
 
 void swap_iter_destroy(swap_iter *iter) {}
 
-static void swap_move_compute_helper(const solution *sol,
-                                     swap_move *mv) {
+bool swap_move_is_effective(const swap_move *mv) {
+    return mv->helper.c1 != mv->helper.c2; // swap of the same course is not effective
+}
+
+/*
+ * Compute the swap_move's data that depends on the current solution.
+ * (Will be valid until the solution is touched).
+ */
+void swap_move_compute_helper(const solution *sol, swap_move *mv) {
     MODEL(sol->model);
-    debug2("swap_move_compute_helper: l=%d -> (r=%d, d=%d, s=%d)",
-           mv->l1, mv->r2, mv->d2, mv->s2);
 
     mv->helper.c1 = sol->model->lectures[mv->l1].course->index;
 
     const assignment *a = &sol->assignments[mv->l1];
-//    solution_get_lecture_assignment(sol, mv->l1, &mv->helper.r1, &mv->helper.d1, &mv->helper.s1);
     mv->helper.r1 = a->r;
     mv->helper.d1 = a->d;
     mv->helper.s1 = a->s;
@@ -424,14 +469,14 @@ static void swap_move_compute_helper(const solution *sol,
     else
         mv->helper.c2 = -1;
 
-    debug2("swap_move_compute_helper: COMPUTED (l=%d, c=%d, r=%d, d=%d, s=%d) <-> (l=%d, c=%d, r=%d, d=%d, s=%d)",
-       mv->l1, mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1,
-       mv->helper.l2, mv->helper.c2, mv->r2, mv->d2, mv->s2);
+    debug2("swap_move_compute_helper: "
+           "COMPUTED (l=%d, c=%d, r=%d, d=%d, s=%d) <-> (l=%d, c=%d, r=%d, d=%d, s=%d)",
+           mv->l1, mv->helper.c1, mv->helper.r1, mv->helper.d1, mv->helper.s1,
+           mv->helper.l2, mv->helper.c2, mv->r2, mv->d2, mv->s2);
 }
 
-
-bool swap_move_is_effective(const swap_move *mv) {
-    return mv->helper.c1 != mv->helper.c2;
+void swap_move_copy(swap_move *dest, const swap_move *src) {
+    memcpy(dest, src, sizeof(swap_move));
 }
 
 void swap_move_generate_random_raw(const solution *sol, swap_move *mv) {
@@ -443,53 +488,58 @@ void swap_move_generate_random_raw(const solution *sol, swap_move *mv) {
     swap_move_compute_helper(sol, mv);
 }
 
-void swap_move_generate_random(const solution *sol, swap_move *mv, bool require_feasible) {
+void swap_move_generate_random_extended(const solution *sol, swap_move *mv,
+                                        bool require_effectiveness, bool require_feasibility) {
     MODEL(sol->model);
-
-    swap_result result = {
-        .feasible = false
-    };
+    swap_result result = {.feasible = false};
 
     do {
         do {
             swap_move_generate_random_raw(sol, mv);
-        } while (!swap_move_is_effective(mv));
+        } while (require_effectiveness && !swap_move_is_effective(mv));
 
-        if (require_feasible)
+        if (require_feasibility)
             swap_predict(sol, mv,
-                         NEIGHBOURHOOD_PREDICT_ALWAYS,
-                         NEIGHBOURHOOD_PREDICT_NEVER,
+                         NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
+                         NEIGHBOURHOOD_PREDICT_COST_NEVER,
                          &result);
-    } while(!(result.feasible || !require_feasible));
-
-    assert(result.feasible || !require_feasible);
+    } while(require_feasibility && !result.feasible);
 }
 
-void swap_move_copy(swap_move *dest, const swap_move *src) {
-    memcpy(dest, src, sizeof(swap_move));
+void swap_move_generate_random_feasible_effective(const solution *sol, swap_move *mv) {
+    swap_move_generate_random_extended(sol, mv, true, true);
+}
+
+void swap_move_reverse(const swap_move *mv, swap_move *reverse_mv) {
+    reverse_mv->l1 = mv->l1;
+    reverse_mv->helper.c1 = mv->helper.c1;
+    reverse_mv->helper.l2 = mv->helper.l2;
+    reverse_mv->helper.c2 = mv->helper.c2;
+
+    reverse_mv->r2 = mv->helper.r1;
+    reverse_mv->d2 = mv->helper.d1;
+    reverse_mv->s2 = mv->helper.s1;
+    reverse_mv->helper.r1 = mv->r2;
+    reverse_mv->helper.d1 = mv->d2;
+    reverse_mv->helper.s1 = mv->s2;
 }
 
 
-static bool swap_iter_skip(const swap_iter *iter) {
-    return iter->current.helper.c1 <= iter->current.helper.c2;
-}
-
-bool swap_iter_next(swap_iter *iter,
-                    swap_move *move) {
+bool swap_iter_next(swap_iter *iter) {
     if (iter->end)
         return false;
 
     MODEL(iter->solution->model);
 
     do {
-        iter->current.s2 = (iter->current.s2 + 1) % S;
-        if (!iter->current.s2) {
-            iter->current.d2 = (iter->current.d2 + 1) % D;
-            if (!iter->current.d2) {
-                iter->current.r2 = (iter->current.r2 + 1) % R;
-                if (!iter->current.r2) {
-                    iter->current.l1 = (iter->current.l1 + 1);
-                    if (!(iter->current.l1 < L)) {
+        iter->move.s2 = (iter->move.s2 + 1) % S;
+        if (!iter->move.s2) {
+            iter->move.d2 = (iter->move.d2 + 1) % D;
+            if (!iter->move.d2) {
+                iter->move.r2 = (iter->move.r2 + 1) % R;
+                if (!iter->move.r2) {
+                    iter->move.l1 = (iter->move.l1 + 1);
+                    if (!(iter->move.l1 < L)) {
                         debug2("Iter exhausted after %d iters", iter->i);
                         iter->end = true;
                         return false;
@@ -497,32 +547,30 @@ bool swap_iter_next(swap_iter *iter,
                 }
             }
         }
-        swap_move_compute_helper(iter->solution, &iter->current);
-        iter->ii++;
-    } while (swap_iter_skip(iter));
+        swap_move_compute_helper(iter->solution, &iter->move);
+    } while (iter->move.helper.c1 <= iter->move.helper.c2);
 
-    assert(swap_move_is_effective(&iter->current));
+    assert(swap_move_is_effective(&iter->move));
+
+    debug2("swap_iter_next: l=%d -> (r=%d, d=%d, s=%d)",
+           iter->move.l1, iter->move.r2, iter->move.d2, iter->move.s2);
 
     iter->i++;
 
-    swap_move_copy(move, &iter->current);
-    debug2("swap_iter_next: l=%d -> (r=%d, d=%d, s=%d)",
-           move->l1, move->r2, move->d2, move->s2);
     return true;
 }
 
 
 void swap_predict(const solution *sol, const swap_move *move,
-                  neighbourhood_predict_strategy predict_feasibility,
-                  neighbourhood_predict_strategy predict_cost,
+                  neighbourhood_predict_feasibility_strategy predict_feasibility,
+                  neighbourhood_predict_cost_strategy predict_cost,
                   swap_result *result) {
-
-    if (predict_feasibility == NEIGHBOURHOOD_PREDICT_ALWAYS)
+    if (predict_feasibility == NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS)
         if (result)
             result->feasible = swap_move_check_hard_constraints(sol, move);
 
-    if (predict_cost == NEIGHBOURHOOD_PREDICT_ALWAYS ||
-        (predict_cost == NEIGHBOURHOOD_PREDICT_IF_FEASIBLE && result->feasible))
+    if (predict_cost == NEIGHBOURHOOD_PREDICT_COST_ALWAYS ||
+        (predict_cost == NEIGHBOURHOOD_PREDICT_COST_IF_FEASIBLE && result->feasible))
         swap_move_compute_cost(sol, move, result);
 }
 
@@ -532,7 +580,8 @@ bool swap_perform(solution *sol, const swap_move *move,
     if (perform == NEIGHBOURHOOD_PERFORM_ALWAYS ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE && result->feasible) ||
             (perform == NEIGHBOURHOOD_PERFORM_IF_BETTER && result->delta.cost < 0) ||
-            (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER && result->feasible && result->delta.cost < 0)) {
+            (perform == NEIGHBOURHOOD_PERFORM_IF_FEASIBLE_AND_BETTER &&
+                result->feasible && result->delta.cost < 0)) {
         swap_move_do(sol, move);
         return true;
     }
@@ -540,12 +589,10 @@ bool swap_perform(solution *sol, const swap_move *move,
 }
 
 bool swap_extended(solution *sol, const swap_move *mv,
-                   neighbourhood_predict_strategy predict_feasibility,
-                   neighbourhood_predict_strategy predict_cost,
+                   neighbourhood_predict_feasibility_strategy predict_feasibility,
+                   neighbourhood_predict_cost_strategy predict_cost,
                    neighbourhood_perform_strategy perform,
                    swap_result *result) {
     swap_predict(sol, mv, predict_feasibility, predict_cost, result);
     return swap_perform(sol, mv, perform, result);
 }
-
-

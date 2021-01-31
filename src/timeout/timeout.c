@@ -4,7 +4,7 @@
 #include <log/debug.h>
 #include <log/verbose.h>
 
-volatile sig_atomic_t timeout;
+volatile sig_atomic_t timeout = 0;
 
 static unsigned int timeout_seconds;
 

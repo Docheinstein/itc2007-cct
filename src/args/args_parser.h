@@ -3,6 +3,7 @@
 
 #include "args.h"
 
+/* Parser of the arguments given at the command line */
 
 typedef struct args_parser {
     char *error;

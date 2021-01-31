@@ -1,14 +1,12 @@
 #include "feasible_solution_finder.h"
-#include "utils/str_utils.h"
+#include <stdlib.h>
 #include "log/debug.h"
+#include "log/verbose.h"
+#include "utils/str_utils.h"
 #include "utils/array_utils.h"
 #include "utils/mem_utils.h"
-#include "log/verbose.h"
+#include "utils/random_utils.h"
 #include "timeout/timeout.h"
-#include <stdlib.h>
-#include <utils/random_utils.h>
-#include <utils/assert_utils.h>
-#include <utils/time_utils.h>
 
 static GHashTable *models_courses_difficulty_cache;
 
@@ -24,12 +22,10 @@ void feasible_solution_finder_destroy(feasible_solution_finder *finder) {
     free(finder->error);
 }
 
-
 static void feasible_solution_finder_reset(feasible_solution_finder *finder) {
     free(finder->error);
     finder->error = NULL;
 }
-
 
 typedef struct lecture_assignment {
     const lecture *lecture;
@@ -46,18 +42,18 @@ static int *get_courses_difficulty(const model *m) {
     MODEL(m);
 
     // Sort the courses by the difficulty, in order to assign the most
-    // difficult courses before the easy ones
+    // difficult courses before the easy ones.
     // (i.e. a course is difficult to place if it has many associated constraints).
     // Specifically:
     // 1. H3a: How many curriculum does the course belong to?
     // 2. H3b: How many courses the teacher of the course teaches?
     // 3. H4: How many unavailability constraint the course has?
 
-    if (!models_courses_difficulty_cache) {
+    // Initialize the cache the first time
+    if (!models_courses_difficulty_cache)
         models_courses_difficulty_cache = g_hash_table_new(g_direct_hash, g_direct_equal);
-    }
 
-    // Check if it has already been computed
+    // Check if the courses difficulty of this model has already been computed
     void *v = g_hash_table_lookup(models_courses_difficulty_cache, GINT_TO_POINTER(GPOINTER_TO_INT(m)));
     if (v)
         return (int *) v;
@@ -76,14 +72,10 @@ static int *get_courses_difficulty(const model *m) {
         // 1. H3a: How many curriculum does the course belong to?
         int n_curriculas;
         model_curriculas_of_course(model, c, &n_curriculas);
-        debug3("Course %s belongs to %d curriculas",  course->id, n_curriculas);
-
 
         // 2. H3b: How many courses the teacher of the course teaches?
         int n_teacher_courses;
         model_courses_of_teacher(model, t, &n_teacher_courses);
-        debug3("Course %s has teacher %s which teaches %d courses",
-               course->id, model->courses[c].teacher_id, n_teacher_courses);
 
         // 3. H4: How many unavailability constraint the course has?
         int n_unavailabilities = 0;
@@ -92,9 +84,8 @@ static int *get_courses_difficulty(const model *m) {
                 n_unavailabilities += !model_course_is_available_on_period(model, c, d, s);
             }
         }
-        debug3("Course %s has %d unavailabilities constraints",
-               model->courses[c].id, n_unavailabilities);
 
+        // Compute the difficulty, based on the number of the course's associated constraints
         courses_difficulty[c] = (n_curriculas * CURRICULAS_CONFLICTS_DIFFICULTY_FACTOR +
                                  n_teacher_courses * UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR +
                                  n_unavailabilities * UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR)
@@ -104,7 +95,7 @@ static int *get_courses_difficulty(const model *m) {
                course->id, courses_difficulty[c]);
     }
 
-    // Cache it
+    // Cache it for next times (useful for multistart)
     g_hash_table_insert(models_courses_difficulty_cache,
                         GINT_TO_POINTER(GPOINTER_TO_INT(m)),
                         courses_difficulty);
@@ -117,10 +108,12 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
                                        solution *sol) {
     MODEL(sol->model);
     feasible_solution_finder_reset(finder);
-    solution_assert_consistency(sol);
 
+    // Get the courses difficulty
     int *courses_difficulty = get_courses_difficulty(model);
 
+    // Assign a score to each lecture, mostly based on `courses_difficulty`
+    // but modified by a random factor `ranking_randomness`.
     lecture_assignment *assignments = mallocx(L, sizeof(lecture_assignment));
     FOR_L {
         lecture_assignment *la = &assignments[l];
@@ -128,30 +121,12 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
         la->lecture = lecture;
         double r = rand_normal(1, config->ranking_randomness);
         la->difficulty = courses_difficulty[lecture->course->index] * r;
-        debug2("Assignment difficulty of lecture %d (%s) = %f (base=%d, rand_factor=%f)",
+        debug2("Assignment difficulty of lecture %d (%s) = %.2f (base=%d, rand_factor=%.2f)",
                l, lecture->course->id, la->difficulty,
                courses_difficulty[lecture->course->index], r);
     }
 
     qsort(assignments, L, sizeof(lecture_assignment), lecture_assignment_compare);
-
-#if DEBUG
-    char *tmp = NULL;
-    size_t sz = 0;
-    FOR_L {
-        strappend_realloc(&tmp, &sz, "(%d:%s:%f)",
-                          assignments[l].lecture->index,
-                          assignments[l].lecture->course->id,
-                          assignments[l].difficulty);
-        if (l < L - 1)
-            strappend_realloc(&tmp, &sz, ", ");
-        if (l && l % 4 == 0)
-            strappend_realloc(&tmp, &sz, "\n");
-    }
-    debug("Computed assignment order (ranking_randomness=%f):\n"
-          "[%s]", config->ranking_randomness, tmp);
-    free(tmp);
-#endif
 
     int n_assignments = 0;
     int n_attempts = 0;
@@ -167,8 +142,6 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
         const int l = lecture->index;
         const int c = course->index;
         const int t = course->teacher->index;
-
-//        debug("Trying to assign lecture[%d]=%d", i, l);
 
         int course_n_curriculas;
         int *course_curriculas = model_curriculas_of_course(model, c, &course_n_curriculas);
@@ -215,8 +188,10 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
                         continue;
                     }
 
+                    // Does not break any hard constraint: lecture assigned!
                     debug2("\t-> ASSIGNED c=%d:%s to (r=%d:%s, d=%d, s=%d)",
                            c, model->courses[c].id, r, model->rooms[r].id, d, s);
+
                     room_is_used[INDEX3(r, R, d, D, s, S)] = true;
                     teacher_is_busy[INDEX3(t, T, d, D, s, S)] = true;
                     for (int cq = 0 ; cq < course_n_curriculas; cq++) {
@@ -232,11 +207,10 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
             }
         };
 
+        // The finder failed to provide a feasible solution
         if (!assigned) {
             verbose2("Failed to found a feasible solution: %d/%d assignments in %d attempts",
                     n_assignments, model->n_lectures, n_attempts);
-            debug("h(sol)=%llu", solution_fingerprint(sol));
-            debug("Failed on lecture %d (%s)", l, course->id);
             finder->error = strmake("can't find a feasible solution: %d/%d assignments in %d attempts",
                                     n_assignments, model->n_lectures, n_attempts);
             break;
@@ -264,6 +238,7 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
     int n_trials = 0;
     bool found = false;
 
+    // Try to generate a feasible solution until it is actually feasible
     while (!timeout && !found) {
         n_trials++;
         found = feasible_solution_finder_try_find(finder, config, sol);
@@ -271,8 +246,10 @@ bool feasible_solution_finder_find(feasible_solution_finder *finder,
             solution_clear(sol);
     }
 
-    if (found)
+    if (found) {
         verbose2("Solution have been found after %d trials", n_trials);
+        solution_assert_consistency(sol);
+    }
     else
         verbose("Finder timed out");
 

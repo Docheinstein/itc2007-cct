@@ -1,5 +1,5 @@
-#include <utils/str_utils.h>
 #include "args.h"
+#include "utils/str_utils.h"
 
 char *args_to_string(const args *args) {
     char *options_str = strjoin((char **)args->options->data, args->options->len, ", ");

@@ -1,11 +1,16 @@
 #ifndef NEIGHBOURHOOD_H
 #define NEIGHBOURHOOD_H
 
-typedef enum neighbourhood_predict_strategy {
-    NEIGHBOURHOOD_PREDICT_ALWAYS,
-    NEIGHBOURHOOD_PREDICT_IF_FEASIBLE,
-    NEIGHBOURHOOD_PREDICT_NEVER
-} neighbourhood_predict_strategy;
+typedef enum neighbourhood_predict_feasibility_strategy {
+    NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
+    NEIGHBOURHOOD_PREDICT_FEASIBILITY_NEVER,
+} neighbourhood_predict_feasibility_strategy;
+
+typedef enum neighbourhood_predict_cost_strategy {
+    NEIGHBOURHOOD_PREDICT_COST_ALWAYS,
+    NEIGHBOURHOOD_PREDICT_COST_IF_FEASIBLE,
+    NEIGHBOURHOOD_PREDICT_COST_NEVER
+} neighbourhood_predict_cost_strategy;
 
 typedef enum neighbourhood_perform_strategy {
     NEIGHBOURHOOD_PERFORM_ALWAYS,
