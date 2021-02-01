@@ -3,7 +3,6 @@
 #include "heuristics/neighbourhoods/swap.h"
 #include "utils/rand_utils.h"
 #include "timeout/timeout.h"
-#include "log/debug.h"
 #include "log/verbose.h"
 
 // p(move) = e^(-delta(move)/temperature)
@@ -13,7 +12,7 @@
 void simulated_annealing_params_default(simulated_annealing_params *params) {
     params->max_idle = -1;
     params->initial_temperature = 1.5;
-    params->cooling_rate = 0.9995;
+    params->cooling_rate = 0.995;
     params->min_temperature = 0.10;
     params->temperature_length_coeff = 1;
 }
@@ -29,7 +28,7 @@ static bool simulated_annealing_accept(heuristic_solver_state *state,
 void simulated_annealing(heuristic_solver_state *state, void *arg) {
     simulated_annealing_params *params = (simulated_annealing_params *) arg;
     MODEL(state->model);
-    bool collect_sa_stats = get_verbosity() >= 2;
+    bool sa_stats = get_verbosity() >= 2;
 
     long max_idle = params->max_idle >= 0 ? params->max_idle : LONG_MAX;
 
@@ -67,7 +66,7 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
             else
                 idle++;
 
-            if (collect_sa_stats &&
+            if (sa_stats &&
                 ((idle > 0 && idle % (params->max_idle > 0 ? (params->max_idle / 10) : 10000) == 0)
                 || iter % (temperature_length * 5) == 0)) {
                 verbose2("%s: Iter = %ld | Idle progress = %ld/%ld (%.2f%%) | "

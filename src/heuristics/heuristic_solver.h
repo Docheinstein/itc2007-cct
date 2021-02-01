@@ -35,7 +35,6 @@ typedef struct heuristic_solver_state {
     long non_improving_best_cycles;
     long non_improving_current_cycles;
 
-    bool collect_stats;
     bool collect_trend;
 
     const char **methods_name;
@@ -101,6 +100,12 @@ typedef struct heuristic_solver {
     heuristic_solver_state state;
 } heuristic_solver;
 
+typedef struct heuristic_solver_resolution_stats {
+    long cycles;
+    long moves;
+    // ...
+} heuristic_solver_resolution_stats;
+
 void heuristic_solver_config_init(heuristic_solver_config *config);
 void heuristic_solver_config_add_method(heuristic_solver_config *config,
                                         heuristic_solver_method_callback method,
@@ -113,7 +118,8 @@ void heuristic_solver_destroy(heuristic_solver *solver);
 bool heuristic_solver_solve(heuristic_solver *solver,
                             const heuristic_solver_config *solver_conf,
                             const feasible_solution_finder_config *finder_conf,
-                            solution *solution);
+                            solution *solution,
+                            heuristic_solver_resolution_stats *stats);
 
 /* Must be called by `heuristic_solver_method_callback` when a move is performed */
 bool heuristic_solver_state_update(heuristic_solver_state *state);

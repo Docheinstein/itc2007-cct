@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -28,6 +29,13 @@ TS_OPTIONS = ["solver.methods=ts",
               "ts.tabu_tenure=80",
               "ts.frequency_penalty_coeff=0"]
 
+SA_OPTIONS = ["solver.methods=sa",
+              "sa.max_idle=-1",
+              "sa.initial_temperature=1.5",
+              "sa.cooling_rate=0.995",
+              "sa.min_temperature=0.10",
+              "sa.temperature_length_coeff=1"]
+
 #   <benchmark_name>  <input>  <output>  <options>  <seconds>  <runs>
 benchmarks = [
     ("comp01-ls", "datasets/comp01.ctt", "benchmarks/168/ls/comp01.out", LS_OPTIONS, 168, 10),
@@ -53,6 +61,14 @@ benchmarks = [
     ("comp05-ts", "datasets/comp05.ctt", "benchmarks/168/ts/comp05.out", TS_OPTIONS, 168, 10),
     ("comp06-ts", "datasets/comp06.ctt", "benchmarks/168/ts/comp06.out", TS_OPTIONS, 168, 10),
     ("comp07-ts", "datasets/comp07.ctt", "benchmarks/168/ts/comp07.out", TS_OPTIONS, 168, 10),
+
+    ("comp01-sa", "datasets/comp01.ctt", "benchmarks/168/sa/comp01.out", SA_OPTIONS, 168, 10),
+    ("comp02-sa", "datasets/comp02.ctt", "benchmarks/168/sa/comp02.out", SA_OPTIONS, 168, 10),
+    ("comp03-sa", "datasets/comp03.ctt", "benchmarks/168/sa/comp03.out", SA_OPTIONS, 168, 10),
+    ("comp04-sa", "datasets/comp04.ctt", "benchmarks/168/sa/comp04.out", SA_OPTIONS, 168, 10),
+    ("comp05-sa", "datasets/comp05.ctt", "benchmarks/168/sa/comp05.out", SA_OPTIONS, 168, 10),
+    ("comp06-sa", "datasets/comp06.ctt", "benchmarks/168/sa/comp06.out", SA_OPTIONS, 168, 10),
+    ("comp07-sa", "datasets/comp07.ctt", "benchmarks/168/sa/comp07.out", SA_OPTIONS, 168, 10),
 ]
 
 # -----------------------------------
@@ -106,7 +122,7 @@ if __name__ == "__main__":
             for opt in options:
                 out.write(f"#   {opt}\n")
             out.write("# ---------------------------------------------------------\n")
-            out.write("# seed  fingerprint  feasible  cost_rc  cost_mwd  cost_cc  cost_rs  cost\n")
+            out.write("# seed  fingerprint  cycles  moves  feasible  cost_rc  cost_mwd  cost_cc  cost_rs  cost\n")
             out.write("# ---------------------------------------------------------\n")
 
         for i in range(runs):

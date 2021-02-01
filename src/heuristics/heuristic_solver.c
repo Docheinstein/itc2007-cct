@@ -79,11 +79,11 @@ bool generate_feasible_solution_if_needed(const heuristic_solver_config *solver_
     return true;
 }
 
-
 bool heuristic_solver_solve(heuristic_solver *solver,
                             const heuristic_solver_config *solver_conf,
                             const feasible_solution_finder_config *finder_conf,
-                            solution *sol_out) {
+                            solution *sol_out,
+                            heuristic_solver_resolution_stats *stats) {
     const model *model = sol_out->model;
 
     heuristic_solver_method_callback_parameterized *methods =
@@ -132,28 +132,25 @@ bool heuristic_solver_solve(heuristic_solver *solver,
     state->non_improving_best_cycles = 0;
     state->non_improving_current_cycles = 0;
 
-    state->collect_stats = get_verbosity() >= 1;
     state->collect_trend = get_verbosity() >= 2;
 
     state->methods_name = mallocx(n_methods, sizeof(const char *));
     for (int i = 0; i < n_methods; i++)
         state->methods_name[i] = methods[i].name;
 
-    if (state->collect_stats) {
-        state->stats.move_count = 0;
-        state->stats.methods = mallocx(n_methods, sizeof(heuristic_solver_state_method_stats));
-        for (int i = 0; i < n_methods; i++) {
-            state->stats.methods[i].improvement = 0;
-            state->stats.methods[i].execution_time = 0;
-            state->stats.methods[i].move_count = 0;
-        }
-        state->stats.starting_time = ms();
-        state->stats.best_solution_time = LONG_MAX;
-        state->stats.ending_time = LONG_MAX;
-        state->stats.last_log_time = 0;
-        state->stats.trend_current = g_array_new(false, false, sizeof(int));
-        state->stats.trend_best = g_array_new(false, false, sizeof(int));
+    state->stats.move_count = 0;
+    state->stats.methods = mallocx(n_methods, sizeof(heuristic_solver_state_method_stats));
+    for (int i = 0; i < n_methods; i++) {
+        state->stats.methods[i].improvement = 0;
+        state->stats.methods[i].execution_time = 0;
+        state->stats.methods[i].move_count = 0;
     }
+    state->stats.starting_time = ms();
+    state->stats.best_solution_time = LONG_MAX;
+    state->stats.ending_time = LONG_MAX;
+    state->stats.last_log_time = 0;
+    state->stats.trend_current = g_array_new(false, false, sizeof(int));
+    state->stats.trend_best = g_array_new(false, false, sizeof(int));
 
     long now;
 
@@ -193,7 +190,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
         }
 
         // Eventually print some stats
-        if (state->collect_stats) {
+        if (get_verbosity()) {
             int lv = 2;
             if (get_verbosity() < lv) {
                 now = clk();
@@ -231,11 +228,9 @@ bool heuristic_solver_solve(heuristic_solver *solver,
             verbose2("------------ %s BEGIN (%d) ------------",
                      method->name, state->current_cost);
             state->method = i;
-            if (state->collect_stats)
-                now = clk();
+            now = clk();
             method->method(state, method->param); // metaheuristics method call
-            if (state->collect_stats)
-                state->stats.methods[i].execution_time += (clk() - now);
+            state->stats.methods[i].execution_time += (clk() - now);
             if (state->collect_trend) {
                 g_array_append_val(state->stats.trend_current, state->current_cost);
                 g_array_append_val(state->stats.trend_best, state->best_cost);
@@ -254,9 +249,8 @@ bool heuristic_solver_solve(heuristic_solver *solver,
         state->cycle++;
     }
 
-QUIT:
     // Eventually print some stats after the resolution
-    if (state->collect_stats) {
+    if (get_verbosity()) {
         state->stats.ending_time = ms();
 
         verbose("=============== SOLVER FINISHED ===============\n"
@@ -305,14 +299,18 @@ QUIT:
             }
             verbosef2("\n");
         }
-
-        free(state->stats.methods);
-        g_array_free(state->stats.trend_current, true);
-        g_array_free(state->stats.trend_best, true);
     }
+
+QUIT:
+    free(state->stats.methods);
+    g_array_free(state->stats.trend_current, true);
+    g_array_free(state->stats.trend_best, true);
 
     free(state->methods_name);
     solution_destroy(state->current_solution);
+
+    stats->moves = state->stats.move_count;
+    stats->cycles = state->cycle;
 
     return strempty(solver->error);
 }
@@ -328,11 +326,9 @@ bool heuristic_solver_state_update(heuristic_solver_state *state) {
         verbose("%s: found new best solution of cost %d",
                 state->methods_name[state->method], state->current_cost);
         assert(solution_satisfy_hard_constraints(state->current_solution));
-        if (state->collect_stats) {
-            if (state->best_cost < INT_MAX)
-                state->stats.methods[state->method].improvement += (state->best_cost - state->current_cost);
-            state->stats.best_solution_time = ms();
-        }
+        if (state->best_cost < INT_MAX)
+            state->stats.methods[state->method].improvement += (state->best_cost - state->current_cost);
+        state->stats.best_solution_time = ms();
 
         state->best_cost = state->current_cost;
         solution_copy(state->best_solution, state->current_solution);
@@ -341,10 +337,8 @@ bool heuristic_solver_state_update(heuristic_solver_state *state) {
         assert(state->best_cost == solution_cost(state->best_solution));
     }
 
-    if (state->collect_stats) {
-        state->stats.move_count++;
-        state->stats.methods[state->method].move_count++;
-    }
+    state->stats.move_count++;
+    state->stats.methods[state->method].move_count++;
 
    return improved;
 }

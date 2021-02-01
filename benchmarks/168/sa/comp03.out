@@ -1,0 +1,18 @@
+# ----------------------------------------------------------
+# ----------------------- BENCHMARK ------------------------
+# ----------------------------------------------------------
+# Dataset:          datasets/comp03.ctt
+# Datetime:         16:29:51 02/01/2021
+# Seconds per run:  168
+# Options:
+#   solver.methods=sa
+#   sa.max_idle=-1
+#   sa.initial_temperature=1.5
+#   sa.cooling_rate=0.995
+#   sa.min_temperature=0.10
+#   sa.temperature_length_coeff=1
+# ---------------------------------------------------------
+# seed  fingerprint  cycles  moves  feasible  cost_rc  cost_mwd  cost_cc  cost_rs  cost
+# ---------------------------------------------------------
+1869379056 16753627261694180011 1946 17932432 1 0 15 66 9 90
+1876348803 5683073804451315163 1973 18377221 1 0 20 56 13 89

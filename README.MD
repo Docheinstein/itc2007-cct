@@ -4,6 +4,9 @@ University Project.
 
 Solver of the "*Curriculum-Based Course Timetabling*" problem (3rd track of [*International Timetabling Competition 2007*](http://www.cs.qub.ac.uk/itc2007/)).
 
+Written in C.  
+Implements different metaheuristics (*Local Search*, *Hill Climbing*, *Tabu Search*, *Simulated Annealing*).
+
 ## Problem formulation
 
 The Curriculum-based timetabling problem consists of the weekly scheduling of the lectures
@@ -76,6 +79,7 @@ a period unavailable for that course_id is one violation.
 * cairo
 
 ## Building
+To build in release mode:
 ```
 mkdir -p build
 cd build
@@ -83,8 +87,80 @@ cmake ..
 make
 ```
 
+To build with `debug` statements enabled (more verbose):
+```
+mkdir -p build-debug
+cd build-debug
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-DDEBUG=1" ..
+make
+```
+
+To build with `debug2` statements enabled (more verbose):
+```
+mkdir -p build-debug2
+cd build-debug2
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-DDEBUG=2" ..
+make
+```
+
+To build with `assert` statements enabled (very slow):
+```
+mkdir -p build-assert
+cd build-assert
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-DDEBUG=1 -DASSERT" ..
+make
+```
+
+
 ## Usage
 
+Solve the instance `datasets/comp01.ctt` with default settings 
+(Hill Climbing + Simulated Annealing):
 ```
-build/itc2007-cct ...
+build/itc2007-cct datasets/comp01.ctt /tmp/sol
+```
+
+Solve the instance `datasets/comp01.ctt` with default settings for 
+120 seconds with verbose statements and seed 2488295934:
+```
+build/itc2007-cct datasets/comp01.ctt /tmp/sol -t 120 -s 2488295934 -v
+```
+
+Solve the instance `datasets/comp01.ctt` and render the solution to `/tmp/sol.png`:
+```
+build/itc2007-cct datasets/comp01.ctt /tmp/sol -d /tmp/sol.png
+```
+
+Solve with different methods/parameters given in config file (e.g. HC only):
+```
+build/itc2007-cct datasets/comp01.ctt /tmp/sol -c configs/hc.conf
+```
+
+Solve with different methods/parameters given at command line (e.g. SA only):
+```
+build/itc2007-cct datasets/comp01.ctt /tmp/sol -osolver.methods=sa -osa.cooling_rate=0.99 -osa.initial_temperature=1.4
+```
+
+Load a solution and print the costs without solve it (act as a validator):
+```
+build/itc2007-cct datasets/comp01.ctt -0i /tmp/sol
+```
+
+## Benchmarks
+
+Benchmarks can be found in `benchmarks` folder and are produced with the `benchmark.py` script.  
+
+For perform all the benchmarks:
+```
+python benchmark.py
+```
+
+For a specific benchmark:
+```
+python benchmark.py comp03-sa
+```
+
+For see the stats of the benchmarks in `benchmarks` folder:
+```
+python stats.py
 ```

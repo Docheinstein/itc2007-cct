@@ -69,10 +69,6 @@ static void renderer_reset(renderer *renderer) {
     renderer_destroy(renderer);
 }
 
-static void random_color(double *r, double *g, double *b) {
-
-}
-
 static void random_colors(int n_colors, double **r, double **g, double **b) {
     if (!n_colors)
         return;
@@ -84,6 +80,7 @@ static void random_colors(int n_colors, double **r, double **g, double **b) {
         renderer_b = mallocx(n_colors, sizeof(double));
     }
     if (n_colors > renderer_n_colors) {
+        // Realloc keeping the first `renderer_n_colors` the same
         renderer_r = realloc(renderer_r, n_colors * sizeof(double));
         renderer_g = realloc(renderer_g, n_colors * sizeof(double));
         renderer_b = realloc(renderer_b, n_colors * sizeof(double));

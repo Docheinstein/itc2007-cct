@@ -194,7 +194,9 @@ int main (int argc, char **argv) {
     heuristic_solver solver;
     heuristic_solver_init(&solver);
 
-    solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &cfg.finder, &sol);
+    heuristic_solver_resolution_stats resolution_stats;
+    solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &cfg.finder, &sol, &resolution_stats);
+
     if (!solution_loaded)
         eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
 
@@ -207,7 +209,7 @@ int main (int argc, char **argv) {
 
         if (args.benchmark_mode) {
             // Just print a line with the format:
-            // <seed> <feasible> <rc> <mwd> <cc> <rs> <cost>
+            // <seed> <feasible> <cycles> <moves> <rc> <mwd> <cc> <rs> <cost>
             char benchmark_output[128];
             int rc = solution_room_capacity_cost(&sol);
             int mwd = solution_min_working_days_cost(&sol);
@@ -215,8 +217,11 @@ int main (int argc, char **argv) {
             int rs = solution_room_stability_cost(&sol);
             int cost = rc + mwd + cc + rs;
             bool feasible = solution_satisfy_hard_constraints(&sol);
-            snprintf(benchmark_output, 128, "%u %llu %d %d %d %d %d %d\n",
-                     rand_get_seed(), fingerprint, feasible, rc, mwd, cc, rs, cost);
+            snprintf(benchmark_output, 128,
+                     "%u %llu %ld %ld "
+                     "%d %d %d %d %d %d\n",
+                     rand_get_seed(), fingerprint, resolution_stats.cycles, resolution_stats.moves,
+                     feasible, rc, mwd, cc, rs, cost);
 
             printf("%s", benchmark_output);
 
@@ -233,7 +238,8 @@ int main (int argc, char **argv) {
                 free(sol_str);
             }
 
-            char *sol_quality_str = solution_quality_to_string(&sol, get_verbosity() || args.solution_input_file);
+            char *sol_quality_str = solution_quality_to_string(
+                    &sol, get_verbosity() || args.solution_input_file);
             print("%s", sol_quality_str);
             free(sol_quality_str);
 
@@ -247,7 +253,7 @@ int main (int argc, char **argv) {
 
     // Render the solution (eventually)
     if (args.draw_all_directory)
-        render_solution_overview(&sol, args.draw_all_directory);
+        render_solution_full(&sol, args.draw_all_directory);
     else if (args.draw_overview_file)
         render_solution_overview(&sol, args.draw_overview_file);
 
