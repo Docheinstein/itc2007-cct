@@ -7,7 +7,7 @@
 #include <utils/io_utils.h>
 #include <utils/time_utils.h>
 #include <log/verbose.h>
-#include <utils/random_utils.h>
+#include <utils/rand_utils.h>
 #include <utils/mem_utils.h>
 
 #define VERBOSITY 0
@@ -89,15 +89,8 @@ void test_finder_multi(const char **datasets, double r_from, double r_to, double
 }
 
 void tests() {
-//    test_finder_single("datasets/comp03.ctt", 0.33, 0.33, 0.00, 100000);
+    test_finder_single("datasets/comp03.ctt", 0.33, 0.33, 0.00, 100000);
 //    test_finder_multi(DATASETS, 0.20, 0.60, 0.02, 1000);
-    long start = clk();
-    long h = 0;
-    for (int i = 0; i < 10000000; i++) {
-        h += clk();
-    }
-    long end = clk();
-    print("%ld", end-start);
 }
 
 int main(int argc, char **argv) {

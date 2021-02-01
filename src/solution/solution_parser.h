@@ -4,6 +4,15 @@
 #include <stdbool.h>
 #include "solution.h"
 
+/*
+ * Parser of ITC2007 solutions.
+ *
+ * This is not strictly necessary for solve the model,
+ * but is useful for debug solutions, start the resolution
+ * from a previously interrupted solution or to render
+ * timetables of solutions.
+ */
+
 typedef struct solution_parser {
     char *error;
     void *_state;

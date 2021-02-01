@@ -1,7 +1,7 @@
 #include "swap.h"
 #include "log/debug.h"
 #include "utils/io_utils.h"
-#include "utils/random_utils.h"
+#include "utils/rand_utils.h"
 #include "utils/array_utils.h"
 #include "utils/assert_utils.h"
 #include "solution/solution.h"
@@ -481,10 +481,10 @@ void swap_move_copy(swap_move *dest, const swap_move *src) {
 
 void swap_move_generate_random_raw(const solution *sol, swap_move *mv) {
     MODEL(sol->model);
-    mv->l1 = rand_int_range(0, L);
-    mv->r2 = rand_int_range(0, R);
-    mv->d2 = rand_int_range(0, D);
-    mv->s2 = rand_int_range(0, S);
+    mv->l1 = rand_range(0, L);
+    mv->r2 = rand_range(0, R);
+    mv->d2 = rand_range(0, D);
+    mv->s2 = rand_range(0, S);
     swap_move_compute_helper(sol, mv);
 }
 

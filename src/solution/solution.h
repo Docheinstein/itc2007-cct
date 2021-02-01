@@ -1,11 +1,10 @@
 #ifndef SOLUTION_H
 #define SOLUTION_H
 
-#include <glib.h>
 #include "model/model.h"
-#include <stdio.h>
+#include <stdbool.h>
 
-/*
+/**
 ------------------
 Hard constraints
 ------------------
@@ -42,42 +41,72 @@ Each isolated lecture in a curriculum counts as 2 points of penalty.
 
 RoomStability: All lectures of a course_id should be given in the same room. Each distinct
 room used for the lectures of a course_id, but the first, counts as 1 point of penalty.
-
 */
 
-#include <stdbool.h>
+/*
+ * ITC2007 instances' solution.
+ */
 
+/* Penalty constants */
 extern const int ROOM_CAPACITY_COST_FACTOR;
 extern const int MIN_WORKING_DAYS_COST_FACTOR;
 extern const int CURRICULUM_COMPACTNESS_COST_FACTOR;
 extern const int ROOM_STABILITY_COST_FACTOR;
 
+/*
+ * Assignment of a lecture to (room, day, slot)
+ */
 typedef struct assignment {
     int r, d, s;
 } assignment;
 
+/*
+ * Solution entity.
+ * For represent a solution, only a timetable (e.g. timetable_crds) could
+ * be enough, but for provide a more efficient computation, redundant
+ * data is store (which must remain consistent).
+ */
 typedef struct solution {
     const model *model;
 
-    bool *timetable_crds;
-    bool *timetable_cdsr;
-    bool *timetable_rdsc;
-    bool *timetable_qdscr;
-    bool *timetable_tdscr;
+    /*
+     * Timetables.
+     * e.g. timetable_crds[c,r,d,s] is true if:
+     *      course c is assigned to room r on day d, slot s
+     */
+    bool *timetable_crds;  // [c,r,d,s]
+    bool *timetable_cdsr;  // [c,d,s,r]
+    bool *timetable_rdsc;  // [r,d,s,c]
+    bool *timetable_qdscr; // [q,d,s,c,r]
+    bool *timetable_tdscr; // [t,d,s,c,r]
 
-    int *c_rds;
-    int *r_cds;
-    int *l_rds;
+    /*
+     * Course/Room/Lecture helpers.
+     * e.g. c_rds[r,d,s] contains:
+     *      the course c assigned to room r on day d, slot s
+     *      or -1 if no course is assigned
+     *
+     */
+    int *c_rds; // [r,d,s]
+    int *r_cds; // [c,d,s]
+    int *l_rds; // [r,d,s]
 
-    int *sum_cr;
-    int *sum_cds;
-    int *sum_cd;
-    int *sum_rds;
-    int *sum_qds;
-    int *sum_tds;
+    /*
+     * Sum helpers.
+     * e.g. sum_cr[c,r] contains sum_d€D(sum_s€S(timetable_crds[c,r,d,s]))
+     *      sum_cds[c,d,s] contains sum_r€R(timetable_crds[c,r,d,s])
+     */
+    int *sum_cr;    // [c,r]
+    int *sum_cds;   // [c,d,s]
+    int *sum_cd;    // [c,d]
+    int *sum_rds;   // [r,d,s]
+    int *sum_qds;   // [q,d,s]
+    int *sum_tds;   // [t,d,s]
 
-    assignment *assignments;
+    // Assignment array of the lectures
+    assignment *assignments; // [l]
 
+    // Debug purposes
     int _id;
 } solution;
 

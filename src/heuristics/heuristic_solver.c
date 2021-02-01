@@ -1,20 +1,19 @@
 #include "heuristic_solver.h"
-#include <log/verbose.h>
-#include <utils/str_utils.h>
-#include <utils/time_utils.h>
 #include <stdlib.h>
-#include <utils/assert_utils.h>
-#include <utils/io_utils.h>
+#include "log/verbose.h"
+#include "utils/str_utils.h"
+#include "utils/time_utils.h"
+#include "utils/assert_utils.h"
+#include "utils/mem_utils.h"
 #include "timeout/timeout.h"
 #include "finder/feasible_solution_finder.h"
-#include "utils/mem_utils.h"
 
 void heuristic_solver_config_init(heuristic_solver_config *config) {
     config->methods = g_array_new(false, false, sizeof(heuristic_solver_method_callback_parameterized));
     config->max_time = 60;
     config->max_cycles = -1;
     config->multistart = false;
-    config->restore_best_after_cycles = 15;
+    config->restore_best_after_cycles = 20;
 
     config->starting_solution = NULL;
     config->dont_solve = false;
@@ -48,32 +47,35 @@ const char *heuristic_solver_get_error(heuristic_solver *solver) {
     return solver->error;
 }
 
+/* Generate a solution if needed (i.e. first time or if multistart=true) */
 bool generate_feasible_solution_if_needed(const heuristic_solver_config *solver_conf,
                                           const feasible_solution_finder_config *finder_conf,
                                           heuristic_solver_state *state) {
+    if (state->current_cost != INT_MAX && !solver_conf->multistart)
+        // Nothing to generate
+        return true;
+
     if (solver_conf->starting_solution) {
+        // If a starting solution is given, start always from it
         solution_copy(state->current_solution, solver_conf->starting_solution);
         return true;
     }
 
-    if (state->current_cost == INT_MAX || solver_conf->multistart) {
-        verbose2("Finding initial feasible solution...");
-        feasible_solution_finder finder;
-        feasible_solution_finder_init(&finder);
+    // Generate a new initial solution
+    verbose2("Finding initial feasible solution...");
+    feasible_solution_finder finder;
+    feasible_solution_finder_init(&finder);
 
-        solution_clear(state->current_solution);
-        if (feasible_solution_finder_find(&finder, finder_conf, state->current_solution)) {
-            state->current_cost = solution_cost(state->current_solution);
-            verbose2("Found initial feasible solution of cost = %d", state->current_cost);
-            heuristic_solver_state_update(state);
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
+    solution_clear(state->current_solution);
 
-    // Nothing to generate, continue from the current solution (standard case)
+    if (!feasible_solution_finder_find(&finder, finder_conf, state->current_solution))
+        // Cannot find feasible solution (probably timed-out)
+        return false;
+
+    // A new feasible solution have been generated
+    state->current_cost = solution_cost(state->current_solution);
+    verbose2("Found initial feasible solution of cost = %d", state->current_cost);
+    heuristic_solver_state_update(state);
     return true;
 }
 
@@ -93,15 +95,16 @@ bool heuristic_solver_solve(heuristic_solver *solver,
         for (int i = 0; i < n_methods; i++)
             names[i] = strdup(methods[i].name);
         char *methods_str = strjoin(names, n_methods, ", ");
-        verbose("solver.methods = %s", methods_str);
         for (int i = 0; i < n_methods; i++)
             free(names[i]);
-        free(methods_str);
 
+        verbose("solver.methods = %s", methods_str);
         verbose("solver.time_limit = %d", solver_conf->max_time);
         verbose("solver.cycles_limit = %d", solver_conf->max_cycles);
         verbose("solver.multistart = %s", booltostr(solver_conf->multistart));
         verbose("solver.restore_best_after_cycles = %d", solver_conf->restore_best_after_cycles);
+
+        free(methods_str);
     }
 
     if (!n_methods) {
@@ -117,6 +120,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
     solution current_solution;
     solution_init(&current_solution, model);
 
+    // Initialize solver's state
     heuristic_solver_state *state = &solver->state;
     state->model = model;
     state->current_solution = &current_solution;
@@ -136,7 +140,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
         state->methods_name[i] = methods[i].name;
 
     if (state->collect_stats) {
-            state->stats.move_count = 0;
+        state->stats.move_count = 0;
         state->stats.methods = mallocx(n_methods, sizeof(heuristic_solver_state_method_stats));
         for (int i = 0; i < n_methods; i++) {
             state->stats.methods[i].improvement = 0;
@@ -153,6 +157,12 @@ bool heuristic_solver_solve(heuristic_solver *solver,
 
     long now;
 
+    if (solver_conf->dont_solve) {
+        generate_feasible_solution_if_needed(solver_conf, finder_conf, state);
+        goto QUIT;
+    }
+
+    // Main solver loop: call all the methods in a round robin way
     while (state->best_cost > 0) {
         if (timeout) {
             verbose("Time limit reached (%ds), stopping here", solver_conf->max_time);
@@ -163,11 +173,9 @@ bool heuristic_solver_solve(heuristic_solver *solver,
             verbose("Cycles limit reached (%d), stopping here", cycles_limit);
             break;
         }
-        // In case of multistart, generate a new solution each cycle
-        if (!generate_feasible_solution_if_needed(solver_conf, finder_conf, state))
-            break;
 
-        if (solver_conf->dont_solve)
+        // Generate a solution the first time (or each time if multistart=true)
+        if (!generate_feasible_solution_if_needed(solver_conf, finder_conf, state))
             break;
 
         int cycle_begin_best_cost = state->best_cost;
@@ -184,11 +192,13 @@ bool heuristic_solver_solve(heuristic_solver *solver,
             state->non_improving_current_cycles = 0;
         }
 
+        // Eventually print some stats
         if (state->collect_stats) {
             int lv = 2;
             if (get_verbosity() < lv) {
                 now = clk();
                 if (now - state->stats.last_log_time > 1000) {
+                    // Print as verbose1 instead of verbose2 once each second
                     state->stats.last_log_time = now;
                     lv = 1;
                 }
@@ -210,19 +220,20 @@ bool heuristic_solver_solve(heuristic_solver *solver,
                        state->cycle,
                        (double) 100 * (double) state->cycle / (double) (ms() - state->stats.starting_time),
                        state->stats.move_count,
-                       (double) 100 * (double) state->stats.move_count / (double) (ms() - state->stats.starting_time)
-           );
+                       (double) 100 * (double) state->stats.move_count /
+                       (double) (ms() - state->stats.starting_time)
+            );
         }
 
-
+        // Real methods loop
         for (int i = 0; i < solver_conf->methods->len; i++) {
             heuristic_solver_method_callback_parameterized *method = &methods[i];
             verbose2("------------ %s BEGIN (%d) ------------",
-                    method->name, state->current_cost);
+                     method->name, state->current_cost);
             state->method = i;
             if (state->collect_stats)
                 now = clk();
-            method->method(state, method->param);
+            method->method(state, method->param); // metaheuristics method call
             if (state->collect_stats)
                 state->stats.methods[i].execution_time += (clk() - now);
             if (state->collect_trend) {
@@ -230,7 +241,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
                 g_array_append_val(state->stats.trend_best, state->best_cost);
             }
             verbose2("------------ %s END   (%d) --------------",
-                    method->name, state->current_cost);
+                     method->name, state->current_cost);
         }
 
         state->non_improving_current_cycles =
@@ -243,6 +254,8 @@ bool heuristic_solver_solve(heuristic_solver *solver,
         state->cycle++;
     }
 
+QUIT:
+    // Eventually print some stats after the resolution
     if (state->collect_stats) {
         state->stats.ending_time = ms();
 
@@ -269,7 +282,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
                     (double) state->stats.methods[i].execution_time / 1000,
                     state->stats.methods[i].move_count,
                     (double) 100 * (double) state->stats.methods[i].move_count /
-                        (double) (state->stats.methods[i].execution_time),
+                    (double) (state->stats.methods[i].execution_time),
                     state->stats.methods[i].improvement);
         }
 
@@ -303,7 +316,11 @@ bool heuristic_solver_solve(heuristic_solver *solver,
 
     return strempty(solver->error);
 }
-
+/*
+ * Must be called by metaherustics methods after each move:
+ * eventually updates the best solution if the current is better
+ * and update some stats.
+ */
 bool heuristic_solver_state_update(heuristic_solver_state *state) {
     bool improved = false;
 
@@ -318,15 +335,10 @@ bool heuristic_solver_state_update(heuristic_solver_state *state) {
         }
 
         state->best_cost = state->current_cost;
-
         solution_copy(state->best_solution, state->current_solution);
-        assert(state->best_cost == solution_cost(state->best_solution));
         improved = true;
 
-//        if (state->collect_trend) {
-//            g_array_append_val(state->stats.trend_current, state->current_cost);
-//            g_array_append_val(state->stats.trend_best, state->best_cost);
-//        }
+        assert(state->best_cost == solution_cost(state->best_solution));
     }
 
     if (state->collect_stats) {

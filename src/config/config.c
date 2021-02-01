@@ -59,7 +59,7 @@ void config_init(config *cfg) {
     cfg->solver.max_time = 60;
     cfg->solver.max_cycles = -1;
     cfg->solver.multistart = false;
-    cfg->solver.restore_best_after_cycles = 15;
+    cfg->solver.restore_best_after_cycles = 20;
 
     // Default methods: HC+SA
 //    heuristic_method *hc = mallocx(1, sizeof(heuristic_method));

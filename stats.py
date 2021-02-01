@@ -3,6 +3,12 @@ import sys
 from pathlib import Path
 from statistics import stdev, mean
 
+"""
+Print stats of benchmarks in `benchmarks_folder`
+Usage:
+    python stats.py
+"""
+
 benchmarks_folder = Path("benchmarks")
 
 

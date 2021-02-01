@@ -5,6 +5,11 @@
 #include <stdbool.h>
 #include <glib.h>
 
+/*
+ * Model of the ITC2007 instances.
+ */
+
+// Macro for avoid to define the model constants each time
 #define MODEL(m) \
     const int C = (m)->n_courses; \
     const int R = (m)->n_rooms;   \
@@ -15,6 +20,7 @@
     const int L = (m)->n_lectures; \
     const model *model = (m)
 
+// Macros for iterate the model's structure easily
 #define FOR_C for (int c = 0; c < C; c++)
 #define FOR_R for (int r = 0; r < R; r++)
 #define FOR_D for (int d = 0; d < D; d++)
@@ -23,6 +29,7 @@
 #define FOR_T for (int t = 0; t < T; t++)
 #define FOR_L for (int l = 0; l < L; l++)
 
+// (implicitly defined by courses)
 typedef struct teacher {
     int index;
     char *id;
@@ -49,7 +56,7 @@ typedef struct room {
     int capacity;
 } room;
 
-// <curricula> := <CurriculumID> <# Courses> <CourseID> ... <CourseID>
+// <curricula> := <CurriculumID> <# Courses> <CourseID_0> ... <CourseID_N>
 // e.g.        :=      q000         4         c0001 c0002 c0004 c0005
 typedef struct curricula {
     int index;
@@ -68,25 +75,31 @@ typedef struct unavailability_constraint {
     const course *course; // redundant, for faster access
 } unavailability_constraint;
 
+// (implicitly defined by courses)
 typedef struct lecture {
     int index;
     const course *course;
 } lecture;
 
+/*
+ * Model.
+ */
 typedef struct model {
     char *name;
+
     int n_courses;
     int n_rooms;
     int n_days;
     int n_slots;
     int n_curriculas;
     int n_unavailability_constraints;
+
     course *courses;
     room *rooms;
     curricula *curriculas;
     unavailability_constraint *unavailability_constraints;
 
-    // Redundant data (for faster access)
+    // Redundant/Implicit data (for faster access)
     int n_lectures;
     lecture *lectures;
 
@@ -98,23 +111,24 @@ typedef struct model {
     GHashTable *curricula_by_id;
     GHashTable *teacher_by_id;
 
-    GArray **curriculas_of_course;
-    GArray **courses_of_teacher;
-    int **courses_of_curricula;
+    GArray **curriculas_of_course;      // [c]
+    GArray **courses_of_teacher;        // [t]
+    int **courses_of_curricula;         // [q]
 
-    bool *course_belongs_to_curricula;
-    bool *course_taught_by_teacher;
-    bool *course_availabilities;
+    bool *course_belongs_to_curricula;  // [q,c]
+    bool *course_taught_by_teacher;     // [c,t]
+    bool *course_availabilities;        // [c,d,s]
+    bool *courses_share_curricula;      // [c,c,q]
+    bool *courses_same_teacher;         // [c,c]
 
-    bool *courses_share_curricula;
-    bool *courses_same_teacher;
-
+    // Debug purposes
     const char *_filename;
 } model;
 
 void model_init(model *model);
 void model_destroy(const model *model);
 
+/* Compute the redundant data: must be called by the parser */
 void model_finalize(model *model);
 
 course *model_course_by_id(const model *model, char *id);
@@ -122,13 +136,13 @@ room *model_room_by_id(const model *model, char *id);
 curricula *model_curricula_by_id(const model *model, char *id);
 teacher *model_teacher_by_id(const model *model, char *id);
 
-bool model_course_belongs_to_curricula(const model *model, int course_idx, int curricula_idx);
-bool model_course_is_taught_by_teacher(const model *model, int course_idx, int teacher_idx);
-bool model_course_is_available_on_period(const model *model, int course_idx, int day, int slot);
-int *model_curriculas_of_course(const model *model, int course_idx, int *n_curriculas);
-int *model_courses_of_curricula(const model *model, int curricula_dx, int *n_courses);
-int *model_courses_of_teacher(const model *model, int teacher_idx, int *n_courses);
-bool model_share_curricula(const model *model, int course1_idx, int course2_idx, int curricula_idx);
-bool model_same_teacher(const model *model, int course1_idx, int course2_idx);
+bool model_course_belongs_to_curricula(const model *model, int c, int q);
+bool model_course_is_taught_by_teacher(const model *model, int c, int t);
+bool model_course_is_available_on_period(const model *model, int c, int d, int s);
+int *model_curriculas_of_course(const model *model, int c, int *n_curriculas);
+int *model_courses_of_curricula(const model *model, int q, int *n_courses);
+int *model_courses_of_teacher(const model *model, int t, int *n_courses);
+bool model_share_curricula(const model *model, int c1, int c2, int q);
+bool model_same_teacher(const model *model, int c1, int c2);
 
 #endif // MODEL_H

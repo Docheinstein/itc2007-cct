@@ -5,7 +5,7 @@
 #include "utils/str_utils.h"
 #include "utils/array_utils.h"
 #include "utils/mem_utils.h"
-#include "utils/random_utils.h"
+#include "utils/rand_utils.h"
 #include "timeout/timeout.h"
 
 static GHashTable *models_courses_difficulty_cache;

@@ -1,8 +1,8 @@
 #include "solution_parser.h"
 #include <stdlib.h>
-#include <utils/io_utils.h>
-#include <utils/str_utils.h>
-#include <utils/mem_utils.h>
+#include "utils/io_utils.h"
+#include "utils/str_utils.h"
+#include "utils/mem_utils.h"
 
 typedef struct solution_parser_state {
     int *courses_l_cursor;
@@ -54,6 +54,9 @@ typedef struct solution_parser_line_handler_arg {
     solution *solution;
 } solution_parser_line_handler_arg;
 
+/*
+ * `fileparse` callback: real parsing logic.
+ */
 static char * solution_parser_line_handler(const char *line, void *arg) {
     solution_parser_line_handler_arg *s_arg = (solution_parser_line_handler_arg *) arg;
     solution_parser *parser = s_arg->parser;
@@ -61,7 +64,6 @@ static char * solution_parser_line_handler(const char *line, void *arg) {
     solution *sol = s_arg->solution;
 
     MODEL(sol->model);
-//    model_parser_state *state = (model_parser_state *) parser->_state;
 
     char *fields[4];
     char *error = NULL;

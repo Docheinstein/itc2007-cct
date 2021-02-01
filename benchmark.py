@@ -3,6 +3,15 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+"""
+Run benchmarks.
+
+Usage:
+    python benchmark.py [BENCHMARK_NAME][,BENCHMARK_NAME]...
+    
+If given without arguments, runs all the `benchmarks`.
+"""
+
 # ----------- PARAMETERS ------------
 
 executable = Path("build/itc2007-cct")
@@ -19,6 +28,7 @@ TS_OPTIONS = ["solver.methods=ts",
               "ts.tabu_tenure=80",
               "ts.frequency_penalty_coeff=0"]
 
+#   <benchmark_name>  <input>  <output>  <options>  <seconds>  <runs>
 benchmarks = [
     ("comp01-ls", "datasets/comp01.ctt", "benchmarks/168/ls/comp01.out", LS_OPTIONS, 168, 10),
     ("comp02-ls", "datasets/comp02.ctt", "benchmarks/168/ls/comp02.out", LS_OPTIONS, 168, 10),

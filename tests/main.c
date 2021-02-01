@@ -1,8 +1,7 @@
 #include <glib.h>
 #include <stdio.h>
-#include <heuristics/neighbourhoods/swap.h>
-#include <utils/array_utils.h>
-#include <renderer/renderer.h>
+#include "heuristics/neighbourhoods/swap.h"
+#include "utils/array_utils.h"
 #include "utils/str_utils.h"
 #include "utils/os_utils.h"
 #include "model/model_parser.h"
@@ -38,7 +37,6 @@ GLIB_TEST(test_strltrim) {
     g_assert_eqstr(strltrim("something  "), "something  ");
     g_assert_eqstr(strltrim(""), "");
     g_assert_eqstr(strltrim(" "), "");
-
 }
 
 GLIB_TEST(test_strrtrim) {
@@ -55,7 +53,6 @@ GLIB_TEST(test_strrtrim) {
     g_assert_eqstr(strrtrim(s4), "  something");
     g_assert_eqstr(strltrim(s5), "");
     g_assert_eqstr(strltrim(s6), "");
-
 }
 
 GLIB_TEST(test_strtrim) {
@@ -74,7 +71,6 @@ GLIB_TEST(test_strtrim) {
     g_assert_eqstr(strtrim(s5), "");
     g_assert_eqstr(strtrim(s6), "");
     g_assert_eqstr(strtrim(s7), "some thing");
-
 }
 
 GLIB_TEST(test_strltrim_chars) {
@@ -84,7 +80,6 @@ GLIB_TEST(test_strltrim_chars) {
     g_assert_eqstr(strltrim_chars("something  ", " "), "something  ");
     g_assert_eqstr(strltrim_chars("", "X"), "");
     g_assert_eqstr(strltrim_chars(" ", " "), "");
-
 }
 
 GLIB_TEST(test_strrtrim_chars) {
@@ -101,7 +96,6 @@ GLIB_TEST(test_strrtrim_chars) {
     g_assert_eqstr(strrtrim_chars(s4, "X"), "  something");
     g_assert_eqstr(strrtrim_chars(s5, " "), "");
     g_assert_eqstr(strrtrim_chars(s6, " "), "");
-
 }
 
 GLIB_TEST(test_strtrim_chars) {
@@ -120,7 +114,6 @@ GLIB_TEST(test_strtrim_chars) {
     g_assert_eqstr(strtrim_chars(s5, " "), "");
     g_assert_eqstr(strtrim_chars(s6, " "), "");
     g_assert_eqstr(strtrim_chars(s7, " "), "some thing");
-
 }
 
 GLIB_TEST(test_strtoint) {
@@ -171,7 +164,6 @@ GLIB_TEST(test_strappend) {
     char s12[5] = "he";
     strappend(s12, 5, "%s%d", "h", 10);
     g_assert_eqstr(s12, "heh1");
-
 }
 
 GLIB_TEST(test_strappend_realloc) {
@@ -192,7 +184,6 @@ GLIB_TEST(test_strappend_realloc) {
     g_assert_cmpint(size, >, 8);
     g_assert_eqstr(s12, "bufferfull");
     free(s12);
-
 }
 
 GLIB_TEST(test_strsplit) {
@@ -221,7 +212,6 @@ GLIB_TEST(test_strsplit) {
     g_assert_eqstr(tokens[3], "pig");
     g_assert_eqstr(tokens[4], "separated");
     g_assert_eqstr(tokens[5], "string");
-
 }
 
 GLIB_TEST(test_strjoin) {
@@ -238,7 +228,6 @@ GLIB_TEST(test_strjoin) {
     char *s2 = strjoin(strings, 3, "");
     g_assert_eqstr(s, "firstsecondthird");
     free(s2);
-
 }
 
 

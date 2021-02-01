@@ -1,14 +1,14 @@
+#include "args_parser.h"
+#include <stdbool.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <argp.h>
-#include <stdlib.h>
-#include "args_parser.h"
 #include "utils/str_utils.h"
 #include "utils/io_utils.h"
-#include <stdbool.h>
-#include <log/debug.h>
+#include "log/debug.h"
 
 const char *argp_program_version = "0.1";
-static const char *argp_args_doc = "INPUT [OUTPUT]";
+static const char *argp_args_doc = "MODEL [OUTPUT]";
 static const char *argp_doc =
     // PRE_DOC
     "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007"
@@ -40,8 +40,8 @@ static const char *argp_doc =
     "\n"
     "# Restore the best solution so far after N non improving cycles.\n"
     "# (does nothing if multistart is true).\n"
-    "# Default: 15\n"
-    "solver.restore_best_after_cycles=15\n"
+    "# Default: 20\n"
+    "solver.restore_best_after_cycles=20\n"
     "\n"
     "# Randomness of the initial feasible solution.\n"
     "# (0 produces always the same deterministic solution,\n"
@@ -50,93 +50,44 @@ static const char *argp_doc =
     "# Default: 0.33\n"
     "finder.ranking_randomness=0.33\n"
     "\n"
-    "# Whether perform immediately a move with delta < 0,\n"
-    "# without evaluating all the neighbourhood for the best one.\n"
-    "# Default: true\n"
-    "ls.greedy=true\n"
+    "# Maximum non-improving iterations number.\n"
+    "# Default: 150000\n"
+    "hc.max_idle=150000\n"
     "\n"
     "# Maximum non-improving iterations number.\n"
-    "# Default: 120000\n"
-    "hc.max_idle=120000\n"
-    "\n"
-    "# Consider the current solution good enough to intensify the search if \n"
-    "# cost(s) < hc.intensification_threshold * cost(best)\n"
-    "# Default: 1.1\n"
-    "hc.intensification_threshold=1.1.\n"
-    "\n"
-    "# Coefficient of intensification: automatically increase the max_idle to\n"
-    "# max_idle * hc.intensification_coeff if the current solution is good enough\n"
-    "# Default: 1.5\n"
-    "hc.intensification_coeff=1.5.\n"
-    "\n"
-    "# Maximum non-improving iterations number.\n"
-    "# Default: 400\n"
-    "ts.max_idle=400\n"
+    "# Default: 4000\n"
+    "ts.max_idle=4000\n"
     "\n"
     "# Tabu tenure (number of iterations a move remain banned).\n"
-    "# Default: 120\n"
-    "ts.tabu_tenure=120\n"
+    "# Default: 80\n"
+    "ts.tabu_tenure=80\n"
     "\n"
     "# Coefficient of penalty for frequently banned moves.\n"
-    "# tt(m) = tt + ts.frequency_penalty_coeff^freq(m)\n"
-    "# Default: 1.2\n"
-    "ts.frequency_penalty_coeff=1.2\n"
-    "\n"
-    "# Whether pick a random move among the best ones of the neighbourhood.\n"
-    "# 'false' picks always the move seen first among the best ones.\n"
-    "# Default: true\n"
-    "ts.random_pick=true\n"
-    "\n"
-    "# Whether perform immediately a move with delta < 0,\n"
-    "# without evaluating all the neighbourhood for the best one.\n"
-    "# Default: true\n"
-    "ts.greedy=true\n"
-    "\n"
-    "# Whether clear the tabu list when a new global best is found.\n"
-    "# Default: true\n"
-    "ts.clear_on_best=true\n"
-    "\n"
-    "# Consider the current solution good enough to intensify the search if \n"
-    "# cost(s) < ts.intensification_threshold * cost(best).\n"
-    "# Default: 1.1\n"
-    "ts.intensification_threshold=1.1\n"
-    "\n"
-    "# Coefficient of intensification: automatically increase the max_idle to\n"
-    "# max_idle * ts.intensification_coeff if the current solution is good enough.\n"
-    "# Default: 1.5\n"
-    "ts.intensification_coeff=1.5\n"
+    "# tt(m) = tt + ts.frequency_penalty_coeff * freq(m)\n"
+    "# Default: 0\n"
+    "ts.frequency_penalty_coeff=0\n"
     "\n"
     "# Maximum non-improving iterations number.\n"
-    "# Default: 80000\n"
-    "sa.max_idle=80000\n"
+    "# Default: -1\n"
+    "sa.max_idle=-1\n"
     "\n"
     "# Initial temperature.\n"
     "# Default: 1.5\n"
     "sa.initial_temperature=1.5\n"
     "\n"
     "# Temperature's cooling rate.\n"
-    "# Default: 0.95\n"
-    "sa.cooling_rate=0.95\n"
+    "# Default: 0.9995\n"
+    "sa.cooling_rate=0.9995\n"
     "\n"
     "# Minimum temperature to reach before leave the method.\n"
-    "# Default: 0.08\n"
-    "sa.min_temperature=0.08\n"
+    "# Default: 0.10\n"
+    "sa.min_temperature=0.10\n"
     "\n"
     "# Coefficient for the number of iterations to do\n"
     "# using the same temperature.\n"
-    "# len = sa.temperature_length_coeff * n_lectures\n"
+    "# temperature_length = sa.temperature_length_coeff * n_lectures\n"
     "# Default: 1\n"
-    "sa.temperature_length_coeff=1\n"
-    "\n"
-    "# Consider the current solution good enough to intensify the search if \n"
-    "# cost(s) < sa.intensification_threshold * cost(best).\n"
-    "# Default: 1.1\n"
-    "sa.intensification_threshold=1.1\n"
-    "\n"
-    "# Coefficient of intensification: automatically increase the max_idle to\n"
-    "# max_idle * sa.intensification_coeff if the current solution is good enough.\n"
-    "# Default: 1.5\n"
-    "sa.intensification_coeff=1.5"
+    "sa.temperature_length_coeff=1"
 ;
 
 typedef enum itc2007_option {
@@ -152,10 +103,9 @@ typedef enum itc2007_option {
     OPTION_DRAW_OVERVIEW_FILE = 'd'
 } itc2007_option;
 
-
 static struct argp_option options[] = {
   { "verbose", OPTION_VERBOSE, NULL, 0,
-        "Print more information (-vv for print even more)." },
+        "Print more information (-vv for print even more)" },
   { "seed", OPTION_SEED, "N", 0,
         "Seed to use for random number generator" },
   { "time", OPTION_MAX_TIME, "SECONDS", 0,
@@ -175,7 +125,8 @@ static struct argp_option options[] = {
   { "solution", OPTION_INPUT_SOLUTION, "FILE", 0,
         "Load the initial solution from FILE instead of find it.\n"
         "Can be useful to continue the computation from a certain solution, eventually using another method.\n"
-        "Can be also useful with -0 and/or -d to print the cost of a previously computed solution and/or to render its timetable." },
+        "Can be also useful with -0 and/or -d to print the cost of a previously computed solution and/or to render its timetable."
+        "For print only the cost of a solution (as a validator) without use the solver, use -0i FILE." },
   { NULL }
 };
 
@@ -200,7 +151,7 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
 #define PARSE_UINT(str, var) PARSE_X(strtouint, str, var, "integer conversion failed ('%s')", str)
 #define PARSE_DOUBLE(str, var) PARSE_X(strtodouble, str, var, "double conversion failed ('%s')", str)
 
-#ifdef DEBUG
+#ifdef DEBUG1
     if (isascii(key))
         debug("Parsing argument %s%c%s%s",
               key ? "-" : "", key ? key : ' ' , arg ? " " : "", arg ? arg : "");

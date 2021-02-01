@@ -179,10 +179,10 @@ char *strjoin(char **strs, size_t size, const char *joiner) {
     if (size) {
         for (int i = 0; i < size - 1; i++)
             buflen += (int) strlen(strs[i]) + joiner_len;
-        buflen += (int) strlen(strs[size - 1]);            // last, without joiner
+        buflen += (int) strlen(strs[size - 1]); // last, without joiner
     }
 
-    buflen += 1;                                       // '\0'
+    buflen += 1; // '\0'
 
     char *s = mallocx(buflen, sizeof(char));
     s[0] = '\0';
@@ -190,7 +190,7 @@ char *strjoin(char **strs, size_t size, const char *joiner) {
     if (size) {
         for (int i = 0; i < size - 1; i++)
             strappend(s, buflen, "%s%s", strs[i], joiner);
-        strappend(s, buflen, "%s", strs[size - 1]);       // last, without joiner
+        strappend(s, buflen, "%s", strs[size - 1]); // last, without joiner
     }
 
     return s; // must be freed outside
@@ -236,11 +236,11 @@ void vstrappend_realloc(char **dest, size_t *size, const char *fmt, va_list args
     if (!dest)
         return;
 
-    static const size_t DEFAULT_BUFFER_SIZE = 256;
+    static const size_t DEFAULT_INITIAL_BUFFER_SIZE = 256;
 
     if (!*dest) {
-        *size = DEFAULT_BUFFER_SIZE;
-        *dest = mallocx(DEFAULT_BUFFER_SIZE, sizeof(char));
+        *size = DEFAULT_INITIAL_BUFFER_SIZE;
+        *dest = mallocx(DEFAULT_INITIAL_BUFFER_SIZE, sizeof(char));
         *dest[0] = '\0';
     }
 

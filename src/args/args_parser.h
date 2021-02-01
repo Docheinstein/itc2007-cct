@@ -18,6 +18,4 @@ bool args_parser_parse(args_parser *parser, int argc, char **argv, args *args);
 
 char *args_parser_get_error(args_parser *parser);
 
-
-
 #endif // ARGS_PARSER_H

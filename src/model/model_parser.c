@@ -1,12 +1,11 @@
 #include "model_parser.h"
 #include <stdio.h>
 #include <string.h>
-#include <utils/io_utils.h>
-#include <utils/str_utils.h>
 #include "log/verbose.h"
-#include "model.h"
+#include "utils/io_utils.h"
+#include "utils/str_utils.h"
 #include "utils/mem_utils.h"
-#include "log/debug.h"
+#include "model.h"
 
 /*
     INPUT FILE SYNTAX
@@ -100,6 +99,9 @@ typedef struct model_parser_line_handler_arg {
     model *model;
 } model_parser_line_handler_arg;
 
+/*
+ * `fileparse` callback: real parsing logic.
+ */
 static char * model_parser_line_handler(const char *line, void *arg) {
 
 #define ABORT_PARSE(str, ...) do { \
@@ -123,7 +125,6 @@ static char * model_parser_line_handler(const char *line, void *arg) {
     char *error = NULL;
     char *line_copy1 = strdup(line);
     char *line_copy2 = strdup(line);
-
 
     // Outside section?
     fields = mallocx(2, sizeof(char *));

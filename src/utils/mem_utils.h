@@ -1,7 +1,7 @@
 #ifndef MEM_UTILS_H
 #define MEM_UTILS_H
 
-#include <stddef.h>
+#include <stdlib.h>
 
 #define freearray(ptr, nmemb) do { \
     if (ptr) {                     \

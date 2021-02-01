@@ -1,12 +1,12 @@
-#include <utils/random_utils.h>
-#include <utils/io_utils.h>
 #include "renderer.h"
-#include "cairo.h"
-#include "utils/str_utils.h"
+#include <cairo.h>
 #include "log/debug.h"
+#include "log/verbose.h"
+#include "utils/rand_utils.h"
+#include "utils/str_utils.h"
+#include "utils/io_utils.h"
 #include "utils/os_utils.h"
 #include "utils/array_utils.h"
-#include "log/verbose.h"
 #include "utils/mem_utils.h"
 
 #define WHITE 1, 1, 1
@@ -44,7 +44,7 @@ bool render_solution_full(const solution *sol, char *output_dir) {
 }
 
 bool render_solution_overview(const solution *sol, char *overview_file) {
-    return render_solution(sol, overview_file, NULL);
+    return render_solution(sol, NULL, overview_file);
 }
 
 void renderer_config_default(renderer_config *config) {
@@ -70,9 +70,7 @@ static void renderer_reset(renderer *renderer) {
 }
 
 static void random_color(double *r, double *g, double *b) {
-    *r = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
-    *g = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
-    *b = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
+
 }
 
 static void random_colors(int n_colors, double **r, double **g, double **b) {
@@ -93,8 +91,11 @@ static void random_colors(int n_colors, double **r, double **g, double **b) {
 
     renderer_n_colors = n_colors;
 
-    for (int i = prev_n_colors; i < renderer_n_colors; i++)
-        random_color(&renderer_r[i], &renderer_g[i], &renderer_b[i]);
+    for (int i = prev_n_colors; i < renderer_n_colors; i++) {
+        renderer_r[i] = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
+        renderer_g[i] = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
+        renderer_b[i] = rand_uniform(DARK_THRESHOLD, LIGHT_THRESHOLD);
+    }
 
     *r = renderer_r;
     *g = renderer_g;

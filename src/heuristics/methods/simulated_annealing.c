@@ -1,7 +1,7 @@
 #include "simulated_annealing.h"
 #include <math.h>
 #include "heuristics/neighbourhoods/swap.h"
-#include "utils/random_utils.h"
+#include "utils/rand_utils.h"
 #include "timeout/timeout.h"
 #include "log/debug.h"
 #include "log/verbose.h"
@@ -32,6 +32,8 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
     bool collect_sa_stats = get_verbosity() >= 2;
 
     long max_idle = params->max_idle >= 0 ? params->max_idle : LONG_MAX;
+
+    // The default temperature length is equal the number of lectures (~100/500)
     int temperature_length = (int) (state->model->n_lectures * params->temperature_length_coeff);
 
     int local_best_cost = state->current_cost;

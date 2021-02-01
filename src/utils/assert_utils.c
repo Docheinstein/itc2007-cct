@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include "assert_utils.h"
+#include <stdlib.h>
 #include "utils/io_utils.h"
 
 void assertion_message(const char *file, int line, const char *func, const char *message) {

@@ -4,11 +4,11 @@
 #include "timeout/timeout.h"
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
-#include "utils/random_utils.h"
+#include "utils/rand_utils.h"
 
 
 void tabu_search_params_default(tabu_search_params *params) {
-    params->max_idle = -1;
+    params->max_idle = 4000;
     params->tabu_tenure = 80;
     params->frequency_penalty_coeff = 0;
 }
@@ -84,7 +84,7 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
     MODEL(state->model);
     bool ts_stats = get_verbosity() >= 2;
 
-    long max_idle = params->max_idle >= 0 ? params->max_idle : LONG_MAX;
+    long max_idle = params->max_idle > 0 ? params->max_idle : LONG_MAX;
     int local_best_cost = state->current_cost;
     long idle = 0;
     long iter = 0;
@@ -148,13 +148,13 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
 
         if (best_swap_cost != INT_MAX) {
             // Pick a random move among the best ones
-            swap_move *mv = &moves[rand_int_range(0, move_cursor)];
+            swap_move *mv = &moves[rand_range(0, move_cursor)];
             swap_perform(state->current_solution, mv,
                          NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
 
             state->current_cost += best_swap_cost;
             heuristic_solver_state_update(state);
-//            bool new_best = heuristic_solver_state_update(state);
+            bool new_best = heuristic_solver_state_update(state);
 //            if (new_best)
 //                tabu_list_clear(&tabu);
             tabu_list_ban_move(&tabu, mv, iter);
@@ -169,7 +169,7 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
         }
 
         if (ts_stats &&
-            (idle > 0 && idle % (params->max_idle > 0 ? (params->max_idle / 10) : 100) == 0)) {
+            (idle > 0 && idle % (params->max_idle >= 0 ? (params->max_idle / 10) : 100) == 0)) {
             verbose2("%s: Iter = %ld | Idle progress = %ld/%ld (%.2f%%) | "
                      "Current = %d | Local best = %d | Global best = %d | "
                      "# Banned = %d/%d | # Side = %d/%d (%d/%d banned) | "

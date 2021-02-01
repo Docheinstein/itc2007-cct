@@ -1,12 +1,10 @@
-#include <utils/str_utils.h>
-#include <utils/io_utils.h>
-#include <utils/assert_utils.h>
-#include <renderer/renderer.h>
 #include "solution.h"
+#include "utils/str_utils.h"
+#include "utils/io_utils.h"
+#include "utils/assert_utils.h"
 #include "utils/mem_utils.h"
 #include "utils/array_utils.h"
 #include "log/debug.h"
-#include "log/verbose.h"
 
 const int ROOM_CAPACITY_COST_FACTOR = 1;
 const int MIN_WORKING_DAYS_COST_FACTOR = 5;
@@ -132,6 +130,12 @@ void solution_copy(solution *sol_dest, const solution *sol_src) {
            model->n_lectures * sizeof(assignment));
 }
 
+/*
+ * Core method that modifies the solution,
+ * keeping the redundant data consistent.
+ * if yes is true: assigns (r,d,s) to lecture l (of course c, even if it is implicit).
+ * if yes is false: unassigns (r,d,s) from lecture l (of course c, even if it is implicit).
+ */
 static void solution_update(solution *sol, int l, int c, int r, int d, int s, bool yes) {
     if (l < 0 || c < 0 || r < 0 || d < 0 || s < 0)
         return;
@@ -172,47 +176,6 @@ static void solution_update(solution *sol, int l, int c, int r, int d, int s, bo
     debug2("r_cds[%d][%d][%d]=%d", c, d, s, sol->r_cds[INDEX3(c, c, d, D, s, S)]);
     debug2("sum_rds[%d][%d][%d]=%d", r, d, s, sol->sum_rds[INDEX3(r, R, d, D, s, S)]);
 }
-
-//
-//void solution_set_lecture_assignment(solution *sol, int l1, int r2, int d2, int s2) {
-//    MODEL(sol->model);
-//    assert(l1 >= 0 && l1 < L && r2 >= 0 && r2 < R && d2 >= 0 && d2 < D && s2 >= 0 && s2 < S);
-//
-//    int l2 = sol->l_rds[INDEX3(r2, R, d2, D, s2, S)];
-//    int c2 = l2 >= 0 ? model->lectures[l2].course->index : -1;
-//
-//    int c1 = model->lectures[l1].course->index;
-//    int r1, d1, s1;
-//    solution_get_lecture_assignment(sol, l1, &r1, &d1, &s1);
-//
-//    debug2("Updating solution {%d}: [lecture %d (%d:%s)] assigned from "
-//           "(r=%d:%s, d=%d, s=%d) to (r=%d:%s, d=%d, s=%d) [lecture %d (%d:%s)]",
-//           sol->_id,
-//           l1, c1, model->courses[c1].id,
-//           r1, r1 >= 0 ? model->rooms[r1].id : "-",
-//           d1, s1,
-//           r2, model->rooms[r2].id, d2, s2,
-//           l2, c2, c2 >= 0 ? model->courses[c2].id : "-");
-//
-//    solution_update(sol, l1, c1, r1, d1, s1, false);
-//    solution_update(sol, l2, c2, r2, d2, s2, false);
-//    solution_update(sol, l1, c1, r2, d2, s2, true);
-//    solution_update(sol, l2, c2, r1, d1, s1, true);
-//
-//    assignment *a1 = &sol->assignments[l1];
-//    a1->r = r2;
-//    a1->d = d2;
-//    a1->s = s2;
-//
-//    if (l2 >= 0) {
-//        assignment *a2 = &sol->assignments[l2];
-//        a2->r = r1;
-//        a2->d = d1;
-//        a2->s = s1;
-//    }
-//
-//    solution_assert_consistency(sol);
-//}
 
 void solution_assign_lecture(solution *sol, int l1, int r2, int d2, int s2) {
     assert(l1 >= 0 && l1 < sol->model->n_lectures && r2 >= 0 && r2 < sol->model->n_rooms &&
@@ -300,7 +263,6 @@ bool solution_satisfy_room_occupancy(const solution *sol) {
     return solution_room_occupancy_violations(sol) == 0;
 }
 
-
 bool solution_satisfy_availabilities(const solution *sol) {
     return solution_availabilities_violations(sol) == 0;
 }
@@ -309,7 +271,16 @@ bool solution_satisfy_conflicts(const solution *sol) {
     return solution_conflicts_violations(sol) == 0;
 }
 
-static int solution_hard_constraint_lectures_violations_a(const solution *sol, char **strout, size_t *strsize) {
+/*
+ * Hard constraints checkers.
+ *
+ * Implementation note: these use only timetable_crds instead of the
+ * helpers (even if it should be faster with the helpers) for being more easy debug.
+ * It's not a problem since these checkers are used only a few times, not frequently.
+ */
+
+static int solution_hard_constraint_lectures_violations_a(const solution *sol,
+                                                          char **strout, size_t *strsize) {
     MODEL(sol->model);
     int violations = 0;
 
@@ -340,17 +311,19 @@ static int solution_hard_constraint_lectures_violations_a(const solution *sol, c
     return violations;
 }
 
-static int solution_hard_constraint_lectures_violations_b(const solution *sol, char **strout, size_t *strsize) {
+static int solution_hard_constraint_lectures_violations_b(const solution *sol,
+                                                          char **strout, size_t *strsize) {
     MODEL(sol->model);
 
     int violations = 0;
-    int *room_usage = callocx(sol->model->n_courses * sol->model->n_days * sol->model->n_slots, sizeof(int));
+    int *room_usage = callocx(C * D * S, sizeof(int));
 
     FOR_C {
         FOR_R {
             FOR_D {
                 FOR_S {
-                    room_usage[INDEX3(c, C, d, D, s, S)] += sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)];
+                    room_usage[INDEX3(c, C, d, D, s, S)] +=
+                            sol->timetable_crds[INDEX4(c, C, r, R, d, D, s, S)];
                 }
             }
         }
@@ -379,7 +352,8 @@ static int solution_hard_constraint_lectures_violations_b(const solution *sol, c
     return violations;
 }
 
-static int solution_lectures_violations_dump(const solution *sol, char **strout, size_t *strsize) {
+static int solution_lectures_violations_dump(const solution *sol,
+                                             char **strout, size_t *strsize) {
     return
         solution_hard_constraint_lectures_violations_a(sol, strout, strsize) +
         solution_hard_constraint_lectures_violations_b(sol, strout, strsize);
@@ -389,7 +363,8 @@ int solution_lectures_violations(const solution *sol) {
     return solution_lectures_violations_dump(sol, NULL, NULL);
 }
 
-static int solution_room_occupancy_violations_dump(const solution *sol, char **strout, size_t *strsize) {
+static int solution_room_occupancy_violations_dump(const solution *sol,
+                                                   char **strout, size_t *strsize) {
     MODEL(sol->model);
 
     int violations = 0;
@@ -423,7 +398,8 @@ int solution_room_occupancy_violations(const solution *sol) {
     return solution_room_occupancy_violations_dump(sol, NULL, NULL);
 }
 
-static int solution_hard_constraint_conflicts_violations_a(const solution *sol, char **strout, size_t *strsize) {
+static int solution_hard_constraint_conflicts_violations_a(const solution *sol,
+                                                           char **strout, size_t *strsize) {
     MODEL(sol->model);
 
     int violations = 0;
@@ -460,7 +436,8 @@ static int solution_hard_constraint_conflicts_violations_a(const solution *sol, 
     return violations;
 }
 
-static int solution_hard_constraint_conflicts_violations_b(const solution *sol, char **strout, size_t *strsize) {
+static int solution_hard_constraint_conflicts_violations_b(const solution *sol,
+                                                           char **strout, size_t *strsize) {
     MODEL(sol->model);
 
     int violations = 0;
@@ -496,7 +473,8 @@ static int solution_hard_constraint_conflicts_violations_b(const solution *sol, 
     return violations;
 }
 
-static int solution_conflicts_violations_dump(const solution *sol, char **strout, size_t *strsize) {
+static int solution_conflicts_violations_dump(const solution *sol,
+                                              char **strout, size_t *strsize) {
     return
         solution_hard_constraint_conflicts_violations_a(sol, strout, strsize) +
         solution_hard_constraint_conflicts_violations_b(sol, strout, strsize);
@@ -506,7 +484,8 @@ int solution_conflicts_violations(const solution *sol) {
     return solution_conflicts_violations_dump(sol, NULL, NULL);
 }
 
-static int solution_availabilities_violations_dump(const solution *sol, char **strout, size_t *strsize) {
+static int solution_availabilities_violations_dump(const solution *sol,
+                                                   char **strout, size_t *strsize) {
     MODEL(sol->model);
 
     int violations = 0;
@@ -548,7 +527,8 @@ int solution_cost(const solution *sol) {
             solution_room_stability_cost(sol);
 }
 
-static int solution_room_capacity_cost_dump(const solution *sol, char **strout, size_t *strsize) {
+static int solution_room_capacity_cost_dump(const solution *sol,
+                                            char **strout, size_t *strsize) {
     MODEL(sol->model);
 
     int penalties = 0;
@@ -591,7 +571,8 @@ int solution_room_capacity_cost(const solution *sol) {
     return solution_room_capacity_cost_dump(sol, NULL, NULL);
 }
 
-static int solution_min_working_days_cost_dump(const solution *sol, char **strout, size_t *strsize) {
+static int solution_min_working_days_cost_dump(const solution *sol,
+                                               char **strout, size_t *strsize) {
     MODEL(sol->model);
 
     int penalties = 0;
@@ -796,6 +777,10 @@ bool write_solution(const solution *sol, const char *filename) {
     return success;
 }
 
+/* Debug purposes */
+
+
+/* Compute an unique identifier (~hash) of this solution. */
 unsigned long long solution_fingerprint(const solution *sol) {
     MODEL(sol->model);
     unsigned long long h = 0;
@@ -803,17 +788,6 @@ unsigned long long solution_fingerprint(const solution *sol) {
         h += sol->timetable_crds[i];
         h *= 85637481940593;
     }
-    /*
-    char *ptr = (char *) sol->assignments;
-    size_t len = L * sizeof(assignment);
-    int i = 0;
-    while (i < len) {
-        h += *ptr;
-        h *= 85637481940593;
-        ptr++;
-        i++;
-    }
-    */
     return h;
 }
 
@@ -823,6 +797,7 @@ void solution_assert_consistency(const solution *sol) {
 #endif
 }
 
+/* Assert the consistency of the internal structures of the solution */
 void solution_assert_consistency_real(const solution *sol) {
     MODEL(sol->model);
 

@@ -1,9 +1,9 @@
-#include <errno.h>
-#include <log/verbose.h>
-#include <string.h>
-#include <log/debug.h>
-#include <stdlib.h>
 #include "io_utils.h"
+#include <errno.h>
+#include <string.h>
+#include <stdlib.h>
+#include "log/verbose.h"
+#include "log/debug.h"
 #include "mem_utils.h"
 #include "str_utils.h"
 #include "array_utils.h"
@@ -49,6 +49,7 @@ int fileclear(const char *filename) {
 
 /*
  * Returns NULL on success, or a malloc-ed error string on failure.
+ * `callback` is responsible for the parsing of the lines.
  */
 char * fileparse(const char *filename,
                  fileparse_options *parse_options,

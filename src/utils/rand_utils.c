@@ -1,26 +1,25 @@
+#include "rand_utils.h"
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
-#include "random_utils.h"
 #include <string.h>
 
-static uint g_seed;
-// TODO: refactor and see if end is inclusive or not...
+static unsigned int the_seed;
 
-void rand_set_seed(uint seed) {
-    g_seed = seed;
+void rand_set_seed(unsigned int seed) {
+    the_seed = seed;
     srandom(seed);
 }
 
-uint rand_get_seed() {
-    return g_seed;
+unsigned int rand_get_seed() {
+    return the_seed;
 }
 
 int rand_int() {
     return (int) random();
 }
 
-int rand_int_range(int start, int end) {
+int rand_range(int start, int end) {
     return start + ((int) random() % (end - start));
 }
 
@@ -35,7 +34,7 @@ double rand_normal(double mean, double std) {
     // s = u^2 + v^2 // until s € [0, 1]
     // z0 = u * sqrt(-2 * ln(s) / s)
     // z1 = v * sqrt(-2 * ln(s) / s)
-    // G = mean + z0 * std      // mean + z1 *std
+    // G = mean + z0 * std      // mean + z1 * std
     static bool z1_usable = false;
     static double z1;
 

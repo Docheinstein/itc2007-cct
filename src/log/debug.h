@@ -3,7 +3,14 @@
 
 #include <stdio.h>
 
-#ifdef DEBUG
+/*
+ * Debug statements.
+ * Enabled only if compiled with -DDEBUG=1 or -DDEBUG=2.
+ * (with cmake: -DCMAKE_C_FLAGS="-DDEBUG=1")
+ */
+
+#if DEBUG >= 1
+#define DEBUG1
 #define debug(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #else
 #define debug(fmt, ...) do {} while(0)

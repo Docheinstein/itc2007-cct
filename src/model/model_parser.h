@@ -4,6 +4,10 @@
 #include "model.h"
 #include <stdbool.h>
 
+/*
+ * Parser of ITC2007 instances.
+ */
+
 typedef struct model_parser {
     char *error;
     void *_state;

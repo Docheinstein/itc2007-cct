@@ -1,8 +1,14 @@
 #ifndef VERBOSE_H
 #define VERBOSE_H
 
-int get_verbosity();
+/*
+ * Verbose statements.
+ * Enabled only if the verbosity level set with set_verbosity
+ * is greater than the message level)
+ */
+
 void set_verbosity(int level);
+int get_verbosity();
 
 void verbose_lv(int level, const char *fmt, ...);
 

@@ -1,9 +1,12 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "model/model.h"
 #include "solution/solution.h"
 
+/*
+ * Graphical renderer of a solution.
+ * Creates one or multiple timetables (.png).
+ */
 typedef struct renderer_config {
     char *output_dir;
     char *output_file;
@@ -17,9 +20,16 @@ typedef struct renderer {
     char *error;
 } renderer;
 
+/*
+ * Generate only an overview timetable.
+ * All the courses, rooms, days, slots are fitted in one table.
+ **/
 bool render_solution_overview(const solution *sol, char *overview_file);
-bool render_solution_full(const solution *sol, char *output_dir);
 
+/*
+ * Generate multiple timetables (by room, by course, by curricula, by teacher).
+ */
+bool render_solution_full(const solution *sol, char *output_dir);
 
 void renderer_config_default(renderer_config *config);
 

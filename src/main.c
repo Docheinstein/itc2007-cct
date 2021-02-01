@@ -75,7 +75,7 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include <stdlib.h>
 #include <stdbool.h>
 #include <utils/io_utils.h>
-#include <utils/random_utils.h>
+#include <utils/rand_utils.h>
 #include <time.h>
 #include "args/args_parser.h"
 #include "log/verbose.h"
