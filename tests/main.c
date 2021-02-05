@@ -1,5 +1,6 @@
 #include <glib.h>
 #include <stdio.h>
+#include "renderer/renderer.h"
 #include "heuristics/neighbourhoods/swap.h"
 #include "utils/array_utils.h"
 #include "utils/str_utils.h"
@@ -465,22 +466,17 @@ GLIB_TEST_ARG(test_swap_reverse) {
     PROLOGUE(params->model_file);
 
     swap_move mv;
-    swap_result result;
 
     unsigned long long h = solution_fingerprint(&s);
 
     for (int i = 0; i < params->trials; i++) {
-        swap_move_generate_random_extended(&s, &mv, true, false);
-        swap_predict(&s, &mv,
-                     NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
-                     NEIGHBOURHOOD_PREDICT_COST_NEVER,
-                     &result);
+        swap_move_generate_random_feasible_effective(&s, &mv);
         swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
         swap_move mv_back;
         swap_move_reverse(&mv, &mv_back);
-        swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
+        swap_perform(&s, &mv_back, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
         unsigned long long h2 = solution_fingerprint(&s);
-        g_assert_cmpint(h, ==, h2);
+        g_assert_cmpuint(h, ==, h2);
 
     }
 

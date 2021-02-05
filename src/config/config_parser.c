@@ -102,26 +102,42 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
     if (streq(key, "finder.ranking_randomness"))
         return PARSE_DOUBLE(value, &cfg->finder.ranking_randomness);
 
+    if (streq(key, "ls.max_distance_from_best_ratio"))
+        return PARSE_DOUBLE(value, &cfg->ls.max_distance_from_best_ratio);
+
     if (streq(key, "hc.max_idle"))
         return PARSE_LONG(value, &cfg->hc.max_idle);
+    if (streq(key, "hc.max_idle_near_best_coeff"))
+        return PARSE_DOUBLE(value, &cfg->hc.max_idle_near_best_coeff);
+    if (streq(key, "hc.near_best_ratio"))
+        return PARSE_DOUBLE(value, &cfg->hc.near_best_ratio);
 
     if (streq(key, "ts.max_idle"))
         return PARSE_LONG(value, &cfg->ts.max_idle);
+    if (streq(key, "ts.max_idle_near_best_coeff"))
+        return PARSE_DOUBLE(value, &cfg->ts.max_idle_near_best_coeff);
+    if (streq(key, "ts.near_best_ratio"))
+        return PARSE_DOUBLE(value, &cfg->ts.near_best_ratio);
     if (streq(key, "ts.tabu_tenure"))
         return PARSE_INT(value, &cfg->ts.tabu_tenure);
     if (streq(key, "ts.frequency_penalty_coeff"))
         return PARSE_DOUBLE(value, &cfg->ts.frequency_penalty_coeff);
 
-    if (streq(key, "sa.max_idle"))
-        return PARSE_LONG(value, &cfg->sa.max_idle);
     if (streq(key, "sa.initial_temperature"))
         return PARSE_DOUBLE(value, &cfg->sa.initial_temperature);
     if (streq(key, "sa.cooling_rate"))
         return PARSE_DOUBLE(value, &cfg->sa.cooling_rate);
-    if (streq(key, "sa.min_temperature"))
-        return PARSE_DOUBLE(value, &cfg->sa.min_temperature);
     if (streq(key, "sa.temperature_length_coeff"))
         return PARSE_DOUBLE(value, &cfg->sa.temperature_length_coeff);
+    if (streq(key, "sa.min_temperature"))
+        return PARSE_DOUBLE(value, &cfg->sa.min_temperature);
+    if (streq(key, "sa.min_temperature_near_best_coeff"))
+        return PARSE_DOUBLE(value, &cfg->sa.min_temperature_near_best_coeff);
+    if (streq(key, "sa.near_best_ratio"))
+        return PARSE_DOUBLE(value, &cfg->sa.near_best_ratio);
+    if (streq(key, "sa.reheat_coeff"))
+        return PARSE_DOUBLE(value, &cfg->sa.reheat_coeff);
+
 
     print("WARN: unexpected key, skipping '%s'", key);
 

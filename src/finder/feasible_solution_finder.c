@@ -41,7 +41,7 @@ static int lecture_assignment_compare(const void *_1, const void *_2) {
 static int *get_courses_difficulty(const model *m) {
     MODEL(m);
 
-    // Sort the courses by the difficulty, in order to assign the most
+    // Compute the courses' difficulties, in order to assign the most
     // difficult courses before the easy ones.
     // (i.e. a course is difficult to place if it has many associated constraints).
     // Specifically:
@@ -58,7 +58,8 @@ static int *get_courses_difficulty(const model *m) {
     if (v)
         return (int *) v;
 
-    // Compute the difficulty score of courses assignments
+    // Compute the difficulty of courses
+
     static const int CURRICULAS_CONFLICTS_DIFFICULTY_FACTOR = 1;
     static const int TEACHER_CONFLICTS_DIFFICULTY_FACTOR = 1;
     static const int UNAVAILABILITY_CONFLICTS_DIFFICULTY_FACTOR = 1;

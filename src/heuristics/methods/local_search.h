@@ -10,6 +10,7 @@
  */
 
 typedef struct local_search_params {
+    double max_distance_from_best_ratio;
 } local_search_params;
 
 void local_search_params_default(local_search_params *params);

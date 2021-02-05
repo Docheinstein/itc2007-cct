@@ -97,6 +97,7 @@ typedef enum itc2007_option {
     OPTION_CONFIG = 'c',
     OPTION_OPTION = 'o',
     OPTION_BENCHMARK_MODE = 'b',
+    OPTION_RACE_MODE = 'r',
     OPTION_DONT_SOLVE = '0',
     OPTION_INPUT_SOLUTION = 'i',
     OPTION_DRAW_ALL_DIRECTORY = 'D',
@@ -115,7 +116,9 @@ static struct argp_option options[] = {
   { "option", OPTION_OPTION, "KEY=VALUE", 0,
         "Set an option KEY to VALUE (as if it was specified in a config file)" },
   { "benchmark", OPTION_BENCHMARK_MODE, NULL, 0,
-        "Benchmark mode: append a line of stats to OUTPUT (instead of writing the solution) with the format <seed> <fingerprint> <feasible> <rc> <mwd> <cc> <rs> <cost>" },
+        "Benchmark mode: append a line of stats to OUTPUT (instead of writing the solution) with the format <seed> <fingerprint> <cycles> <moves> <feasible> <rc> <mwd> <cc> <rs> <cost>" },
+  { "race", OPTION_RACE_MODE, NULL, 0,
+        "Race mode: when a new best is found, it is immediately written to OUTPUT (the solution itself or the stats if -b is given)" },
   { "no-solve", OPTION_DONT_SOLVE, NULL, 0,
         "Do not solve the model: can be useful with -i to print the cost of a loaded solution, and with -d to it render it" },
   { "draw-all", OPTION_DRAW_ALL_DIRECTORY, "DIR", 0,
@@ -175,6 +178,9 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         break;
     case OPTION_BENCHMARK_MODE:
         args->benchmark_mode = true;
+        break;
+    case OPTION_RACE_MODE:
+        args->race_mode = true;
         break;
     case OPTION_DONT_SOLVE:
         args->dont_solve = true;

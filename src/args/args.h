@@ -18,6 +18,7 @@ typedef struct args {
     char *config_file;
     GArray *options;
     bool benchmark_mode;
+    bool race_mode;
     bool dont_solve;
     char *draw_all_directory;
     char *draw_overview_file;

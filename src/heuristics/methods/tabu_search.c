@@ -8,8 +8,10 @@
 
 
 void tabu_search_params_default(tabu_search_params *params) {
-    params->max_idle = 4000;
-    params->tabu_tenure = 80;
+    params->max_idle = -1;
+    params->max_idle_near_best_coeff = 1.5;
+    params->near_best_ratio = 1.02;
+    params->tabu_tenure = 120;
     params->frequency_penalty_coeff = 0;
 }
 
@@ -84,7 +86,9 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
     MODEL(state->model);
     bool ts_stats = get_verbosity() >= 2;
 
-    long max_idle = params->max_idle > 0 ? params->max_idle : LONG_MAX;
+    long max_idle = params->max_idle >= 0 ? params->max_idle : LONG_MAX;
+    long max_idle_near_best = (long) (params->max_idle_near_best_coeff * (double) params->max_idle);
+    max_idle_near_best = max_idle_near_best >= 0 ? max_idle_near_best : LONG_MAX;
     int local_best_cost = state->current_cost;
     long idle = 0;
     long iter = 0;
@@ -100,7 +104,10 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
         int n_side_banned_moves;
     } stats = {0, 0, 0};
 
-    while (!timeout && idle < max_idle) {
+    // Exit conditions: timeout or exceed max_idle (eventually increased if near best)
+    while (!timeout &&
+            ((state->current_cost < params->near_best_ratio * state->best_cost) ?
+                idle <= max_idle_near_best : idle <= max_idle)) {
         swap_iter swap_iter;
         swap_iter_init(&swap_iter, state->current_solution);
 
@@ -112,7 +119,7 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
 
         int best_swap_cost = INT_MAX;
 
-        while (swap_iter_next(&swap_iter/*, &swap_mv*/)) {
+        while (swap_iter_next(&swap_iter)) {
             swap_predict(state->current_solution, &swap_iter.move,
                          NEIGHBOURHOOD_PREDICT_FEASIBILITY_ALWAYS,
                          NEIGHBOURHOOD_PREDICT_COST_IF_FEASIBLE,
@@ -154,9 +161,6 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
 
             state->current_cost += best_swap_cost;
             heuristic_solver_state_update(state);
-            bool new_best = heuristic_solver_state_update(state);
-//            if (new_best)
-//                tabu_list_clear(&tabu);
             tabu_list_ban_move(&tabu, mv, iter);
         }
 
@@ -169,7 +173,7 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
         }
 
         if (ts_stats &&
-            (idle > 0 && idle % (params->max_idle >= 0 ? (params->max_idle / 10) : 100) == 0)) {
+            (idle > 0 && idle % (params->max_idle >= 10 ? (params->max_idle / 10) : 100) == 0)) {
             verbose2("%s: Iter = %ld | Idle progress = %ld/%ld (%.2f%%) | "
                      "Current = %d | Local best = %d | Global best = %d | "
                      "# Banned = %d/%d | # Side = %d/%d (%d/%d banned) | "

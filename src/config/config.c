@@ -18,16 +18,19 @@ char *config_to_string(const config *cfg) {
         "solver.max_cycles = %d\n"
         "solver.multistart = %s\n"
         "solver.restore_best_after_cycles = %d\n"
-        "finder.ranking_randomness = %.2f\n"
+        "finder.ranking_randomness = %.4f\n"
         "hc.max_idle = %ld\n"
+        "hc.max_idle_near_best_coeff = %.4f\n"
+        "hc.near_best_ratio = %.4f\n"
         "ts.max_idle = %ld\n"
+        "ts.max_idle_near_best_coeff = %.4f\n"
+        "ts.near_best_ratio = %.4f\n"
         "ts.tabu_tenure = %d\n"
-        "ts.frequency_penalty_coeff = %.2f\n"
-        "sa.max_idle = %ld\n"
-        "sa.initial_temperature = %.2f\n"
-        "sa.cooling_rate = %.2f\n"
-        "sa.min_temperature = %.2f\n"
-        "sa.temperature_length_coeff = %.2f",
+        "ts.frequency_penalty_coeff = %.4f\n"
+        "sa.initial_temperature = %.5f\n"
+        "sa.cooling_rate = %.5f\n"
+        "sa.min_temperature = %.5f\n"
+        "sa.temperature_length_coeff = %.5f",
         solver_methods,
         cfg->solver.max_time,
         cfg->solver.max_cycles,
@@ -37,12 +40,15 @@ char *config_to_string(const config *cfg) {
         cfg->finder.ranking_randomness,
         // ---
         cfg->hc.max_idle,
+        cfg->hc.max_idle_near_best_coeff,
+        cfg->hc.near_best_ratio,
         // ---
         cfg->ts.max_idle,
+        cfg->ts.max_idle_near_best_coeff,
+        cfg->ts.near_best_ratio,
         cfg->ts.tabu_tenure,
         cfg->ts.frequency_penalty_coeff,
         // ---
-        cfg->sa.max_idle,
         cfg->sa.initial_temperature,
         cfg->sa.cooling_rate,
         cfg->sa.min_temperature,
@@ -59,7 +65,7 @@ void config_init(config *cfg) {
     cfg->solver.max_time = 60;
     cfg->solver.max_cycles = -1;
     cfg->solver.multistart = false;
-    cfg->solver.restore_best_after_cycles = 20;
+    cfg->solver.restore_best_after_cycles = 50;
 
     // Default methods: HC+SA
 //    heuristic_method *hc = mallocx(1, sizeof(heuristic_method));

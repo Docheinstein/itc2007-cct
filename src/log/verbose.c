@@ -5,7 +5,11 @@
 static int verbosity;
 
 int get_verbosity() {
+#ifndef DEBUG
     return verbosity;
+#else
+    return 2;
+#endif
 }
 
 void set_verbosity(int level) {

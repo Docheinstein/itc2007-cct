@@ -82,19 +82,87 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 #include "model/model_parser.h"
 #include "solution/solution.h"
 #include "renderer/renderer.h"
-#include "finder/feasible_solution_finder.h"
 #include "log/debug.h"
 #include <sys/time.h>
 #include "heuristics/heuristic_solver.h"
 
 #include <heuristics/methods/hill_climbing.h>
 #include <config/config_parser.h>
-#include <utils/mem_utils.h>
 #include <heuristics/methods/tabu_search.h>
 #include <heuristics/methods/simulated_annealing.h>
 #include <config/config.h>
 #include <solution/solution_parser.h>
 #include <heuristics/methods/local_search.h>
+#include <utils/time_utils.h>
+
+typedef struct new_best_solution_callback_params {
+    args *args;
+} new_best_solution_callback_params;
+
+static void new_best_solution_callback(const solution *sol,
+                                       const heuristic_solver_stats *stats,
+                                       void *arg) {
+    debug("Handling new best solution...");
+
+    new_best_solution_callback_params *params = (new_best_solution_callback_params *) arg;
+
+    unsigned long long fingerprint = solution_fingerprint(sol);
+
+    if (params->args->benchmark_mode || params->args->race_mode) {
+        char benchmark_output[128];
+        int rc = solution_room_capacity_cost(sol);
+        int mwd = solution_min_working_days_cost(sol);
+        int cc = solution_curriculum_compactness_cost(sol);
+        int rs = solution_room_stability_cost(sol);
+        int cost = rc + mwd + cc + rs;
+        bool feasible = solution_satisfy_hard_constraints(sol);
+        bool ending_time = stats->ending_time < LONG_MAX ? stats->ending_time : ms();
+
+        if (params->args->benchmark_mode) {
+           // Just print a line with the format:
+            // <seed> <feasible> <cycles> <moves> <rc> <mwd> <cc> <rs> <cost>
+            snprintf(benchmark_output, 128,
+                     "%u %llu %.1f %ld %ld "
+                     "%d %d %d %d %d %d\n",
+                     rand_get_seed(), fingerprint,
+                     (double) (ending_time - stats->starting_time) / 1000,
+                     stats->cycle_count, stats->move_count,
+                     feasible, rc, mwd, cc, rs, cost);
+
+            if (params->args->output_file)
+                fileappend(params->args->output_file, benchmark_output);
+        }
+
+        // Print a stats line either in benchmark or race mode
+        printf("%s", benchmark_output);
+    }
+    else {
+        // Print the solution and the violations/costs
+        if (!params->args->output_file || get_verbosity()) {
+            char *sol_str = solution_to_string(sol);
+            verbose("====== SOLUTION ======\n"
+                    "%s\n"
+                    "----------------------", sol_str);
+            free(sol_str);
+        }
+
+        char *sol_quality_str = solution_quality_to_string(
+                sol, get_verbosity() || params->args->solution_input_file);
+        print("%s", sol_quality_str);
+        free(sol_quality_str);
+
+        verbose("\n"
+                "Solution fingerprint: %llu", fingerprint);
+        if (params->args->output_file)
+            write_solution(sol, params->args->output_file);
+    }
+
+    // Render the solution (eventually)
+    if (params->args->draw_all_directory)
+        render_solution_full(sol, params->args->draw_all_directory);
+    else if (params->args->draw_overview_file)
+        render_solution_overview(sol, params->args->draw_overview_file);
+}
 
 int main (int argc, char **argv) {
     // Parse command line arguments
@@ -164,98 +232,70 @@ int main (int argc, char **argv) {
     heuristic_solver_config solver_conf;
     heuristic_solver_config_init(&solver_conf);
 
-    solver_conf.max_cycles = cfg.solver.max_cycles;
-    solver_conf.max_time = args.max_time >= 0 ? args.max_time : cfg.solver.max_time;
     solver_conf.starting_solution = solution_loaded ? &sol : NULL;
     solver_conf.multistart = cfg.solver.multistart;
     solver_conf.restore_best_after_cycles = cfg.solver.restore_best_after_cycles;
     solver_conf.dont_solve = args.dont_solve;
+    solver_conf.max_cycles = cfg.solver.max_cycles;
+    solver_conf.max_time = cfg.solver.max_time;
+    if (args.max_time >= 0 || args.race_mode)
+        // -t TIME override the default time (60 seconds).
+        // Furthermore, if -r is given and -t is not, the time limit is unlimited
+        // (which is the default value of args.max_time)
+        solver_conf.max_time = args.max_time;
+
+    new_best_solution_callback_params new_best_callback_params = {
+        .args = &args
+    };
+
+    if (args.race_mode) {
+        // Race mode, dump the new best solution when it is found
+        solver_conf.new_best_callback.callback = new_best_solution_callback;
+        solver_conf.new_best_callback.arg = &new_best_callback_params;
+
+    }
 
     heuristic_method *methods = (heuristic_method *) cfg.solver.methods->data;
     for (int i = 0; i < cfg.solver.methods->len; i++) {
         heuristic_method method = methods[i];
         const char *method_name = heuristic_method_to_string(method);
+        const char *method_short_name = heuristic_method_to_string_short(method);
 
         if (method == HEURISTIC_METHOD_LOCAL_SEARCH) {
             heuristic_solver_config_add_method(&solver_conf, local_search,
-                                               &cfg.ls, method_name);
+                                               &cfg.ls, method_name, method_short_name);
         } else if (method == HEURISTIC_METHOD_TABU_SEARCH) {
             heuristic_solver_config_add_method(&solver_conf, tabu_search,
-                                               &cfg.ts, method_name);
+                                               &cfg.ts, method_name, method_short_name);
         } else if (method == HEURISTIC_METHOD_HILL_CLIMBING) {
             heuristic_solver_config_add_method(&solver_conf, hill_climbing,
-                                               &cfg.hc, method_name);
+                                               &cfg.hc, method_name, method_short_name);
         } else if (method == HEURISTIC_METHOD_SIMULATED_ANNEALING) {
             heuristic_solver_config_add_method(&solver_conf, simulated_annealing,
-                                               &cfg.sa, method_name);
+                                               &cfg.sa, method_name, method_short_name);
         }
     }
 
     heuristic_solver solver;
     heuristic_solver_init(&solver);
 
-    heuristic_solver_resolution_stats resolution_stats;
-    solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &cfg.finder, &sol, &resolution_stats);
-
-    if (!solution_loaded)
-        eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
-
-    heuristic_solver_destroy(&solver);
-    heuristic_solver_config_destroy(&solver_conf);
-
+    heuristic_solver_stats stats;
+    heuristic_solver_stats_init(&stats);
+    solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &cfg.finder,
+                                             &sol, &stats);
 
     if (solution_loaded) {
-        unsigned long long fingerprint = solution_fingerprint(&sol);
-
-        if (args.benchmark_mode) {
-            // Just print a line with the format:
-            // <seed> <feasible> <cycles> <moves> <rc> <mwd> <cc> <rs> <cost>
-            char benchmark_output[128];
-            int rc = solution_room_capacity_cost(&sol);
-            int mwd = solution_min_working_days_cost(&sol);
-            int cc = solution_curriculum_compactness_cost(&sol);
-            int rs = solution_room_stability_cost(&sol);
-            int cost = rc + mwd + cc + rs;
-            bool feasible = solution_satisfy_hard_constraints(&sol);
-            snprintf(benchmark_output, 128,
-                     "%u %llu %ld %ld "
-                     "%d %d %d %d %d %d\n",
-                     rand_get_seed(), fingerprint, resolution_stats.cycles, resolution_stats.moves,
-                     feasible, rc, mwd, cc, rs, cost);
-
-            printf("%s", benchmark_output);
-
-            if (args.output_file)
-                fileappend(args.output_file, benchmark_output);
-        }
-        else {
-            // Print the solution and the violations/costs
-            if (!args.output_file || get_verbosity()) {
-                char *sol_str = solution_to_string(&sol);
-                verbose("====== SOLUTION ======\n"
-                        "%s\n"
-                        "----------------------", sol_str);
-                free(sol_str);
-            }
-
-            char *sol_quality_str = solution_quality_to_string(
-                    &sol, get_verbosity() || args.solution_input_file);
-            print("%s", sol_quality_str);
-            free(sol_quality_str);
-
-            verbose("\n"
-                    "Solution fingerprint: %llu", fingerprint);
-            if (args.output_file)
-                write_solution(&sol, args.output_file);
-        }
+        // In race mode the solution has already been handled;
+        // handle the solution now only if not in race mode
+        if (!args.race_mode)
+            new_best_solution_callback(&sol, &stats, &new_best_callback_params);
+    } else {
+        eprint("ERROR: failed to solve model (%s)", heuristic_solver_get_error(&solver));
     }
 
-
-    // Render the solution (eventually)
-    if (args.draw_all_directory)
-        render_solution_full(&sol, args.draw_all_directory);
-    else if (args.draw_overview_file)
-        render_solution_overview(&sol, args.draw_overview_file);
+    heuristic_solver_destroy(&solver);
+    heuristic_solver_stats_destroy(&stats);
+    heuristic_solver_config_destroy(&solver_conf);
 
     solution_destroy(&sol);
     model_destroy(&model);

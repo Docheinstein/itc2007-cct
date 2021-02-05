@@ -27,8 +27,8 @@ bool render_solution(const solution *sol, char *output_dir, char *overview_file)
 
     renderer_config config;
     renderer_config_default(&config);
-    config.output_dir = overview_file;
-    config.output_file = output_dir;
+    config.output_dir = output_dir;
+    config.output_file = overview_file;
 
     bool success = renderer_render(&renderer, &config, sol);
     if (!success)

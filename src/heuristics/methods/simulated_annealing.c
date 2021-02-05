@@ -10,11 +10,19 @@
 
 
 void simulated_annealing_params_default(simulated_annealing_params *params) {
-    params->max_idle = -1;
-    params->initial_temperature = 1.5;
-    params->cooling_rate = 0.995;
-    params->min_temperature = 0.10;
-    params->temperature_length_coeff = 1;
+    params->initial_temperature = 1.4;
+//    params->initial_temperature = 1.3;
+//    params->cooling_rate = 0.965;
+//    params->temperature_length_coeff = 50;
+    params->cooling_rate = 0.965;
+    params->temperature_length_coeff = 0.125;
+//    params->temperature_length_coeff = 0.2;
+//    params->min_temperature = 0.11;
+    params->min_temperature = 0.12;
+//    params->min_temperature_near_best_coeff = 0.72;
+    params->min_temperature_near_best_coeff = 0.68;
+    params->near_best_ratio = 1.05;
+    params->reheat_coeff = 1.015;
 }
 
 static bool simulated_annealing_accept(heuristic_solver_state *state,
@@ -30,17 +38,27 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
     MODEL(state->model);
     bool sa_stats = get_verbosity() >= 2;
 
-    long max_idle = params->max_idle >= 0 ? params->max_idle : LONG_MAX;
-
     // The default temperature length is equal the number of lectures (~100/500)
-    int temperature_length = (int) (state->model->n_lectures * params->temperature_length_coeff);
+//    int temperature_length = (int) (state->model->n_lectures * params->temperature_length_coeff);
+    int temperature_length = (int) (L * R * D * S * params->temperature_length_coeff);
+    int temperature_length_5_times = 5 * temperature_length;
+    double t = params->initial_temperature;
+    double t_min = params->min_temperature;
+    double cooling_rate = params->cooling_rate;
+    double t_min_near_best = t_min * params->min_temperature_near_best_coeff;
+
+    double reheat = pow(params->reheat_coeff, (double) state->non_improving_best_cycles);
+    t *= reheat;
 
     int local_best_cost = state->current_cost;
     long idle = 0;
     long iter = 0;
-    double t = params->initial_temperature;
 
-    while (!timeout && idle < max_idle && t > params->min_temperature) {
+
+    // Exit conditions: timeout or below minimum temperature
+    while (!timeout &&
+            ((state->current_cost < round(params->near_best_ratio * state->best_cost)) ?
+                t > t_min_near_best : t > t_min)) {
         // Perform temperature_length iters with the same temperature
         for (int it = 0; it < temperature_length; it++) {
             swap_move swap_mv;
@@ -67,23 +85,23 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
                 idle++;
 
             if (sa_stats &&
-                ((idle > 0 && idle % (params->max_idle > 0 ? (params->max_idle / 10) : 10000) == 0)
-                || iter % (temperature_length * 5) == 0)) {
-                verbose2("%s: Iter = %ld | Idle progress = %ld/%ld (%.2f%%) | "
+                ((idle > 0 && idle % 10000) == 0)
+                || iter > 0 && iter % (temperature_length_5_times) == 0) {
+                verbose2("%s: Iter = %ld | Idle = %ld | "
                          "Current = %d | Local best = %d | Global best = %d | "
-                         "Temperature = %.5f | p(+1) = %g  p(+5) = %g  p(+10) = %g",
+                         "Temperature = %.5f | p(+1) = %g  p(+5) = %g  p(+10) = %g | "
+                         "T_length = %d | Cooling Rate = %.5f",
                      state->methods_name[state->method],
                      iter, idle,
-                     params->max_idle > 0 ? params->max_idle : 0,
-                     params->max_idle > 0 ? (double) 100 * idle / params->max_idle : 0,
                      state->current_cost, local_best_cost, state->best_cost,
-                     t, SA_ACCEPTANCE(1, t), SA_ACCEPTANCE(5, t), SA_ACCEPTANCE(10, t));
+                     t, SA_ACCEPTANCE(1, t), SA_ACCEPTANCE(5, t), SA_ACCEPTANCE(10, t),
+                     temperature_length, cooling_rate);
             }
 
             iter++;
         }
 
         // Decrease the temperature by cooling rate
-        t *= params->cooling_rate;
+        t *= cooling_rate;
     }
 }

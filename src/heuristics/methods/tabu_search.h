@@ -18,6 +18,8 @@
 
 typedef struct tabu_search_params {
     long max_idle;
+    double max_idle_near_best_coeff;
+    double near_best_ratio;
     int tabu_tenure;
     double frequency_penalty_coeff;
 } tabu_search_params;

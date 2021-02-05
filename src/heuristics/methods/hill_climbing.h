@@ -14,6 +14,8 @@
 
 typedef struct hill_climbing_params {
     long max_idle;
+    double max_idle_near_best_coeff;
+    double near_best_ratio;
 } hill_climbing_params;
 
 void hill_climbing_params_default(hill_climbing_params *params);

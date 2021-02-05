@@ -1,5 +1,7 @@
 #include "heuristic_solver.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <config/config.h>
 #include "log/verbose.h"
 #include "utils/str_utils.h"
 #include "utils/time_utils.h"
@@ -13,20 +15,24 @@ void heuristic_solver_config_init(heuristic_solver_config *config) {
     config->max_time = 60;
     config->max_cycles = -1;
     config->multistart = false;
-    config->restore_best_after_cycles = 20;
+    config->restore_best_after_cycles = 50;
 
     config->starting_solution = NULL;
     config->dont_solve = false;
+    config->new_best_callback.callback = NULL;
+    config->new_best_callback.arg = NULL;
 }
 
 void heuristic_solver_config_add_method(heuristic_solver_config *config,
                                         heuristic_solver_method_callback method,
                                         void *param,
-                                        const char *name) {
+                                        const char *name,
+                                        const char *short_name) {
     heuristic_solver_method_callback_parameterized method_parameterized = {
         .method = method,
         .param = param,
-        .name = name
+        .name = name,
+        .short_name = short_name
     };
     g_array_append_val(config->methods, method_parameterized);
 }
@@ -34,6 +40,30 @@ void heuristic_solver_config_add_method(heuristic_solver_config *config,
 void heuristic_solver_config_destroy(heuristic_solver_config *config) {
     g_array_free(config->methods, true);
 }
+
+
+void heuristic_solver_stats_init(heuristic_solver_stats *stats) {
+    stats->cycle_count = 0;
+    stats->move_count = 0;
+    stats->best_restored_count = 0;
+    stats->methods = NULL;
+    stats->starting_time = ms();
+    stats->best_solution_time = LONG_MAX;
+    stats->ending_time = LONG_MAX;
+}
+
+void heuristic_solver_stats_destroy(heuristic_solver_stats *stats) {
+    if (stats->methods) {
+        for (int m = 0; m < stats->n_methods; m++) {
+            g_array_free(stats->methods[m].trend.current.before, true);
+            g_array_free(stats->methods[m].trend.current.after, true);
+            g_array_free(stats->methods[m].trend.best.before, true);
+            g_array_free(stats->methods[m].trend.best.after, true);
+        }
+        free(stats->methods);
+    }
+}
+
 
 void heuristic_solver_init(heuristic_solver *solver) {
     solver->error = NULL;
@@ -48,9 +78,10 @@ const char *heuristic_solver_get_error(heuristic_solver *solver) {
 }
 
 /* Generate a solution if needed (i.e. first time or if multistart=true) */
-bool generate_feasible_solution_if_needed(const heuristic_solver_config *solver_conf,
-                                          const feasible_solution_finder_config *finder_conf,
-                                          heuristic_solver_state *state) {
+static bool generate_feasible_solution_if_needed(
+        const heuristic_solver_config *solver_conf,
+        const feasible_solution_finder_config *finder_conf,
+        heuristic_solver_state *state) {
     if (state->current_cost != INT_MAX && !solver_conf->multistart)
         // Nothing to generate
         return true;
@@ -83,7 +114,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
                             const heuristic_solver_config *solver_conf,
                             const feasible_solution_finder_config *finder_conf,
                             solution *sol_out,
-                            heuristic_solver_resolution_stats *stats) {
+                            heuristic_solver_stats *statistics) {
     const model *model = sol_out->model;
 
     heuristic_solver_method_callback_parameterized *methods =
@@ -116,6 +147,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
         set_timeout(solver_conf->max_time);
 
     int cycles_limit = solver_conf->max_cycles >= 0 ? solver_conf->max_cycles : INT_MAX;
+    bool collect_trend = get_verbosity();
 
     solution current_solution;
     solution_init(&current_solution, model);
@@ -131,26 +163,29 @@ bool heuristic_solver_solve(heuristic_solver *solver,
     state->method = 0;
     state->non_improving_best_cycles = 0;
     state->non_improving_current_cycles = 0;
-
-    state->collect_trend = get_verbosity() >= 2;
+    state->_last_log_time = 0;
+    state->config = solver_conf;
+    state->stats = statistics;
 
     state->methods_name = mallocx(n_methods, sizeof(const char *));
-    for (int i = 0; i < n_methods; i++)
+    state->stats->methods = mallocx(n_methods, sizeof(heuristic_solver_state_method_stats));
+    state->stats->n_methods = n_methods;
+
+    for (int i = 0; i < n_methods; i++) {
         state->methods_name[i] = methods[i].name;
 
-    state->stats.move_count = 0;
-    state->stats.methods = mallocx(n_methods, sizeof(heuristic_solver_state_method_stats));
-    for (int i = 0; i < n_methods; i++) {
-        state->stats.methods[i].improvement = 0;
-        state->stats.methods[i].execution_time = 0;
-        state->stats.methods[i].move_count = 0;
+        state->stats->methods[i].execution_time = 0;
+        state->stats->methods[i].move_count = 0;
+        state->stats->methods[i].improvement_count = 0;
+        state->stats->methods[i].improvement_count_after_first_cycle = 0;
+        state->stats->methods[i].improvement_delta = 0;
+        state->stats->methods[i].improvement_delta_after_first_cycle = 0;
+        state->stats->methods[i].trend.current.before = g_array_new(false, false, sizeof(int));
+        state->stats->methods[i].trend.current.after = g_array_new(false, false, sizeof(int));
+        state->stats->methods[i].trend.best.before = g_array_new(false, false, sizeof(int));
+        state->stats->methods[i].trend.best.after = g_array_new(false, false, sizeof(int));
     }
-    state->stats.starting_time = ms();
-    state->stats.best_solution_time = LONG_MAX;
-    state->stats.ending_time = LONG_MAX;
-    state->stats.last_log_time = 0;
-    state->stats.trend_current = g_array_new(false, false, sizeof(int));
-    state->stats.trend_best = g_array_new(false, false, sizeof(int));
+
 
     long now;
 
@@ -187,6 +222,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
             state->current_cost = state->best_cost;
             state->non_improving_best_cycles = 0;
             state->non_improving_current_cycles = 0;
+            state->stats->best_restored_count++;
         }
 
         // Eventually print some stats
@@ -194,9 +230,9 @@ bool heuristic_solver_solve(heuristic_solver *solver,
             int lv = 2;
             if (get_verbosity() < lv) {
                 now = clk();
-                if (now - state->stats.last_log_time > 1000) {
+                if (now - state->_last_log_time > 1000) {
                     // Print as verbose1 instead of verbose2 once each second
-                    state->stats.last_log_time = now;
+                    state->_last_log_time = now;
                     lv = 1;
                 }
             }
@@ -215,10 +251,10 @@ bool heuristic_solver_solve(heuristic_solver *solver,
                        state->non_improving_current_cycles,
                        state->non_improving_best_cycles,
                        state->cycle,
-                       (double) 100 * (double) state->cycle / (double) (ms() - state->stats.starting_time),
-                       state->stats.move_count,
-                       (double) 100 * (double) state->stats.move_count /
-                       (double) (ms() - state->stats.starting_time)
+                       (double) 1000 * (double) state->cycle / (double) (ms() - state->stats->starting_time),
+                       state->stats->move_count,
+                       (double) 1000 * (double) state->stats->move_count /
+                       (double) (ms() - state->stats->starting_time)
             );
         }
 
@@ -229,12 +265,16 @@ bool heuristic_solver_solve(heuristic_solver *solver,
                      method->name, state->current_cost);
             state->method = i;
             now = clk();
-            method->method(state, method->param); // metaheuristics method call
-            state->stats.methods[i].execution_time += (clk() - now);
-            if (state->collect_trend) {
-                g_array_append_val(state->stats.trend_current, state->current_cost);
-                g_array_append_val(state->stats.trend_best, state->best_cost);
+            if (collect_trend) {
+                g_array_append_val(state->stats->methods[i].trend.current.before, state->current_cost);
+                g_array_append_val(state->stats->methods[i].trend.best.before, state->best_cost);
             }
+            method->method(state, method->param); // metaheuristic method call
+            if (collect_trend) {
+                g_array_append_val(state->stats->methods[i].trend.current.after, state->current_cost);
+                g_array_append_val(state->stats->methods[i].trend.best.after, state->best_cost);
+            }
+            state->stats->methods[i].execution_time += (clk() - now);
             verbose2("------------ %s END   (%d) --------------",
                      method->name, state->current_cost);
         }
@@ -247,77 +287,88 @@ bool heuristic_solver_solve(heuristic_solver *solver,
                 0 : (state->non_improving_best_cycles + 1);
 
         state->cycle++;
+        state->stats->cycle_count++;
     }
+
+    state->stats->ending_time = ms();
 
     // Eventually print some stats after the resolution
     if (get_verbosity()) {
-        state->stats.ending_time = ms();
-
         verbose("=============== SOLVER FINISHED ===============\n"
                 "Best = %d (found after %.2f seconds)\n"
                 "Execution time = %.2f seconds\n"
                 "Cycles = %d (cycles/s = %.2f)\n"
-                "Moves = %d (moves/s = %.2f)",
+                "Moves = %d (moves/s = %.2f)\n"
+                "Best restored %d times",
                 state->best_cost,
-                (double) (state->stats.best_solution_time - state->stats.starting_time) / 1000,
-                (double) (state->stats.ending_time - state->stats.starting_time) / 1000,
+                (double) (state->stats->best_solution_time - state->stats->starting_time) / 1000,
+                (double) (state->stats->ending_time - state->stats->starting_time) / 1000,
                 state->cycle,
-                (double) 100 * (double) state->cycle / (double) (ms() - state->stats.starting_time),
-                state->stats.move_count,
-                (double) 100 * (double) state->stats.move_count / (double) (ms() - state->stats.starting_time)
+                (double) 1000 * (double) state->cycle / (double) (state->stats->ending_time - state->stats->starting_time),
+                state->stats->move_count,
+                (double) 1000 * (double) state->stats->move_count / (double) (state->stats->ending_time - state->stats->starting_time),
+                state->stats->best_restored_count
         );
 
         for (int i = 0; i < n_methods; i++) {
             verbose("%s:\n"
                     "   Execution time = %.2f seconds\n"
                     "   Moves = %d (moves/s = %.2f)\n"
-                    "   Overall improvement = %d",
+                    "   Improvement count = %d (%d after first cycle\n"
+                    "   Improvement delta = %d (%d after first cycle)",
                     state->methods_name[i],
-                    (double) state->stats.methods[i].execution_time / 1000,
-                    state->stats.methods[i].move_count,
-                    (double) 100 * (double) state->stats.methods[i].move_count /
-                    (double) (state->stats.methods[i].execution_time),
-                    state->stats.methods[i].improvement);
+                    (double) state->stats->methods[i].execution_time / 1000,
+                    state->stats->methods[i].move_count,
+                    (double) 1000 * (double) state->stats->methods[i].move_count /
+                    (double) (state->stats->methods[i].execution_time),
+                    state->stats->methods[i].improvement_count,
+                    state->stats->methods[i].improvement_count_after_first_cycle,
+                    state->stats->methods[i].improvement_delta,
+                    state->stats->methods[i].improvement_delta_after_first_cycle);
         }
 
-        if (state->collect_trend) {
-            verbose2("--- TREND OF CURRENT ---");
-            int *trend_current = (int *) state->stats.trend_current->data;
-            for (int i = 0; i < state->stats.trend_current->len; i++) {
-                if (i && i % 10 == 0)
-                    verbosef2("\n");
-                verbosef2("%5d", trend_current[i]);
+        if (collect_trend) {
+            verbose("================== TREND ==================");
+            /*                  LS                      SA
+             * _0 | _7777 -> (-7000) -> 777* | 777 -> ( -400) -> 377*
+             * _1 | __377 -> ( -200) -> 177* | 177 -> ( -400) -> 177
+             */
+            int trend_len = state->stats->methods[0].trend.current.before->len;
+            int n_cycles_strlen = snprintf(NULL, 0, "%ld", state->cycle);
+            int spacing = (int) n_cycles_strlen + 18;
+            for (int m = 0; m < n_methods; m++) {
+                const char *method_name = methods[m].short_name;
+                verbosef("%*s", spacing - (int) strlen(method_name) / 2, method_name);
+                spacing = 32 - (int) strlen(method_name);
             }
-            verbosef2("\n");
+            verbosef("\n");
+            for (int i = 0; i < trend_len; i++) {
+                verbosef("%s%*d", i > 0 ? "\n" : "", n_cycles_strlen, i);
+                for (int m = 0; m < n_methods; m++) {
+                    int bef = ((int *) state->stats->methods[m].trend.current.before->data)[i];
+                    int aft = ((int *) state->stats->methods[m].trend.current.after->data)[i];
+                    int delta = aft - bef;
+                    bool new_best =
+                            ((int *) state->stats->methods[m].trend.best.after->data)[i] <
+                            ((int *) state->stats->methods[m].trend.best.before->data)[i];
+                    verbosef(" | %5d -> (%+6d) -> %5d%s", bef, delta, aft, new_best ? "*" : " ");
+                }
 
-            verbose2("--- TREND OF BEST ---");
-            int *trend_best = (int *) state->stats.trend_best->data;
-            for (int i = 0; i < state->stats.trend_best->len; i++) {
-                if (i && i % 10 == 0)
-                    verbosef2("\n");
-                verbosef2("%5d", trend_best[i]);
             }
-            verbosef2("\n");
+            verbosef("\n");
         }
     }
 
 QUIT:
-    free(state->stats.methods);
-    g_array_free(state->stats.trend_current, true);
-    g_array_free(state->stats.trend_best, true);
-
     free(state->methods_name);
     solution_destroy(state->current_solution);
-
-    stats->moves = state->stats.move_count;
-    stats->cycles = state->cycle;
 
     return strempty(solver->error);
 }
 /*
  * Must be called by metaherustics methods after each move:
  * eventually updates the best solution if the current is better
- * and update some stats.
+ * and update some stats->
  */
 bool heuristic_solver_state_update(heuristic_solver_state *state) {
     bool improved = false;
@@ -326,19 +377,35 @@ bool heuristic_solver_state_update(heuristic_solver_state *state) {
         verbose("%s: found new best solution of cost %d",
                 state->methods_name[state->method], state->current_cost);
         assert(solution_satisfy_hard_constraints(state->current_solution));
-        if (state->best_cost < INT_MAX)
-            state->stats.methods[state->method].improvement += (state->best_cost - state->current_cost);
-        state->stats.best_solution_time = ms();
 
+        if (state->best_cost != INT_MAX) {
+            int delta = state->current_cost - state->best_cost;
+            state->stats->methods[state->method].improvement_count++;
+            state->stats->methods[state->method].improvement_delta += delta;
+            if (state->cycle > 0) {
+                state->stats->methods[state->method].improvement_count_after_first_cycle++;
+                state->stats->methods[state->method].improvement_delta_after_first_cycle += delta;
+            }
+        }
+
+        state->stats->best_solution_time = ms();
+
+        // Copy the current solution to the best
         state->best_cost = state->current_cost;
         solution_copy(state->best_solution, state->current_solution);
         improved = true;
 
+        // Eventually callback
+        if (state->config->new_best_callback.callback)
+            state->config->new_best_callback.callback(
+                    state->best_solution, state->stats,
+                    state->config->new_best_callback.arg);
+        
         assert(state->best_cost == solution_cost(state->best_solution));
     }
 
-    state->stats.move_count++;
-    state->stats.methods[state->method].move_count++;
+    state->stats->move_count++;
+    state->stats->methods[state->method].move_count++;
 
    return improved;
 }

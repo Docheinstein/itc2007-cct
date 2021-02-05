@@ -23,11 +23,13 @@
  */
 
 typedef struct simulated_annealing_params {
-    long max_idle;
     double initial_temperature;
     double cooling_rate;
-    double min_temperature;
     double temperature_length_coeff;
+    double min_temperature;
+    double min_temperature_near_best_coeff;
+    double near_best_ratio;
+    double reheat_coeff;
 } simulated_annealing_params;
 
 void simulated_annealing_params_default(simulated_annealing_params *params);

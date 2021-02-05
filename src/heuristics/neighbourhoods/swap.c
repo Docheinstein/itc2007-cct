@@ -211,33 +211,33 @@ static int compute_curriculum_compactness_cost(
 
     MODEL(sol->model);
 
-#define Z(q, d, s) \
+#define QDS(q, d, s) \
     ((s) >= 0 && (s) < S && sol->sum_qds[INDEX3(q, Q, d, D, s, S)])
 
-#define Z_OUT_AFTER(q, d, s) \
+#define QDS_OUT_AFTER(q, d, s) \
     (!((d) == d1 && (s) == s1) && \
-    ((Z(q, d, s))))
+    ((QDS(q, d, s))))
 
-#define Z_IN_BEFORE(q, d, s) \
+#define QDS_IN_BEFORE(q, d, s) \
     (!((d) == d1 && (s) == s1) && \
-    ((Z(q, d, s))))
+    ((QDS(q, d, s))))
 
-#define Z_IN_AFTER(q, d, s) \
+#define QDS_IN_AFTER(q, d, s) \
     (((s) == s2 && (d) == d2) || \
     (!((d) == d1 && (s) == s1) && \
-    ((Z(q, d, s)))))
+    ((QDS(q, d, s)))))
 
 #define ALONE_OUT_BEFORE(q, d, s) \
-    (Z(q, d, s) && !Z(q, d, (s) - 1) && !Z(q, d, (s) + 1))
+    (QDS(q, d, s) && !QDS(q, d, (s) - 1) && !QDS(q, d, (s) + 1))
 
 #define ALONE_OUT_AFTER(q, d, s) \
-    (Z_OUT_AFTER(q, d, s) && !Z_OUT_AFTER(q, d, (s) - 1) && !Z_OUT_AFTER(q, d, (s) + 1))
+    (QDS_OUT_AFTER(q, d, s) && !QDS_OUT_AFTER(q, d, (s) - 1) && !QDS_OUT_AFTER(q, d, (s) + 1))
 
 #define ALONE_IN_BEFORE(q, d, s) \
-    (Z_IN_BEFORE(q, d, s) && !Z_IN_BEFORE(q, d, (s) - 1) && !Z_IN_BEFORE(q, d, (s) + 1))
+    (QDS_IN_BEFORE(q, d, s) && !QDS_IN_BEFORE(q, d, (s) - 1) && !QDS_IN_BEFORE(q, d, (s) + 1))
 
 #define ALONE_IN_AFTER(q, d, s) \
-    (Z_IN_AFTER(q, d, s) && !Z_IN_AFTER(q, d, (s) - 1) && !Z_IN_AFTER(q, d, (s) + 1))
+    (QDS_IN_AFTER(q, d, s) && !QDS_IN_AFTER(q, d, (s) - 1) && !QDS_IN_AFTER(q, d, (s) + 1))
     
     
     int cost = 0;
@@ -307,10 +307,10 @@ static int compute_curriculum_compactness_cost(
 
     debug2("CurriculumCompactness delta cost: %d", cost);
 
-#undef Z
-#undef Z_OUT_AFTER
-#undef Z_IN_BEFORE
-#undef Z_IN_AFTER
+#undef QDS
+#undef QDS_OUT_AFTER
+#undef QDS_IN_BEFORE
+#undef QDS_IN_AFTER
 #undef ALONE_OUT_BEFORE
 #undef ALONE_OUT_AFTER
 #undef ALONE_IN_BEFORE
@@ -345,13 +345,13 @@ static bool swap_move_check_hard_constraints(const solution *sol,
 
     // RoomOccupancy: no need to check since the swap replaces the room by design
 
-    // Conflicts: curriculum
-    if (!check_conflicts_curriculum_constraint(
-            sol, mv->helper.c1, mv->helper.d1, mv->helper.s1, mv->helper.c2, mv->d2, mv->s2))
+    // Availabilities
+    if (!check_availabilities_constraint(
+            sol, mv->helper.c1, mv->d2, mv->s2))
         return false;
 
-    if (!check_conflicts_curriculum_constraint(
-            sol, mv->helper.c2, mv->d2, mv->s2, mv->helper.c1, mv->helper.d1, mv->helper.s1))
+    if (!check_availabilities_constraint(
+            sol, mv->helper.c2, mv->helper.d1, mv->helper.s1))
         return false;
 
     // Conflicts: teacher
@@ -363,15 +363,14 @@ static bool swap_move_check_hard_constraints(const solution *sol,
             sol, mv->helper.c2, mv->d2, mv->s2, mv->helper.c1, mv->helper.d1, mv->helper.s1))
         return false;
 
-    // Availabilities
-    if (!check_availabilities_constraint(
-            sol, mv->helper.c1, mv->d2, mv->s2))
+    // Conflicts: curriculum (as last, since is the toughest to compute)
+    if (!check_conflicts_curriculum_constraint(
+            sol, mv->helper.c1, mv->helper.d1, mv->helper.s1, mv->helper.c2, mv->d2, mv->s2))
         return false;
 
-    if (!check_availabilities_constraint(
-            sol, mv->helper.c2, mv->helper.d1, mv->helper.s1))
+    if (!check_conflicts_curriculum_constraint(
+            sol, mv->helper.c2, mv->d2, mv->s2, mv->helper.c1, mv->helper.d1, mv->helper.s1))
         return false;
-
     return true;
 }
 
@@ -380,6 +379,8 @@ static void swap_move_compute_cost(
         const swap_move *mv,
         swap_result *result) {
     MODEL(sol->model);
+    static int non_gave_up = 0;
+    static int gave_up = 0;
 
     result->delta.room_capacity_cost = 0;
     result->delta.min_working_days_cost = 0;
@@ -388,42 +389,40 @@ static void swap_move_compute_cost(
 
     // Room capacity
     result->delta.room_capacity_cost +=
-            compute_room_capacity_cost(
-                    sol, mv->helper.c1, mv->helper.r1, mv->r2) +
-                compute_room_capacity_cost(
-                        sol, mv->helper.c2, mv->r2, mv->helper.r1);
+            compute_room_capacity_cost(sol, mv->helper.c1, mv->helper.r1, mv->r2);
+    result->delta.room_capacity_cost +=
+            compute_room_capacity_cost(sol, mv->helper.c2, mv->r2, mv->helper.r1);
 
     // MinWorkingDays
     result->delta.min_working_days_cost +=
-            compute_min_working_days_cost(
-                    sol, mv->helper.c1, mv->helper.d1, mv->helper.c2, mv->d2) +
-                    compute_min_working_days_cost(
-                            sol, mv->helper.c2, mv->d2, mv->helper.c1, mv->helper.d1);
+            compute_min_working_days_cost(sol, mv->helper.c1, mv->helper.d1, mv->helper.c2, mv->d2);
+    result->delta.min_working_days_cost +=
+            compute_min_working_days_cost(sol, mv->helper.c2, mv->d2, mv->helper.c1, mv->helper.d1);
 
     // CurriculumCompactness
     result->delta.curriculum_compactness_cost +=
             compute_curriculum_compactness_cost(
-                    sol, mv->helper.c1, mv->helper.d1, mv->helper.s1, mv->helper.c2, mv->d2, mv->s2) +
-                    compute_curriculum_compactness_cost(
-                            sol, mv->helper.c2, mv->d2, mv->s2, mv->helper.c1, mv->helper.d1, mv->helper.s1);
+                    sol, mv->helper.c1, mv->helper.d1, mv->helper.s1, mv->helper.c2, mv->d2, mv->s2);
+    result->delta.curriculum_compactness_cost +=
+            compute_curriculum_compactness_cost(
+                    sol, mv->helper.c2, mv->d2, mv->s2, mv->helper.c1, mv->helper.d1, mv->helper.s1);
 
     // RoomStability
-    result->delta.room_stability_cost +=
-            compute_room_stability_cost(
-                    sol, mv->helper.c1, mv->helper.r1, mv->helper.c2, mv->r2) +
-                    compute_room_stability_cost(
-                            sol, mv->helper.c2, mv->r2, mv->helper.c1, mv->helper.r1);
+    result->delta.min_working_days_cost +=
+            compute_room_stability_cost(sol, mv->helper.c1, mv->helper.r1, mv->helper.c2, mv->r2);
+    result->delta.min_working_days_cost +=
+            compute_room_stability_cost(sol, mv->helper.c2, mv->r2, mv->helper.c1, mv->helper.r1);
 
     result->delta.cost =
             result->delta.room_capacity_cost +
             result->delta.min_working_days_cost +
             result->delta.curriculum_compactness_cost +
             result->delta.room_stability_cost;
-
     debug2("swap_move_compute_cost cost = %d", result->delta.cost);
 }
 
 static void swap_move_do(solution *sol, const swap_move *mv) {
+//    print("mv: %d -> %d %d %d", mv->l1, mv->r2, mv->d2, mv->s2);
     assert(sol->assignments[mv->l1].r == mv->helper.r1);
     assert(sol->assignments[mv->l1].d == mv->helper.d1);
     assert(sol->assignments[mv->l1].s == mv->helper.s1);
@@ -588,11 +587,11 @@ bool swap_perform(solution *sol, const swap_move *move,
     return false;
 }
 
-bool swap_extended(solution *sol, const swap_move *mv,
-                   neighbourhood_predict_feasibility_strategy predict_feasibility,
-                   neighbourhood_predict_cost_strategy predict_cost,
-                   neighbourhood_perform_strategy perform,
-                   swap_result *result) {
-    swap_predict(sol, mv, predict_feasibility, predict_cost, result);
-    return swap_perform(sol, mv, perform, result);
-}
+//bool swap_extended(solution *sol, const swap_move *mv,
+//                   neighbourhood_predict_feasibility_strategy predict_feasibility,
+//                   neighbourhood_predict_cost_strategy predict_cost,
+//                   neighbourhood_perform_strategy perform,
+//                   swap_result *result) {
+//    swap_predict(sol, mv, predict_feasibility, predict_cost, result);
+//    return swap_perform(sol, mv, perform, result);
+//}

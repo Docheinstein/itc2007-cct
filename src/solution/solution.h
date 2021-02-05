@@ -75,10 +75,6 @@ typedef struct solution {
      *      course c is assigned to room r on day d, slot s
      */
     bool *timetable_crds;  // [c,r,d,s]
-    bool *timetable_cdsr;  // [c,d,s,r]
-    bool *timetable_rdsc;  // [r,d,s,c]
-    bool *timetable_qdscr; // [q,d,s,c,r]
-    bool *timetable_tdscr; // [t,d,s,c,r]
 
     /*
      * Course/Room/Lecture helpers.
