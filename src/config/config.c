@@ -19,6 +19,7 @@ char *config_to_string(const config *cfg) {
         "solver.multistart = %s\n"
         "solver.restore_best_after_cycles = %d\n"
         "finder.ranking_randomness = %.4f\n"
+        "ls.max_distance_from_best_ratio = %.4f\n"
         "hc.max_idle = %ld\n"
         "hc.max_idle_near_best_coeff = %.4f\n"
         "hc.near_best_ratio = %.4f\n"
@@ -29,8 +30,11 @@ char *config_to_string(const config *cfg) {
         "ts.frequency_penalty_coeff = %.4f\n"
         "sa.initial_temperature = %.5f\n"
         "sa.cooling_rate = %.5f\n"
+        "sa.temperature_length_coeff = %.5f\n"
         "sa.min_temperature = %.5f\n"
-        "sa.temperature_length_coeff = %.5f",
+        "sa.min_temperature_near_best_coeff = %.5f\n"
+        "sa.near_best_ratio = %.5f\n"
+        "sa.reheat_coeff = %.5f",
         solver_methods,
         cfg->solver.max_time,
         cfg->solver.max_cycles,
@@ -38,6 +42,8 @@ char *config_to_string(const config *cfg) {
         cfg->solver.restore_best_after_cycles,
         // ---
         cfg->finder.ranking_randomness,
+        // ---
+        cfg->ls.max_distance_from_best_ratio,
         // ---
         cfg->hc.max_idle,
         cfg->hc.max_idle_near_best_coeff,
@@ -51,8 +57,11 @@ char *config_to_string(const config *cfg) {
         // ---
         cfg->sa.initial_temperature,
         cfg->sa.cooling_rate,
+        cfg->sa.temperature_length_coeff,
         cfg->sa.min_temperature,
-        cfg->sa.temperature_length_coeff
+        cfg->sa.min_temperature_near_best_coeff,
+        cfg->sa.near_best_ratio,
+        cfg->sa.reheat_coeff
     );
 
     free(solver_methods);
@@ -66,17 +75,6 @@ void config_init(config *cfg) {
     cfg->solver.max_cycles = -1;
     cfg->solver.multistart = false;
     cfg->solver.restore_best_after_cycles = 50;
-
-    // Default methods: HC+SA
-//    heuristic_method *hc = mallocx(1, sizeof(heuristic_method));
-//    heuristic_method *sa = mallocx(1, sizeof(heuristic_method));
-//    *hc = HEURISTIC_METHOD_HILL_CLIMBING;
-//    *sa = HEURISTIC_METHOD_SIMULATED_ANNEALING;
-    heuristic_method hc = HEURISTIC_METHOD_HILL_CLIMBING;
-    heuristic_method sa = HEURISTIC_METHOD_SIMULATED_ANNEALING;
-
-    g_array_append_val(cfg->solver.methods, hc);
-    g_array_append_val(cfg->solver.methods, sa);
 
     feasible_solution_finder_config_default(&cfg->finder);
     local_search_params_default(&cfg->ls);

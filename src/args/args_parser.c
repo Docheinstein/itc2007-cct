@@ -8,7 +8,7 @@
 #include "log/debug.h"
 
 const char *argp_program_version = "0.1";
-static const char *argp_args_doc = "MODEL [OUTPUT]";
+static const char *argp_args_doc = "INPUT [OUTPUT]";
 static const char *argp_doc =
     // PRE_DOC
     "Solver of the Curriculum-Based Course Timetabling Problem of ITC 2007"
@@ -17,77 +17,101 @@ static const char *argp_doc =
     "The solver supports the following heuristics methods:\n"
     "Local Search, Hill Climbing, Tabu Search and Simulated Annealing.\n"
     "\n"
-    "The solver itself and each method can be customized via a config file (-c FILE) "
+    "The solver itself and each heuristics can be customized via a config file (-c FILE) "
     "or giving options at the command line (-o KEY=VALUE).\n"
     "\n"
     "The following options are currently supported:\n"
     "\n"
+    "SOLVER\n"
+    "\n"
     "# Comma separated list of methods among 'ls', 'hc', 'ts', 'sa'.\n"
-    "# Default: hc,sa\n"
-    "solver.methods=hc,sa\n"
+    "solver.methods=sa,ls\n"
     "\n"
     "# Solve for no more than N seconds.\n"
-    "# Default: 60\n"
     "solver.max_time=60\n"
     "\n"
     "# Solve for no more than N cycles.\n"
-    "# Default: -1\n"
     "solver.max_cycles=-1\n"
     "\n"
     "# Whether generate a new initial solution each cycle.\n"
-    "# Default: false\n"
     "solver.multistart=false\n"
     "\n"
     "# Restore the best solution so far after N non improving cycles.\n"
     "# (does nothing if multistart is true).\n"
-    "# Default: 20\n"
-    "solver.restore_best_after_cycles=20\n"
+    "solver.restore_best_after_cycles=50\n"
+    "\n"
+    "FINDER\n"
     "\n"
     "# Randomness of the initial feasible solution.\n"
     "# (0 produces always the same deterministic solution,\n"
-    "# higher value produces \"more random\" solutions,\n"
+    "# an higher value produces \"more random\" solutions,\n"
     "# but makes it harder to find feasible ones).\n"
-    "# Default: 0.33\n"
     "finder.ranking_randomness=0.33\n"
     "\n"
-    "# Maximum non-improving iterations number.\n"
-    "# Default: 150000\n"
-    "hc.max_idle=150000\n"
+    "SIMULATED ANNEALING\n"
+    "\n"
+    "# Initial temperature.\n"
+    "sa.initial_temperature=1.4\n"
+    "\n"
+    "# Temperature's cooling rate.\n"
+    "sa.cooling_rate=0.965\n"
+    "\n"
+    "# Minimum temperature to reach before leave the method.\n"
+    "sa.min_temperature=0.12\n"
+    "\n"
+    "# Decrease the minimum temperature to reach to \n"
+    "# sa.min_temperature * sa.min_temperature_near_best_coeff if near\n"
+    "# the best; the meaning of \"near\" can be customized with sa.near_best_ratio.\n"
+    "sa.min_temperature_near_best_coeff=0.68\n"
+    "\n"
+    "# Consider a solution \"near best\" if the current solution has cost\n"
+    "# equal or less sa.near_best_ratio times the best solution cost.\n"
+    "sa.near_best_ratio=1.05\n"
+    "\n"
+    "# Coefficient for the number of iterations with the same temperature.\n"
+    "# temperature_length = sa.temperature_length_coeff * L * R* * D * S\n"
+    "sa.temperature_length_coeff=0.125\n"
+    "\n"
+    "LOCAL SEARCH\n"
+    "\n"
+    "# Do nothing if the current solution has cost greater than \n"
+    "# ls.max_distance_from_best_ratio times the best solution cost.\n"
+    "ls.max_distance_from_best_ratio=-1\n"
+    "\n"
+    "HILL CLIMBING\n"
     "\n"
     "# Maximum non-improving iterations number.\n"
-    "# Default: 4000\n"
-    "ts.max_idle=4000\n"
+    "hc.max_idle=120000\n"
+    "\n"
+    "# Increase hc.max_idle to hc.max_idle * by hc.max_idle_near_best_coeff\n"
+    "# if near the best (intensification); the meaning of \"near\" can be\n"
+    "# customized with hc.near_best_ratio.\n"
+    "hc.max_idle_near_best_coeff=3\n"
+    "\n"
+    "# Consider a solution \"near best\" if the current solution has cost\n"
+    "# equal or less hc.near_best_ratio times the best solution cost.\n"
+    "hc.near_best_ratio=1.02\n"
+    "\n"
+    "TABU SEARCH\n"
+    "\n"
+    "# Maximum non-improving iterations number.\n"
+    "ts.max_idle=-1\n"
     "\n"
     "# Tabu tenure (number of iterations a move remain banned).\n"
-    "# Default: 80\n"
-    "ts.tabu_tenure=80\n"
+    "ts.tabu_tenure=120\n"
     "\n"
     "# Coefficient of penalty for frequently banned moves.\n"
     "# tt(m) = tt + ts.frequency_penalty_coeff * freq(m)\n"
-    "# Default: 0\n"
     "ts.frequency_penalty_coeff=0\n"
     "\n"
-    "# Maximum non-improving iterations number.\n"
-    "# Default: -1\n"
-    "sa.max_idle=-1\n"
+    "# Increase ts.max_idle to ts.max_idle * by ts.max_idle_near_best_coeff\n"
+    "# if near the best (intensification); the meaning of \"near\" can be\n"
+    "# customized with hc.near_best_ratio.\n"
+    "ts.max_idle_near_best_coeff=1.5\n"
     "\n"
-    "# Initial temperature.\n"
-    "# Default: 1.5\n"
-    "sa.initial_temperature=1.5\n"
-    "\n"
-    "# Temperature's cooling rate.\n"
-    "# Default: 0.995\n"
-    "sa.cooling_rate=0.995\n"
-    "\n"
-    "# Minimum temperature to reach before leave the method.\n"
-    "# Default: 0.10\n"
-    "sa.min_temperature=0.10\n"
-    "\n"
-    "# Coefficient for the number of iterations to do\n"
-    "# using the same temperature.\n"
-    "# temperature_length = sa.temperature_length_coeff * n_lectures\n"
-    "# Default: 1\n"
-    "sa.temperature_length_coeff=1"
+    "# Consider a solution \"near best\" if the current solution has cost\n"
+    "# equal or less ts.near_best_ratio times the best solution cost.\n"
+    "ts.near_best_ratio=1.02"
 ;
 
 typedef enum itc2007_option {
@@ -96,10 +120,13 @@ typedef enum itc2007_option {
     OPTION_MAX_TIME = 't',
     OPTION_CONFIG = 'c',
     OPTION_OPTION = 'o',
-    OPTION_BENCHMARK_MODE = 'b',
+    OPTION_BENCHMARK_FILE = 'b',
     OPTION_RACE_MODE = 'r',
+    OPTION_QUIET = 'q',
     OPTION_DONT_SOLVE = '0',
+    OPTION_PRINT_VIOLATIONS = 'V',
     OPTION_INPUT_SOLUTION = 'i',
+    OPTION_INPUT_SOLUTION_VALIDATE = 'I',
     OPTION_DRAW_ALL_DIRECTORY = 'D',
     OPTION_DRAW_OVERVIEW_FILE = 'd'
 } itc2007_option;
@@ -115,21 +142,34 @@ static struct argp_option options[] = {
         "Load config from FILE" },
   { "option", OPTION_OPTION, "KEY=VALUE", 0,
         "Set an option KEY to VALUE (as if it was specified in a config file)" },
-  { "benchmark", OPTION_BENCHMARK_MODE, NULL, 0,
-        "Benchmark mode: append a line of stats to OUTPUT (instead of writing the solution) with the format <seed> <fingerprint> <cycles> <moves> <feasible> <rc> <mwd> <cc> <rs> <cost>" },
+  { "benchmark", OPTION_BENCHMARK_FILE, "FILE", OPTION_ARG_OPTIONAL,
+        "Benchmark mode: print a line of stats with the format "
+        "<seed> <fingerprint> <cycles> <moves> <feasible> <rc> <mwd> <cc> <rs> <cost> "
+        "and append it to FILE if it is given.\n"
+        "When used with -r, append a line of stats each time a new best solution is found." },
   { "race", OPTION_RACE_MODE, NULL, 0,
-        "Race mode: when a new best is found, it is immediately written to OUTPUT (the solution itself or the stats if -b is given)" },
+        "Race mode: run forever (unless -t is explicitly given).\n"
+        "When a new best solution is found, it is handled immediately "
+        "(and depending on other options is printed to stdout, written to OUTPUT, drawn, etc.)." },
+  { "quiet", OPTION_QUIET, NULL, 0,
+        "Does not print the solution to stdout" },
   { "no-solve", OPTION_DONT_SOLVE, NULL, 0,
-        "Do not solve the model: can be useful with -i to print the cost of a loaded solution, and with -d to it render it" },
+        "Do not solve the model: can be useful with -i to load a solution without solving it" },
+  { "print-violations", OPTION_PRINT_VIOLATIONS, NULL, 0,
+        "Print the costs and the violations of the solution (-VV for print the details of each violation)"},
   { "draw-all", OPTION_DRAW_ALL_DIRECTORY, "DIR", 0,
-        "Draw all the timetables (room, teacher, course, curricula) of the solution and place them in DIR" },
+        "Draw all the timetables (room, teacher, course, curricula) of the solution "
+        "and place them in DIR" },
   { "draw-overview", OPTION_DRAW_OVERVIEW_FILE, "FILE", 0,
         "Draw only the overview timetable of the solution and save it as FILE" },
   { "solution", OPTION_INPUT_SOLUTION, "FILE", 0,
-        "Load the initial solution from FILE instead of find it.\n"
-        "Can be useful to continue the computation from a certain solution, eventually using another method.\n"
-        "Can be also useful with -0 and/or -d to print the cost of a previously computed solution and/or to render its timetable."
-        "For print only the cost of a solution (as a validator) without use the solver, use -0i FILE." },
+        "Load the initial solution from FILE instead of find it. "
+        "Can be useful to continue the computation from a previously computed solution (eventually using another method). "
+        "For print only the costs and the violations of a solution (as a validator) "
+        "without use the solver, use -0VVqi FILE."},
+  { "validate", OPTION_INPUT_SOLUTION_VALIDATE, "FILE", 0,
+        "Print only the costs and the violations of a solution in FILE (as a validator).\n"
+        "Alias for -0VVqi FILE."},
   { NULL }
 };
 
@@ -176,14 +216,21 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
     case OPTION_OPTION:
         g_array_append_val(args->options, arg);
         break;
-    case OPTION_BENCHMARK_MODE:
+    case OPTION_BENCHMARK_FILE:
         args->benchmark_mode = true;
+        args->benchmark_file = arg;
         break;
     case OPTION_RACE_MODE:
         args->race_mode = true;
         break;
+    case OPTION_QUIET:
+        args->quiet = true;
+        break;
     case OPTION_DONT_SOLVE:
         args->dont_solve = true;
+        break;
+    case OPTION_PRINT_VIOLATIONS:
+        args->print_violations++;
         break;
     case OPTION_DRAW_ALL_DIRECTORY:
         args->draw_all_directory = arg;
@@ -193,6 +240,14 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
         break;
     case OPTION_INPUT_SOLUTION:
         args->solution_input_file = arg;
+        break;
+    case OPTION_INPUT_SOLUTION_VALIDATE:
+        // Alias for -0VVqi
+        parse_option(OPTION_DONT_SOLVE, NULL, state);
+        parse_option(OPTION_PRINT_VIOLATIONS, NULL, state);
+        parse_option(OPTION_PRINT_VIOLATIONS, NULL, state);
+        parse_option(OPTION_QUIET, NULL, state);
+        parse_option(OPTION_INPUT_SOLUTION, arg, state);
         break;
     case ARGP_KEY_ARG:
         switch (state->arg_num) {

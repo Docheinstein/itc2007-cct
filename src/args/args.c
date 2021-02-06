@@ -12,8 +12,10 @@ char *args_to_string(const args *args) {
         "config = %s\n"
         "options = %s\n"
         "benchmark_mode = %s\n"
+        "benchmark_file = %s\n"
         "race_mode = %s\n"
         "dont_solve = %s\n"
+        "print_violations = %s\n"
         "draw_all_directory = %s\n"
         "draw_overview_file = %s\n"
         "input_solution = %s",
@@ -25,8 +27,10 @@ char *args_to_string(const args *args) {
         args->config_file,
         options_str,
         booltostr(args->benchmark_mode),
+        args->benchmark_file,
         booltostr(args->race_mode),
         booltostr(args->dont_solve),
+        booltostr(args->print_violations),
         args->draw_all_directory,
         args->draw_overview_file,
         args->solution_input_file
@@ -46,8 +50,11 @@ void args_init(args *args) {
     args->config_file = NULL;
     args->options = g_array_new(false, false, sizeof(char *));
     args->benchmark_mode = false;
+    args->benchmark_file = NULL;
     args->race_mode = false;
+    args->quiet = false;
     args->dont_solve = false;
+    args->print_violations = 0;
     args->draw_all_directory = NULL;
     args->draw_overview_file = NULL;
     args->solution_input_file = NULL;

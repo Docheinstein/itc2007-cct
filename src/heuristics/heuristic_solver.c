@@ -47,7 +47,7 @@ void heuristic_solver_stats_init(heuristic_solver_stats *stats) {
     stats->move_count = 0;
     stats->best_restored_count = 0;
     stats->methods = NULL;
-    stats->starting_time = ms();
+    stats->starting_time = LONG_MAX;
     stats->best_solution_time = LONG_MAX;
     stats->ending_time = LONG_MAX;
 }
@@ -88,24 +88,25 @@ static bool generate_feasible_solution_if_needed(
 
     if (solver_conf->starting_solution) {
         // If a starting solution is given, start always from it
+        verbose2("Starting from loaded solution...");
         solution_copy(state->current_solution, solver_conf->starting_solution);
-        return true;
+    } else {
+        // Generate a new initial solution
+        verbose2("Finding initial feasible solution...");
+        feasible_solution_finder finder;
+        feasible_solution_finder_init(&finder);
+
+        solution_clear(state->current_solution);
+
+        if (!feasible_solution_finder_find(&finder, finder_conf, state->current_solution))
+            // Cannot find feasible solution (probably timed-out)
+            return false;
     }
-
-    // Generate a new initial solution
-    verbose2("Finding initial feasible solution...");
-    feasible_solution_finder finder;
-    feasible_solution_finder_init(&finder);
-
-    solution_clear(state->current_solution);
-
-    if (!feasible_solution_finder_find(&finder, finder_conf, state->current_solution))
-        // Cannot find feasible solution (probably timed-out)
-        return false;
 
     // A new feasible solution have been generated
     state->current_cost = solution_cost(state->current_solution);
-    verbose2("Found initial feasible solution of cost = %d", state->current_cost);
+    verbose2("Starting from solution of cost = %d", state->current_cost);
+
     heuristic_solver_state_update(state);
     return true;
 }
@@ -186,11 +187,13 @@ bool heuristic_solver_solve(heuristic_solver *solver,
         state->stats->methods[i].trend.best.after = g_array_new(false, false, sizeof(int));
     }
 
+    state->stats->starting_time = ms();
 
     long now;
 
     if (solver_conf->dont_solve) {
         generate_feasible_solution_if_needed(solver_conf, finder_conf, state);
+        state->stats->ending_time = ms();
         goto QUIT;
     }
 

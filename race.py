@@ -3,10 +3,16 @@ import sys
 from pathlib import Path
 
 """
-Start a race: run the solver for unlimited time in order to find the best.
+Start a race.
+Run the solver for unlimited time in order 
+to find the best possible solution.
 
 Usage:
-    python race.py INPUT OUTPUT
+    python race.py INPUT OUTPUT [LOG]
+
+e.g.
+    python race.py datasets/comp02.ctt results/races/comp02.ctt.sol 
+    python race.py datasets/comp02.ctt results/races/comp02.ctt.sol results/races/comp02.ctt.sol.log
 """
 
 executable = Path("build/itc2007-cct")
@@ -24,6 +30,7 @@ if __name__ == "__main__":
 
     dataset = Path(sys.argv[1])
     output = Path(sys.argv[2])
+    output_log = Path(sys.argv[3]) if len(sys.argv) >= 4 else ""
 
     if not dataset.exists():
         print(f"ERROR: '{dataset.absolute()}' not found")
@@ -31,7 +38,8 @@ if __name__ == "__main__":
 
     print("=============== RACE ================")
     print(f"Input:          {dataset}")
-    print(f"Estimated time: {output}")
+    print(f"Output:         {output}")
+    print(f"Log:            {output_log}")
     print("=====================================")
 
-    subprocess.run([str(executable), str(dataset), str(output), "-r"])
+    subprocess.run([str(executable), str(dataset), str(output), "-qr", f"-b{output_log}"])

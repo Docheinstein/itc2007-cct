@@ -95,14 +95,6 @@ cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-DDEBUG=1" ..
 make
 ```
 
-To build with `debug2` statements enabled (more verbose):
-```
-mkdir -p build-debug2
-cd build-debug2
-cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-DDEBUG=2" ..
-make
-```
-
 To build with `assert` statements enabled (very slow):
 ```
 mkdir -p build-assert
@@ -112,23 +104,25 @@ make
 ```
 
 
-## Usage
+## Usage examples
 
 Solve the instance `datasets/comp01.ctt` with default settings 
-(Hill Climbing + Simulated Annealing):
+(Simulated Annealing + Local Search) for 60 seconds and write 
+the solution to `/tmp/sol`:
 ```
 build/itc2007-cct datasets/comp01.ctt /tmp/sol
 ```
 
 Solve the instance `datasets/comp01.ctt` with default settings for 
-120 seconds with verbose statements and seed 2488295934:
+120 seconds with verbose statements and seed 2488295934 and write
+the solution to `/tmp/sol~:
 ```
 build/itc2007-cct datasets/comp01.ctt /tmp/sol -t 120 -s 2488295934 -v
 ```
 
 Solve the instance `datasets/comp01.ctt` and render the solution to `/tmp/sol.png`:
 ```
-build/itc2007-cct datasets/comp01.ctt /tmp/sol -d /tmp/sol.png
+build/itc2007-cct datasets/comp01.ctt -d /tmp/sol.png
 ```
 
 Solve with different methods/parameters given in config file (e.g. HC only):
@@ -138,17 +132,29 @@ build/itc2007-cct datasets/comp01.ctt /tmp/sol -c configs/hc.conf
 
 Solve with different methods/parameters given at command line (e.g. SA only):
 ```
-build/itc2007-cct datasets/comp01.ctt /tmp/sol -osolver.methods=sa -osa.cooling_rate=0.99 -osa.initial_temperature=1.4
+build/itc2007-cct datasets/comp01.ctt /tmp/sol -osolver.methods=sa
 ```
 
-Load a solution and print the costs without solve it (act as a validator):
+Load the solution `/tmp/comp01.ctt.sol` and print the costs/violations without solve it (as a validator):
 ```
-build/itc2007-cct datasets/comp01.ctt -0i /tmp/sol
+build/itc2007-cct datasets/comp01.ctt -I /tmp/comp01.ctt.sol
+```
+
+Solve the instance `datasets/comp01.ctt` in race mode: write 
+the solution to `/tmp/comp01.ctt.sol` as soon as a new best is found:
+```
+build/itc2007-cct datasets/comp01.ctt /tmp/comp01.ctt.sol -r
+```
+
+Solve the instance `datasets/comp01.ctt`, write the solution to
+`/tmp/comp01.ctt.sol` and append a line of benchmark stats to `/tmp/comp01.ctt.bench`
+```
+build/itc2007-cct datasets/comp01.ctt /tmp/comp01.ctt.sol -b /tmp/comp01.ctt.bench
 ```
 
 ## Benchmarks
 
-Benchmarks can be found in `benchmarks` folder and are produced with the `benchmark.py` script.  
+Benchmarks can be found in `results/benchmarks` folder and are produced with the `benchmark.py` script.  
 
 For perform all the benchmarks:
 ```
@@ -160,7 +166,19 @@ For a specific benchmark:
 python benchmark.py comp03-sa
 ```
 
-For see the stats of the benchmarks in `benchmarks` folder:
+For see the stats of the benchmarks in `results/benchmarks` folder:
 ```
 python stats.py
 ```
+
+Best solutions found so far.
+
+| Instance    | Cost |
+| ----------- |:----:|
+| `comp01`    | 5    |
+| `comp02`    | 36   |
+| `comp03`    | 66   |
+| `comp04`    | 38   |
+| `comp05`    | 328  |
+| `comp06`    | 41   |
+| `comp07`    | 17   |

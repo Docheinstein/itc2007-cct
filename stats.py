@@ -10,9 +10,12 @@ are taken into account.
 
 Usage:
     python stats.py [FILTER]
+e.g.
+    python stats.py
+    python stats.py comp02
 """
 
-benchmarks_folder = "benchmarks"
+benchmarks_folder = "results/benchmarks"
 
 
 def values_subset(values):

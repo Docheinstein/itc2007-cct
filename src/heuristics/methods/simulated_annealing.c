@@ -11,15 +11,9 @@
 
 void simulated_annealing_params_default(simulated_annealing_params *params) {
     params->initial_temperature = 1.4;
-//    params->initial_temperature = 1.3;
-//    params->cooling_rate = 0.965;
-//    params->temperature_length_coeff = 50;
     params->cooling_rate = 0.965;
     params->temperature_length_coeff = 0.125;
-//    params->temperature_length_coeff = 0.2;
-//    params->min_temperature = 0.11;
     params->min_temperature = 0.12;
-//    params->min_temperature_near_best_coeff = 0.72;
     params->min_temperature_near_best_coeff = 0.68;
     params->near_best_ratio = 1.05;
     params->reheat_coeff = 1.015;

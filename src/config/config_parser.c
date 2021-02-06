@@ -138,7 +138,6 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
     if (streq(key, "sa.reheat_coeff"))
         return PARSE_DOUBLE(value, &cfg->sa.reheat_coeff);
 
-
     print("WARN: unexpected key, skipping '%s'", key);
 
 #undef PARSE_LONG

@@ -696,6 +696,7 @@ char *solution_quality_to_string(const solution *sol, bool verbose) {
     size_t strsize;
 
     if (verbose)
+        // Allocate str if there is something to dump (verbose=true)
         strappend_realloc(&str, &strsize, "");
 
     int h1 = solution_lectures_violations_dump(sol, &str, &strsize);
@@ -707,7 +708,7 @@ char *solution_quality_to_string(const solution *sol, bool verbose) {
     int s3 = solution_curriculum_compactness_cost_dump(sol, &str, &strsize);
     int s4 = solution_room_stability_cost_dump(sol, &str, &strsize);
 
-    strappend_realloc(&str, &strsize, str ? "\n" : "");
+    strappend_realloc(&str, &strsize, !strempty(str) ? "\n" : "");
 
     strappend_realloc(&str, &strsize,
         "Violations (%d)\n"

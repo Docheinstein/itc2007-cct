@@ -1,5 +1,6 @@
 #include "solution_parser.h"
 #include <stdlib.h>
+#include <log/verbose.h>
 #include "utils/io_utils.h"
 #include "utils/str_utils.h"
 #include "utils/mem_utils.h"
@@ -101,7 +102,7 @@ static char * solution_parser_line_handler(const char *line, void *arg) {
 
     int l = state->courses_l_cursor[c]++;
     if ((c < C - 1 && l >= state->courses_l_cursor[c + 1]) || l > model->n_lectures) {
-        error = strmake("unexpected lecture count, unable to parse unfeasible solution", fields[3]);
+        error = strmake("unexpected lecture count, unable to parse this unfeasible solution", fields[3]);
         goto QUIT;
     }
 
@@ -125,7 +126,11 @@ bool solution_parser_parse(solution_parser *parser,
     parser->error = fileparse(filename, NULL, solution_parser_line_handler, &arg);
     solution_parser_state_destroy(parser->_state);
 
-    return strempty(parser->error);
+    bool success = strempty(parser->error);
+    if (success) {
+        verbose("Input solution '%s' parsed successfully.", filename);
+    }
+    return success;
 }
 
 const char *solution_parser_get_error(solution_parser *solution_parser) {
