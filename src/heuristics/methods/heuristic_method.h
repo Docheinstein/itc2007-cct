@@ -9,6 +9,7 @@ typedef enum heuristic_method {
     HEURISTIC_METHOD_TABU_SEARCH,
     HEURISTIC_METHOD_HILL_CLIMBING,
     HEURISTIC_METHOD_SIMULATED_ANNEALING,
+    HEURISTIC_METHOD_DEEP_LOCAL_SEARCH,
 } heuristic_method;
 
 const char * heuristic_method_to_string(heuristic_method method);

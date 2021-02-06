@@ -149,7 +149,7 @@ build/itc2007-cct datasets/comp01.ctt /tmp/comp01.ctt.sol -r
 Solve the instance `datasets/comp01.ctt`, write the solution to
 `/tmp/comp01.ctt.sol` and append a line of benchmark stats to `/tmp/comp01.ctt.bench`
 ```
-build/itc2007-cct datasets/comp01.ctt /tmp/comp01.ctt.sol -b /tmp/comp01.ctt.bench
+build/itc2007-cct datasets/comp01.ctt /tmp/comp01.ctt.sol -b/tmp/comp01.ctt.bench
 ```
 
 ## Benchmarks
@@ -178,7 +178,7 @@ Best solutions found so far.
 | `comp01`    | 5    |
 | `comp02`    | 36   |
 | `comp03`    | 66   |
-| `comp04`    | 38   |
-| `comp05`    | 328  |
+| `comp04`    | 37   |
+| `comp05`    | 305  |
 | `comp06`    | 41   |
 | `comp07`    | 17   |

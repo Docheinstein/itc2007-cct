@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <glib.h>
+#include <heuristics/methods/deep_local_search.h>
 #include "heuristics/methods/heuristic_method.h"
 #include "heuristics/heuristic_solver.h"
 #include "heuristics/methods/local_search.h"
@@ -21,6 +22,7 @@ typedef struct config {
         int restore_best_after_cycles;
     } solver;
     feasible_solution_finder_config finder;
+    deep_local_search_params dls;
     local_search_params ls;
     hill_climbing_params hc;
     tabu_search_params ts;

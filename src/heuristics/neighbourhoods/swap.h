@@ -44,6 +44,8 @@ typedef struct swap_result {
     } delta;
 } swap_result;
 
+int swap_neighbourhood_maximum_size(const model *m);
+
 void swap_iter_init(swap_iter *iter, const solution *sol);
 void swap_iter_destroy(swap_iter *iter);
 bool swap_iter_next(swap_iter *iter);

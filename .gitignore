@@ -2,3 +2,6 @@
 /build*/
 /cmake-build-debug/
 /.tmp/
+/docs/latex/*
+!/docs/latex/itc2007.tex
+!/docs/latex/itc2007.bib

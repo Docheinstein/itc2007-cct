@@ -97,7 +97,7 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
     tabu_list_init(&tabu, state->model,
                    params->tabu_tenure, params->frequency_penalty_coeff);
 
-    swap_move *moves = mallocx(tabu.model->n_lectures * R * D * S, sizeof(swap_move));
+    swap_move *moves = mallocx(swap_neighbourhood_maximum_size(model), sizeof(swap_move));
     struct {
         int n_banned_moves;
         int n_side_moves;

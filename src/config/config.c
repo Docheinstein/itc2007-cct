@@ -34,7 +34,8 @@ char *config_to_string(const config *cfg) {
         "sa.min_temperature = %.5f\n"
         "sa.min_temperature_near_best_coeff = %.5f\n"
         "sa.near_best_ratio = %.5f\n"
-        "sa.reheat_coeff = %.5f",
+        "sa.reheat_coeff = %.5f\n"
+        "dls.max_distance_from_best_ratio = %.4f",
         solver_methods,
         cfg->solver.max_time,
         cfg->solver.max_cycles,
@@ -61,7 +62,9 @@ char *config_to_string(const config *cfg) {
         cfg->sa.min_temperature,
         cfg->sa.min_temperature_near_best_coeff,
         cfg->sa.near_best_ratio,
-        cfg->sa.reheat_coeff
+        cfg->sa.reheat_coeff,
+        // ---
+        cfg->dls.max_distance_from_best_ratio
     );
 
     free(solver_methods);
@@ -81,6 +84,7 @@ void config_init(config *cfg) {
     hill_climbing_params_default(&cfg->hc);
     tabu_search_params_default(&cfg->ts);
     simulated_annealing_params_default(&cfg->sa);
+    deep_local_search_params_default(&cfg->dls);
 }
 
 void config_destroy(config *cfg) {

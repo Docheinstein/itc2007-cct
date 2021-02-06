@@ -62,8 +62,10 @@ static void config_parser_add_method(config *cfg, const char *method) {
         m = HEURISTIC_METHOD_HILL_CLIMBING;
     else if (streq(method, "sa"))
         m = HEURISTIC_METHOD_SIMULATED_ANNEALING;
+    else if (streq(method, "dls"))
+        m = HEURISTIC_METHOD_DEEP_LOCAL_SEARCH;
     else {
-        print("WARN: unexpected method, skipping '%s' (possible values are 'ls', 'ts', 'hc', 'sa'", method);
+        print("WARN: unexpected method, skipping '%s' (possible values are 'ls', 'ts', 'hc', 'sa', 'dls'", method);
         return;
     }
 
@@ -137,6 +139,9 @@ static char * config_parser_key_value_handler(config *cfg, char *key, char *valu
         return PARSE_DOUBLE(value, &cfg->sa.near_best_ratio);
     if (streq(key, "sa.reheat_coeff"))
         return PARSE_DOUBLE(value, &cfg->sa.reheat_coeff);
+
+    if (streq(key, "dls.max_distance_from_best_ratio"))
+        return PARSE_DOUBLE(value, &cfg->dls.max_distance_from_best_ratio);
 
     print("WARN: unexpected key, skipping '%s'", key);
 

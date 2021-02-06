@@ -301,6 +301,9 @@ int main (int argc, char **argv) {
         } else if (method == HEURISTIC_METHOD_SIMULATED_ANNEALING) {
             heuristic_solver_config_add_method(&solver_conf, simulated_annealing,
                                                &cfg.sa, method_name, method_short_name);
+        } else if (method == HEURISTIC_METHOD_DEEP_LOCAL_SEARCH) {
+            heuristic_solver_config_add_method(&solver_conf, deep_local_search,
+                                               &cfg.dls, method_name, method_short_name);
         }
     }
 

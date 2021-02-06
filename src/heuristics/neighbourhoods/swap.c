@@ -587,6 +587,11 @@ bool swap_perform(solution *sol, const swap_move *move,
     return false;
 }
 
+int swap_neighbourhood_maximum_size(const model *m) {
+    MODEL(m);
+    return L * R * D * S;
+}
+
 //bool swap_extended(solution *sol, const swap_move *mv,
 //                   neighbourhood_predict_feasibility_strategy predict_feasibility,
 //                   neighbourhood_predict_cost_strategy predict_cost,

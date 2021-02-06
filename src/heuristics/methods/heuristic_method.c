@@ -12,6 +12,8 @@ const char *heuristic_method_to_string(heuristic_method method) {
         return "Hill Climbing";
     case HEURISTIC_METHOD_SIMULATED_ANNEALING:
         return "Simulated Annealing";
+    case HEURISTIC_METHOD_DEEP_LOCAL_SEARCH:
+        return "Deep Local Search";
     default:
         return "?";
     }
@@ -29,6 +31,8 @@ const char *heuristic_method_to_string_short(heuristic_method method) {
         return "hc";
     case HEURISTIC_METHOD_SIMULATED_ANNEALING:
         return "sa";
+    case HEURISTIC_METHOD_DEEP_LOCAL_SEARCH:
+        return "dls";
     default:
         return "?";
     }
