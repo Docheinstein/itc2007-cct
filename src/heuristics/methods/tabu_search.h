@@ -9,11 +9,11 @@
  * (chosen at random if more than one exists).
  * After that, the (room, day, slot) assignment of the courses
  * moved by the swap move is stored into the tabu_list and therefore
- * the lectures of these courses cannot came back to the same
+ * the lectures of these courses cannot come back to the same
  * (room, day, slot) within the  next `tabu_tenure` iterations.
  *
  * `frequency_penalty_coeff` increases the ban time of a move
- *      by `frequency_penalty_coeff` * count(move)
+ *      by `frequency_penalty_coeff` * freq(move)
  */
 
 typedef struct tabu_search_params {

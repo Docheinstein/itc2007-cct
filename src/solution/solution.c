@@ -1,4 +1,5 @@
 #include "solution.h"
+#include <errno.h>
 #include "utils/str_utils.h"
 #include "utils/io_utils.h"
 #include "utils/assert_utils.h"

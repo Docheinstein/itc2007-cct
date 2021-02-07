@@ -74,27 +74,25 @@ RoomStability: All lectures of a course should be given in the same room. Each d
 
 #include <stdlib.h>
 #include <stdbool.h>
-#include <utils/io_utils.h>
-#include <utils/rand_utils.h>
 #include <time.h>
+#include <sys/time.h>
+#include "utils/io_utils.h"
+#include "utils/rand_utils.h"
+#include "utils/time_utils.h"
 #include "args/args_parser.h"
-#include "log/verbose.h"
 #include "model/model_parser.h"
 #include "solution/solution.h"
+#include "solution/solution_parser.h"
 #include "renderer/renderer.h"
+#include "log/verbose.h"
 #include "log/debug.h"
-#include <sys/time.h>
 #include "heuristics/heuristic_solver.h"
-
-#include <heuristics/methods/hill_climbing.h>
-#include <config/config_parser.h>
-#include <heuristics/methods/tabu_search.h>
-#include <heuristics/methods/simulated_annealing.h>
-#include <config/config.h>
-#include <solution/solution_parser.h>
-#include <heuristics/methods/local_search.h>
-#include <utils/time_utils.h>
-#include <utils/str_utils.h>
+#include "heuristics/methods/hill_climbing.h"
+#include "heuristics/methods/tabu_search.h"
+#include "heuristics/methods/simulated_annealing.h"
+#include "heuristics/methods/local_search.h"
+#include "config/config_parser.h"
+#include "config/config.h"
 
 static void handle_new_best_solution(const solution *sol,
                                      const heuristic_solver_stats *stats,
@@ -120,7 +118,6 @@ static void handle_new_best_solution(const solution *sol,
     debug("do_write_sol = %s", booltostr(do_write_sol));
     debug("do_print_stats = %s", booltostr(do_print_stats));
     debug("do_write_stats = %s", booltostr(do_write_stats));
-
 
     // Print the solution
     if (do_print_sol) {
@@ -169,7 +166,6 @@ static void handle_new_best_solution(const solution *sol,
         if (do_print_stats)
             printf("%s", stats_output);
     }
-
 
     verbose("Solution fingerprint: %llu", fingerprint);
 
@@ -312,6 +308,8 @@ int main (int argc, char **argv) {
 
     heuristic_solver_stats stats;
     heuristic_solver_stats_init(&stats);
+
+    // Actual call to the solver
     solution_loaded = heuristic_solver_solve(&solver, &solver_conf, &cfg.finder,
                                              &sol, &stats);
 

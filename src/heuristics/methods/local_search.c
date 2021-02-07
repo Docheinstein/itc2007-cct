@@ -1,6 +1,6 @@
-#include <heuristics/neighbourhoods/swap.h>
-#include <math.h>
 #include "local_search.h"
+#include <math.h>
+#include "heuristics/neighbourhoods/swap.h"
 #include "utils/mem_utils.h"
 #include "timeout/timeout.h"
 

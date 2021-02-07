@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include <cairo.h>
+#include <errno.h>
 #include "log/debug.h"
 #include "log/verbose.h"
 #include "utils/rand_utils.h"

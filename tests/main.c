@@ -1,10 +1,13 @@
 #include <glib.h>
 #include <stdio.h>
+#include <utils/io_utils.h>
+#include <heuristics/neighbourhoods/swap.h>
 #include "renderer/renderer.h"
 #include "heuristics/neighbourhoods/swap.h"
 #include "utils/array_utils.h"
 #include "utils/str_utils.h"
 #include "utils/os_utils.h"
+#include "utils/rand_utils.h"
 #include "model/model_parser.h"
 #include "solution/solution_parser.h"
 #include "solution/solution.h"
@@ -546,6 +549,11 @@ GLIB_TEST_ARG(test_swap_cost) {
                      NEIGHBOURHOOD_PREDICT_FEASIBILITY_NEVER,
                      NEIGHBOURHOOD_PREDICT_COST_ALWAYS,
                      &result);
+//        print("Moving %s from (%s,%d,%d) to (%s,%d,%d) - cost (rc=%d, mwd=%d, cc=%d, rs=%d)",
+//              model->courses[mv.helper.c1].id, model->rooms[mv.helper.r1].id, mv.helper.d1, mv.helper.s1,
+//              model->rooms[mv.r2].id, mv.d2, mv.s2,
+//              result.delta.room_capacity_cost, result.delta.min_working_days_cost,
+//              result.delta.curriculum_compactness_cost, result.delta.room_stability_cost);
         swap_perform(&s, &mv, NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
         g_assert_cmpint(rc + result.delta.room_capacity_cost, ==, solution_room_capacity_cost(&s));
         g_assert_cmpint(mwd + result.delta.min_working_days_cost, ==, solution_min_working_days_cost(&s));
@@ -562,9 +570,23 @@ GLIB_TEST_ARG(test_swap_cost) {
 
 
 int main(int argc, char *argv[]) {
-    set_verbosity(0);
+    set_verbosity(0  );
+
+    unsigned int my_seed;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    my_seed = ts.tv_nsec ^ ts.tv_sec;
+
+    for (int i = 0; i < argc - 1; i++) {
+        if (streq(argv[i], "--my-seed"))
+            if (!strtouint(argv[i + 1], &my_seed))
+                my_seed = ts.tv_nsec ^ ts.tv_sec;
+    }
+    rand_set_seed(my_seed);
+    printf("# my seed: %u\n", my_seed);
 
     g_test_init(&argc, &argv, NULL);
+
     GLIB_ADD_TEST("/str/strpos", test_strpos);
     GLIB_ADD_TEST("/str/strltrim", test_strltrim);
     GLIB_ADD_TEST("/str/strrtrim", test_strrtrim);
@@ -668,6 +690,12 @@ int main(int argc, char *argv[]) {
         .trials = 50000
     };
     GLIB_ADD_TEST_ARG("/itc/swap_cost/comp04", test_swap_cost, &_13);
+
+    test_swap_cost_params _14 = {
+        .model_file = "datasets/comp07.ctt",
+        .trials = 50000
+    };
+    GLIB_ADD_TEST_ARG("/itc/swap_cost/comp07", test_swap_cost, &_14);
 
     g_test_run();
 }

@@ -3,6 +3,7 @@
 \usepackage{amsmath}
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{multirow}
+\usepackage{enumerate}
 
 \usepackage[utf8]{inputenc}
 \usepackage[italian]{babel}
@@ -20,7 +21,7 @@
 
 % quote with \q{}
 \newcommand{\q}[1]{``#1''}
-\newcommand{\E}{È}
+\newcommand{\E}{È }
 % algorithm2e stuff
 \newcommand{\assign}[0]{ $\leftarrow$ }
 \SetKwProg{Func}{function}{:}{end}
@@ -47,25 +48,33 @@
 
 \begin{abstract}
 
-Il presente documento descrive l'analisi e la progettazione di un risolutore facente uso di diverse metaeuristiche per la risoluzione della Traccia n. 3 della International Timetabling Competition del 2007 \cite{bib:itc2007}.
+Questa relazione descrive l'analisi e la progettazione di un algoritmo facente uso di diverse metaeuristiche per la risoluzione della Traccia 3 (\textit{Curriculum Course Timetabling}) della competizione International Timetabling Competition 2007 \cite{bib:itc2007}.
 
 \end{abstract}
 
 \section{Introduzione}
 
-\section{Traccia}
-Il problema definito \textit{Curriculum Course Timetabling} consiste nel trovare per ogni lezione di ogni corso un assegnamento di aula, giorno ed orario che non violi i quattro vincoli $H1$, $H2$, $H3$, $H4$ (\textit{Hard Constraints}), minimizzando il costo introdotto dai vincoli $S1$, $S2$, $S3$, $S4$ (\textit{Soft Constraints}).
+Nelle sezioni che seguono sono descritte la traccia del problema, il modello formale dedotto da essa, un algoritmo per la costruzione di una soluzione iniziale ammissibile, la descrizione del neighbourhood adottato e l'implementazione di diverse metaeuristiche che ne facessero uso per fornire una soluzione di costo ridotto.
 
-Si riporta di seguito la Traccia n.3 (Curriculum Based Course Timetabling)  proposta all'ITC2007:
+Infine, i risultati forniti dall'algoritmo sviluppato sono stati confrontati con i risultati ottenuti dai partecipanti dell'ITC2007.
+
+\section{Traccia}
+Il problema \textit{Curriculum Course Timetabling} è riportato integralmente nei paragrafi che seguono e può essere così riassunto:
+
+Dato un insieme di corsi $C$, per ogni corso $c \in C$ è definito un numero di lezioni $l_c$ che devono essere assegnate fra le varie aule $r \in R$ nei diversi periodi della settimana, definiti dalla coppia ($d \in D$, $s \in S$).
+Una soluzione al problema consiste nel trovare un assegnamento ($r$, $d$, $s$) per ogni lezione di ogni corso in modo da non violare nessuno degli \textit{Hard Constraints} imposti dalla traccia (H1, H2, H3, H4), minimizzando il costo introdotto dai \textit{Soft Constraints} (S1, S2, S3, S4).
+
+\vspace{10pt}
+Si riporta di seguito la traccia completa:
 
 \vspace{10pt}
 \noindent
-The Curriculum-based timetabling problem consists of the weekly scheduling of the lectures
+The Curriculum-based timetabling problem consists of the weekly scheduling of the lecturesEntità
 for several university courses within a given number of rooms and time periods, where conflicts
 between courses are set according to the curricula published by the University and not on the
 basis of enrolment data.
 
-\subsection{Entità}
+\subsection{Entities}
 
 \hangpara{1em}{1}
 \textbf{Days, Timeslots, and Periods.} We are given a number of teaching days in the week (typically 5 or 6). 
@@ -137,10 +146,10 @@ Each distinct room used for the lectures of a course, but the first, counts as 1
 
 \section{Modello}
 
-Il primo step compiuto dopo l'analisi del problema è stata la definizione formale del problema mediante un modello matematico. Seppure non strettamente necessario allo sviluppo del risolutore facente uso di metaeuristiche, definire un modello formale ha consentito l'acquisizione una maggiore conoscenza del problema, su cui è stato possibile sviluppare in modo più agevole.
+Il primo passo compiuto in seguito all'analisi della traccia è stata la definizione formale del problema mediante modello matematico. Seppure non strettamente necessario allo sviluppo del risolutore facente uso di metaeuristiche, definire un modello formale ha consentito di acquisire una maggiore conoscenza del problema, permettendo di sviluppare l'algoritmo in modo più agevole.
 
 A scopo didattico e per verificarne la correttezza, il modello è stato anche implementato mediante l'ottimizzatore \textit{Gurobi}.
-Data la complessità del problema (\textit{MIQP}, in particolare con il vincolo $S2$ quadratico), \textit{Gurobi} è stato in grado di fornire la soluzione ottima in tempo ragionevole solo per le istanze più facili del problema (in particolare, solo \texttt{toy.ctt}  e \texttt{comp01.ctt}); questo giustifica lo sviluppo di un risolutore non esatto.
+Come prevedibile, data l'elevata complessità del problema, \textit{Gurobi} è stato in grado di fornire la soluzione ottima in tempo ragionevole solo per le istanze più facili del problema (\texttt{toy}  e \texttt{comp01}); questo giustifica lo sviluppo di un risolutore non esatto.
 
 \subsection{Simboli}
 
@@ -250,12 +259,12 @@ Il corso $c$ può essere assegnato nel giorno $d$, slot $s$ solo se è possibile
 \end{itemize}
 
 
-\paragraph{Funzione obbiettivo} \mbox{}\\
+\subsection{Funzione obbiettivo}
 
-\hangpara{1em}{1}
-La funziona obbiettivo da minimizzare è la somma pesata dei \textit{Soft Constraints}.
+La funzione obbiettivo $f$ da minimizzare rispetto ad una soluzione X è la somma pesata dei \textit{Soft Constraints}.
 
 \[ \min f(X) \]
+\vspace{6pt}
 \[ 
 \begin{split}
 f(X) =  \alpha_1 \sum_{c \in C} \: \sum_{r \in R} \: \sum_{d \in D} \sum_{s \in S}  S1(c,r,d,s) +  \alpha_2 \sum_{c \in C} S2(c) + \\
@@ -295,7 +304,7 @@ Se le lezioni del corso $c$ non sono distribuite in almeno $mwd_c$ giorni, è in
 \begin{itemize}
 	\item \textbf{S3: CurriculumCompactness} \mbox{}\\	
 	
-Se le lezioni dei corsi appartenenti al curriculum $q$ assegnate al giorno $d$, slot $s$,  non hanno lezioni negli slot adiacenti, è introdotta una penalità per ognuna di esse.
+Se le lezioni dei corsi appartenenti al curriculum $q$ assegnate nel giorno $d$, slot $s$,  non hanno lezioni dello stesso curriculum $q$ negli slot adiacenti, è introdotta una penalità per ognuna di esse.
 	\[ S3(q,d,s) =  u_{qds} \cdot ind_3(q,d,s)  \]
 	\[ 
 		ind_3(q,d,s) = 
@@ -323,13 +332,13 @@ Se il corso $c$ ha lezioni assegnate in più di un'aula, una penalità è introd
 \end{itemize}
 
 \section{Algoritmo}
-L'algoritmo sviluppato prevede dapprima la costruzione di una soluzione ammissibile per la quale sono tenuti in considerazione solamente gli \textit{Hard Constraints} ed in seguito l'uso di una o più metaeuristiche che, eseguendo mosse del \textit{neighbourhood}, consentono di minimizzare il costo $f(X$) della soluzione.
+L'algoritmo sviluppato prevede innanzitutto la costruzione di una soluzione ammissibile (per la quale sono tenuti in considerazione solamente gli \textit{Hard Constraints}) ed in seguito l'uso di una o più metaeuristiche che eseguendo mosse del \textit{neighbourhood} consentono di minimizzare il costo $f(X$) della soluzione.
 
 \subsection{Costruzione di una soluzione ammissibile}
-La prima fase dell'algoritmo consiste nella costruzione di una iniziale soluzione iniziale ammissibile (che rispetti gli \textit{Hard Constraints} $H1$, $H2$, $H3$, $H4$).
+La prima fase dell'algoritmo consiste nella costruzione di una iniziale soluzione iniziale ammissibile (che rispetti gli \textit{Hard Constraints} H1, H2, H3, H4).
 
-Una prima idea per costruire una soluzione ammissibile è un processo \textit{greedy} che consiste nell'assegnare, per ognuna delle $l_c$ lezioni di ogni corso $c$, la prima terna (aula, giorno, slot) disponibile che non violi nessuno degli \textit{Hard Constraints}, rimuovendo poi tale terna da quelle ancora assegnabili.
-Se le terne (aula, giorno, slot) assegnabili si esauriscono prima delle lezioni, il processo di costruzione fallisce.
+La prima idea formulata per la costruzione di una soluzione ammissibile è un algoritmo \textit{greedy} che consiste nell'assegnare, per ognuna delle $l_c$ lezioni di ogni corso $c$, la prima terna (aula, giorno, slot) disponibile che non violi nessuno degli \textit{Hard Constraints}, rimuovendo poi tale terna da quelle ancora assegnabili.
+Se una lezione non può essere assegnata a nessuna delle terne (aula, giorno, slot) rimanenti senza violare un \textit{Hard Constraint}, il processo di costruzione fallisce.
 
 Nella sua forma descritta, il processo di costruzione si è dimostrato fallire frequentemente per istanze medio/difficili.
 \E stata quindi introdotta una modifica che ha consentito di fornire una soluzione ammissibile con alta probabilità: assegnare le lezioni $l$ non in ordine prestabilito (e.g., nella prima idea erano assegnate secondo l'ordine con cui i corsi apparivano nell'istanza di input), ma secondo una \textit{difficoltà di assegnamento} stimata con la seguente formula:
@@ -343,7 +352,7 @@ Dove:
 
 \[\#{H3b}(c) = \sum_{c^\prime \in C} e_{c^\prime t_{c}}\]
 \begin{center}
-\text{(numero corso insegnati dall'insegnante $t_c$ del corso $c$)}
+\text{(numero di corsi insegnati dall'insegnante $t_c$ del corso $c$)}
 \end{center}
 
 \[\#{H4}(c) = \sum_{d \in D} \sum_{s \in S} (1 -a_{cds})\]
@@ -351,23 +360,24 @@ Dove:
 \text{(numero di non disponibilità del corso $c$)}
 \end{center}
 
-Ordinando le lezioni dei corsi in modo decrescente rispetto alla formula descritta, è stato ottenuto un costruttore di soluzione ammissibili con buone probabilità di successo (a seconda della difficoltà intrinseca del \textit{dataset}).
+Ordinando le lezioni dei corsi in modo decrescente rispetto al $rank$ descritto, è stato ottenuto un costruttore di soluzione ammissibili con buone probabilità di successo (a seconda della difficoltà intrinseca dell'istanza).
 \E stato tuttavia necessario apporta un'ultima modifica all'algoritmo di costruzione, principalmente per due ragioni:
 \begin{itemize}
-	\item Nel caso in cui l'assegnamento di lezioni ritenuto più facile dovesse fallire, non ci sarebbe altro modo di costruire una soluzione ammissibile.
+	\item Nel caso in cui l'ordine di l'assegnamento di lezioni ritenuto più facile dovesse fallire, non ci sarebbe altro modo di costruire una soluzione ammissibile.
 	\item Avendo implementato un meccanismo di \textit{multistart} all'interno del risolutore, è sorta l'esigenza di produrre più soluzioni iniziali ammissibili diverse l'una dall'altra, in modo da coprire quanto più possibile lo spazio delle soluzioni.
 \end{itemize}
-Tali esigenze si traducono nell'introduzione di un semplice meccanismo di \textit{randomizzazione} dell'ordine di assegnamento delle lezioni; questo non può tuttavia essere completamente aleatorio  perchè porterebbe ad avere un costruttore di soluzioni totalmente casuale che si è rivelato non essere in grado fornire una soluzione iniziale ammissibile in tempo ragionevole.
+Tali esigenze si traducono nell'introduzione di un semplice meccanismo di \textit{randomizzazione} dell'ordine di assegnamento delle lezioni; questo non può tuttavia essere completamente aleatorio  perchè porterebbe ad avere un costruttore di soluzioni totalmente casuale che si è rivelato spesso non essere in grado fornire una soluzione iniziale ammissibile.
 
 La \textit{difficoltà di assegnamento} di una lezione $l$ è stata invece solo leggermente modificata, per un valore casuale, rispetto al valore di \textit{difficulty($c_l$)}.
 In definitiva, l'ordine di assegnamento delle lezioni è stato decretato ordinando in modo decrescente le lezioni secondo la seguente formula:
 \[ \mathit{rank}(l,rr) = \mathit{difficulty}(c_l) \cdot \mathit{norm}(\mu=1, \sigma=rr) \]
-Dove $norm$ è un generatore casuale di media $\mu$ e deviazione standard $\sigma$, e $rr$ ($r$anking $r$andomness) è il parametro corrispondente alla deviazione standard, di default impostato a \text{0.33}.
-Si osserva che impostando il parametro $rr$ a \text{0} verrà generata sempre la stessa soluzione deterministica (quella ritenuta più facile, in cui ordine di assegnamento delle lezioni rispetta la \textit{difficulty}), mentre aumentando il valore di $rr$ si otterranno ordini di assegnamento che daranno luogo a soluzioni sempre più \q{casuali}, ma che al contempo avranno una bassa probabilità di essere ammissibili. \E ora possibile definire l'algoritmo che genera una soluzione iniziale ammissibile.
+Dove $norm$ è un generatore casuale che segue una distribuzione normale di media $\mu=1$ e deviazione standard $\sigma=rr$ ($r$anking $r$andomness), di default impostato a \text{0.33}.
+Si osserva che impostando il parametro $rr$ a \text{0} verrà generata sempre la stessa soluzione deterministica (quella ritenuta più facile, in cui l'ordine di assegnamento delle lezioni rispetta la \textit{difficulty}), mentre aumentando il valore di $rr$ si otterranno ordini di assegnamento che daranno luogo a soluzioni sempre più \q{casuali}, ma che al contempo avranno una bassa probabilità di essere ammissibili. \E ora possibile definire l'algoritmo che genera una soluzione iniziale ammissibile.
 
 \vspace{10pt}
 
 \begin{algorithm}[H]
+	\caption{Generatore di una soluzione iniziale ammissibile}
 	\SetAlgoLined
 	\Input{$m$, $rr$}
 	\Output{a feasible solution for $m$}
@@ -393,8 +403,9 @@ Si osserva che impostando il parametro $rr$ a \text{0} verrà generata sempre la
 		$L$ \assign lectures of $m$ sorted by descending $rank(l, rr)$\;
 		\ForEach{$ l \in L$}{
 			\ForEach{$ (r,d,s) \in (R,D,S)$}{
-				\If{$(r,d,s)$  \upshape{is available} \And $l$ \upshape{can be assigned to} $(r,d,s)$}{
+				\If{$l$ \upshape{can be assigned to} $(r,d,s)$ \upshape{without violations}}{
 					$sol[l]$ $\leftarrow$ $(r,d,s)$\;
+					$(R,D,S)$ \assign $(R,D,S) \setminus \{(r,d,s)\}$\;
 					\Break\;
 				}
 			}
@@ -404,8 +415,6 @@ Si osserva che impostando il parametro $rr$ a \text{0} verrà generata sempre la
 		}
 		\Return $sol$\;
 	}
-
-	\caption{Generazione di una soluzione iniziale ammissibile}
 \end{algorithm}
 
 \subsection{Neighbourhood}
@@ -424,24 +433,28 @@ La dimensione del \textit{neighbourhood} completo è dunque:
 
 \subsection{Metaeuristiche}
 
+Nei prossimi paragrafi saranno descritte le metaeuristiche implementate all'interno del risolutore; alcune di queste sono utilizzate come strategie di risoluzione nell'algoritmo proposto, altre non si sono rivelate all'altezza ma sono comunque state lasciate all'interno del progetto.
+
+Si fornisce, per comodità, la seguente definizione di sottoinsieme del \textit{neighbourhood} $N$ composto solo dalle mosse che possono essere effettuate senza violare gli \textit{Hard Constraitns}:
+\[N^*(s): \{mv \in N(s) \; | \; move\_is\_feasible(mv, s)\}\]
+
 \subsubsection{Local Search}
-La prima strategia sviluppata, con cui è stato possibile confrontare le metaeuristiche sviluppate in seguito per giudicarne la bontà dei risultati, è stata la \textit{Local Search}.
+La prima strategia sviluppata con cui è stato possibile confrontare le strategie sviluppate in seguito per giudicarne la bontà è stata la \textit{Local Search}  (impropriamente inserita all'interno della categoria delle metaeuristiche).
 
 Data una soluzione iniziale $s$, il processo di \textit{Local Search} consiste nell'ispezionare $N(s)$ accettando mosse di \textit{swap} solo se (sono ammissibili e) diminuiscono il costo della soluzione; iterando il procedimento fino a che non è più presente alcuna mossa in $N(s)$ che migliori il costo della soluzione attuale.
 
-	\vspace{10pt}
+\vspace{6pt}
 
 \begin{algorithm}[H]
 	\caption{Local Search}
 	
 	\SetAlgoLined
 		
-	\Input{$m$, $s$}
+	\Input{$s$}
 	\Output{$s^\prime$}
 	
 	\vspace{6pt}
 		
-	\Comment $m$: model\\
 	\Comment $s$: initial feasible solution\\
 	
 	\vspace{10pt}
@@ -449,8 +462,8 @@ Data una soluzione iniziale $s$, il processo di \textit{Local Search} consiste n
 	\Begin{
 		\DoWhile{$improved$ is \True}{
 			$improved$ \assign \False\;
-			\ForEach{$move \in N(s)$}{
-				\If{$move\_is\_feasible(move)$ \And $move\_cost(move) < 0$ }{
+			\ForEach{$move \in N^*(s)$}{
+				\If{$move\_cost(move, s) < 0$ }{
 					$s$ \assign $apply\_move(s, move)$\;
 					$improved$ \assign \True\;
 					\Break
@@ -463,20 +476,21 @@ Data una soluzione iniziale $s$, il processo di \textit{Local Search} consiste n
 \end{algorithm}
 
 \subsubsection{Hill Climbing}
-La seconda strategia implementata risulta simile alla \textit{Local Search}, ma ha permesso, attuando la semplice modifica di accettare mosse di $N(s)$ anche se mantengono invariato il costo $f(s)$ della soluzione attuale, di ottenere risultati decisamente migliori  \ref{sec:risultati}.
+La seconda strategia implementata risulta simile alla \textit{Local Search}, ma ha permesso, attuando la semplice modifica di accettare mosse di $N(s)$ anche se mantengono invariato il costo $f(s)$ della soluzione attuale, di ottenere risultati decisamente migliori  (si veda \ref{sec:risultati}).
 
-In aggiunta, le mosse del \textit{neighbourhood} non sono ispezionate in sequenza (perchè si avrebbe una buona probabilità di creare un ciclo di mosse, che richiederebbe una strategia simile alla \textit{Tabu Search} per essere evitato), ma sono scelte casualmente; questo introduce la necessità di un parametro $max\_idle$ che definisca dopo quanti tentativi per la quale il costo della soluzione non diminuisce interrompere il processo. 
+Le mosse del \textit{neighbourhood} non sono ispezionate in sequenza (perchè si avrebbe una buona probabilità di creare un ciclo di mosse, che richiederebbe una strategia simile alla \textit{Tabu Search} per essere evitato), ma sono scelte casualmente; questo introduce la necessità di un parametro $max\_idle$ che definisca dopo quanti tentativi per la quale il costo della soluzione non diminuisce interrompere il processo. 
+
+\vspace{6pt}
 
 \begin{algorithm}[H]
 	\caption{Hill Climbing}
 	\SetAlgoLined
 	
-	\Input{$m$, $s$, $max\_idle$}
+	\Input{$s$, $max\_idle$}
 	\Output{$s^\prime$}
 	
 	\vspace{6pt}
 	
-	\Comment $m$: model\\
 	\Comment $s$: initial feasible solution\\
 	\Comment $max\_idle$: maximum number of non-improving iterations\\
 	
@@ -486,11 +500,8 @@ In aggiunta, le mosse del \textit{neighbourhood} non sono ispezionate in sequenz
 		$idle$ \assign $0$\;
 		$current\_cost$ \assign $solution\_cost(s)$\;
 		\DoWhile{$idle < max\_idle$}{
-			$move$ \assign $random\_move(s)$\;
-			\If{\Not $move\_is\_feasible(move)$}{
-				\Continue
-			}
-			\If{$move\_cost(move) \le 0$ }{
+			$move$ \assign random move from $N^*(s)$\;
+			\If{$move\_cost(move, s) \le 0$ }{
 				$s$ \assign $apply\_move(s, move)$\;
 			}
 			\eIf{$solution\_cost(s) < current\_cost$}{
@@ -505,30 +516,31 @@ In aggiunta, le mosse del \textit{neighbourhood} non sono ispezionate in sequenz
 \end{algorithm}
 
 \subsection{Tabu Search}
-La prima\q{vera metaeuristica} che è stata implementata è la Tabu Search; anche se, come discusso in \ref{sec:risultati}, i risultati ottenuti non sono stati all'altezza delle aspettative.
+La prima\q{vera metaeuristica} che è stata implementata è la Tabu Search; anche se, come verrà discusso nella sezione \ref{sec:risultati}, i risultati ottenuti non sono stati all'altezza delle aspettative.
 
-Il processo di \textit{Tabu Search} effettua la miglior mossa possibile del \textit{neighbourhood}, ma a differenza di \textit{Local Search} e \textit{Hill Climbing}, può accettare anche mosse che peggiorano il costo della soluzione, con il fine di sfuggire ad un minimo locale; a supporto di ciò, per evitare che una volta sfuggiti da un minimo locale si ritorni nello stesso, è mantenuta una \textit{Tabu List} che memorizza un certo numero di mosse recentemente eseguite, impedendo che le mosse inverse ad esse siano eseguite.
+Il processo di \textit{Tabu Search} effettua la miglior mossa possibile del \textit{neighbourhood} ma, a differenza di \textit{Local Search} e \textit{Hill Climbing}, può accettare anche mosse che peggiorano il costo della soluzione con il fine di sfuggire ad un minimo locale; a supporto di ciò, per evitare che una volta usciti da un minimo locale si ritorni nello stesso, è mantenuta una \textit{Tabu List} che memorizza un certo numero di mosse recentemente eseguite, impedendo che le mosse inverse ad esse siano eseguite.
 
-Nell'implementazione proposta per la \textit{Tabu Search}, la \textit{Tabu List} è stata in realtà attuata mediante una matrice di dimensione $|N(s)| = L \cdot R \cdot D \cdot S$ e non mediante una lista/vettore; questo è stato possibile perchè la dimensione del \textit{neighbourhood} è contenuta ed ha il beneficio di consentire un accesso $o(1)$ alla \textit{Tabu List}.
+Nell'implementazione proposta per la \textit{Tabu Search}, la \textit{Tabu List} è stata in realtà attuata mediante una matrice di dimensione $|N(s)| = L \cdot R \cdot D \cdot S$ e non mediante una lista/vettore; questo è stato possibile perchè la dimensione del \textit{neighbourhood} ne consente la memorizzazione ed ha il beneficio di consentire un accesso $o(1)$ alla \textit{Tabu List}.
 
-Il parametro principale della \textit{Tabu Search} è la \textit{tabu tenure} $tt$ che indica il numero di iterazioni per la quale una mossa è considerata \textit{tabu-active}; è stato inoltre aggiunto un parametro opzionale $\rho$ che determina un coefficiente di penalità in relazione al numero di volte che una mossa è diventata \textit{tabu}.
+Il parametro principale della \textit{Tabu Search} è la \textit{tabu tenure} $(tt)$ che indica il numero di iterazioni per la quale una mossa è considerata \textit{tabu-active}; è stato inoltre aggiunto un parametro opzionale $\rho$ che determina un coefficiente di penalità in relazione al numero di volte che una mossa è diventata \textit{tabu}.
 
 La formula per calcolare il numero di iterazioni per la quale una mossa è \textit{tabu-active} è la seguente:
 
-\[tabu\_length(m) = tt + \rho \cdot count(m)\]
+\[tabu\_length(m) = tt + \rho \cdot freq(m)\]
 
 Infine, è stato introdotto anche l'\textit{Aspiration Criteria} che consente di accettare una mossa \textit{tabu-active} nel caso in cui questa migliori il costo della miglior soluzione trovata fino a quel momento.
+
+\vspace{6pt}
 
 \begin{algorithm}[H]
 	\caption{Tabu Search}
 	\SetAlgoLined
 		
-	\Input{$m$, $s$, $tt$, $\rho$, $max\_idle$}
+	\Input{$s$, $tt$, $\rho$, $max\_idle$}
 	\Output{$s^\prime$}
 	
 	\vspace{6pt}
 
-	\Comment $m$: model\\
 	\Comment $s$: initial feasible solution\\
 	\Comment $tt$: tabu tenure (default = $120$)\\
 	\Comment $\rho$: frequency penalty (default = $0$)\\
@@ -545,22 +557,20 @@ Infine, è stato introdotto anche l'\textit{Aspiration Criteria} che consente di
 		\DoWhile{$idle < max\_idle$}{
 			$best\_move\_cost$ = $\infty$ \;
 			$best\_moves$ = []\;
-			\ForEach{$move \in N(s)$}{
-				\If{\Not $is\_feasible(s,move)$}{
-					\Continue
-				}
+			\tcp{Find the subset of best non tabu-active moves} 
+			\ForEach{$move \in N^*(s)$}{
 			
-				\If{$move\_cost(move) \le best\_move\_cost$ \And \\
+				\If{$move\_cost(move, s) \le best\_move\_cost$ \And \\
 					\hspace{22pt} $(tabu.is\_allowed(move, iter)$ \Or \\
-					\hspace{26pt} $current\_cost + move\_cost(move) < best\_cost)$}{
-					$best\_moves.append(move)$\;
+					\hspace{26pt} $current\_cost + move\_cost(move,s) < best\_cost)$}{
 					\If{$move\_cost(move) < best\_move\_cost$}{
-						$best\_move\_cost$ \assign $move\_cost(move)$\;
+						$best\_move\_cost$ \assign $move\_cost(move,s)$\;
 						$best\_moves$ = []\;
 					}
+					$best\_moves.append(move)$\;
 				}
 			}
-		
+			\tcp{Apply a move and make it tabu-active} 
 			$best\_move$ \assign pick at random from $best\_moves$\;
 			$s$ \assign $apply\_move(s, best\_move)$\;
 			$tabu.ban(best\_move, iter)$\;
@@ -580,28 +590,31 @@ Infine, è stato introdotto anche l'\textit{Aspiration Criteria} che consente di
 \end{algorithm}
 
 \subsection{Simulated Annealing}
-Ultima ad essere implementata, \textit{Simulated Annealing} è stata la metaeuristica che ha fornito i risultati migliori fra quelle proposte.
+Ultima ad essere implementata, \textit{Simulated Annealing} è stata la metaeuristica che fra quelle proposte ha fornito i risultati migliori.
 
-L'idea di \textit{Simulated Annealing} è di generare mosse casualmente  ed accettare, con una certa probabilità, anche mosse che peggiorano il costo della soluzione, al fine di estendere la ricerca il più possibile all'interno dello spazio delle soluzioni. La probabilità $p$ con cui una mossa è accettata dipende sia dalla temperatura $T$ attuale del sistema, la quale viene decrementata secondo un determinato \textit{Simulated Annealing Schedule}, che dal costo $\Delta$ della mossa:
+L'idea di \textit{Simulated Annealing} è di generare mosse casualmente  ed accettare, con una certa probabilità, anche mosse che peggiorano il costo della soluzione. La probabilità $p$ con cui una mossa è accettata dipende sia dalla temperatura $T$ attuale del sistema, la quale viene decrementata secondo un determinato \textit{Simulated Annealing Schedule}, che dal costo $\Delta$ della mossa:
 
 \[p(m)  = e^{-\Delta/T} \]
 
+\hangpara{1em}{1}
 Il valore di $T$ viene decrementato ad ogni ciclo $k$  per il \textit{cooling rate} $cr$:
 
 \[T_{k+1}=T_{k} \cdot cr\]
 
-Ogni ciclo $k$ dura $ \tau \cdot  |N(s)|$ iterazioni, dove $\tau$ di default è $\frac{1}{8}$.
+\hangpara{1em}{1}
+Ogni ciclo $k$ (per la quale $T$ è mantenuta costante) dura $ \tau \cdot  |N(s)|$ iterazioni, dove $\tau$ di default è $\frac{1}{8}$.
+
+\vspace{6pt}
 
 \begin{algorithm}[H]
 	\caption{Simulated Annealing}
 	\SetAlgoLined
 	
-	\Input{$m$, $s$, $T_{init}$, $T_{min}$, $cr$, $\tau$}
+	\Input{$s$, $T_{init}$, $T_{min}$, $cr$, $\tau$}
 	\Output{$s^\prime$}
 	
 	\vspace{6pt}
 	
-	\Comment $m$: model\\
 	\Comment $s$: initial feasible solution\\
 	\Comment $T_{init}$: initial temperature (default = $1.4$)\\
 	\Comment $T_{min}$: minimum temperature to reach (default $\in [0.08,0.12]$)\\
@@ -615,13 +628,10 @@ Ogni ciclo $k$ dura $ \tau \cdot  |N(s)|$ iterazioni, dove $\tau$ di default è 
 		$T_{len}$ \assign $\tau \cdot L \cdot R \cdot D \cdot S$\;
 %		$current\_cost$ \assign $solution\_cost(s)$\;
 %		$best\_cost$ \assign $solution\_cost(s)$\;
-		\While{$T < T_{min}$}{
+		\While{$T > T_{min}$}{
 			\For{$it < T_{len}$}{
-				$move$ \assign $random\_move(s)$\;
-				\If{\Not $move\_is\_feasible(move)$}{
-					\Continue
-				}
-				$\Delta$ \assign $move\_cost(move)$\;
+				$move$ \assign random move from $N^*(s)$\;
+				$\Delta$ \assign $move\_cost(move,s)$\;
 				\If{$rand(0,1) < e^{-\Delta/T} $}{
 					$s$ \assign $apply\_move(s, move)$\;
 				}
@@ -639,19 +649,23 @@ Nel caso in cui il risolutore sia configurato per utilizzare più di una metaeur
 
 Questo ha consentito di creare un algoritmo flessibile, in cui possono essere cambiate sia le metaeuristiche utilizzate che i rispettivi parametri.
 
-Come anticipato, e come sarà discusso in \ref{sec:risultati}, di default l'algoritmo utilizza in sequenza due metaeuristiche: \textit{Simulated Annealing} e \textit{Local Search}.
+%Come anticipato, e come sarà discusso nella sezione \ref{sec:risultati}, di default l'algoritmo utilizza in sequenza due metaeuristiche: \textit{Simulated Annealing} e \textit{Local Search}.
 
 \section{Risultati}\label{sec:risultati}
 
-Per confrontare i risultati delle diverse strategie implementate, sono state effettuate, per ogni metaeuristica, 10 esecuzioni di tutti i dataset compresi fra \texttt{comp01} e \texttt{comp07}.
+In questa sezione saranno confrontati i risultati delle metaeuristiche sviluppate, sia fra di esse  (tabella \ref{tab:intra-results}), che rispetto ai risultati noti per le istanze provate (tabella \ref{tab:inter-avg-results}).
+
+\subsection{Confronto fra le metaeuristiche}
+Per confrontare i risultati delle diverse strategie implementate sono state effettuate, per ogni metaeuristica, 10 esecuzioni di tutti i dataset compresi fra \texttt{comp01} e \texttt{comp07}.
 La durata di ogni esecuzione rispetta il tempo limite definito dalla traccia dell'ITC2007 e, nel caso della macchina su cui è stato sviluppato l'algoritmo (Arch Linux, Kernel 5.9.11, Intel i7 4790K @ 4.4GHz, 16GB RAM), è stato calcolato essere 168 secondi (tempo determinato mediante il programma \texttt{benchmark\_my\_linux\_machine} fornito dagli organizzatori della competizione).
 
 Di seguito sono riportati i parametri utilizzati per ciascuno dei \textit{benchmark} ed i risultati ottenuti.
 
 
-\begin{table}
-\caption{\label{tab:params} Parametri utilizzati per il \textit{benchmark} delle metaeuristiche}
-\scriptsize
+\begin{table}[h]
+\caption{Parametri utilizzati per il \textit{benchmark} delle metaeuristiche}
+\label{tab:params} 
+\footnotesize
 \begin{center}
 \begin{tabular}{| l | l |}
 	\hline			
@@ -664,13 +678,14 @@ Di seguito sono riportati i parametri utilizzati per ciascuno dei \textit{benchm
 	 & \texttt{hc.near\_best\_ratio=1.02} \\
 	 \hline
 	 
-	 \multicolumn{1}{|c|}{$TS$} & \multicolumn{1}{c|}{$SA(+LS)$} \\
+	 \multicolumn{1}{|c|}{$TS$} & \multicolumn{1}{c|}{$SA$ $(+LS)$} \\
 	\hline
 	\texttt{solver.methods=ts} & \texttt{solver.methods=sa,ls}  \\
 	\texttt{solver.multistart=false} &\texttt{solver.multistart=false} \\
-	 \texttt{ts.max\_idle=-1}&  \texttt{sa.initial\_temperature=1.4}\\
-	\texttt{ts.tabu\_tenure=120}&\texttt{sa.cooling\_rate=0.965} \\
-	\texttt{ts.frequency\_penalty\_coeff=0}&  \texttt{sa.min\_temperature=0.12} \\
+	\texttt{ts.max\_idle=-1}&\texttt{solver.restore\_best\_after\_cycles=50} \\
+	\texttt{ts.tabu\_tenure=120}&  \texttt{sa.initial\_temperature=1.4}\\
+	\texttt{ts.frequency\_penalty\_coeff=0}&\texttt{sa.cooling\_rate=0.965} \\
+	&  \texttt{sa.min\_temperature=0.12} \\
 	& \texttt{sa.temperature\_length\_coeff=0.125}\\
 	&\texttt{sa.near\_best\_ratio=1.05} \\
 	& \texttt{sa.reheat\_coeff=1.015}  \\
@@ -681,35 +696,119 @@ Di seguito sono riportati i parametri utilizzati per ciascuno dei \textit{benchm
 \end{center}
 \end{table}
 
-\begin{table}
-	\caption{\label{tab:results} Risultati dei \textit{benchmark} delle metaeuristiche}
-	\scriptsize
-\begin{center}
-	\begin{tabular}{| c | c c | c c  | c c |  c c | c |}
-		\hline
-		\multirow{2}{*}{Dataset} & 
-		\multicolumn{2}{|c|}{$LS_{multi}$} & \multicolumn{2}{c|}{$HC_{multi}$} & \multicolumn{2}{c|}{$TS$}  & \multicolumn{3}{c|}{$SA+LS$} \\
-		\cline{2-10}
-		& $avg$ & $\sigma$ & $avg$ & $\sigma$ & 
-		$avg$ & $\sigma$ & $avg$ & $\sigma$ & $best_{t=\infty}$ \\
-		\hline  
-		\texttt{comp01} & 20.4 & 1.4 		&  5 & 0 					& 5.4 & 0.5		 		& 5 & 0 & 5\\
-		\texttt{comp02} & 204.1 & 9.8 		&  119.0 & 5.2		&  135.7 & 21.0 		& 48.0 & 4.3 & 36\\
-		\texttt{comp03} &182.1 & 5.8 		&  117.4 & 5.8 			& 156.8 & 11.5 		& 74.2 & 3.9 & 66 \\
-		\texttt{comp04} &111.4 & 5.4 		&  53.7 & 2.9 			& 60.1 & 8.0 			& 40.9 & 1.3 & 38\\
-		\texttt{comp05} &538.4 & 29.8 		&  515.4 & 15.3		& 722.2 & 103.3 	& 392.9 & 40.4 & 328\\
-		\texttt{comp06} &168.5 & 5.5 		&  87.4 & 5.9 			& 101.2 & 11.5 		& 51.9 & 3.3 & 41\\
-		\texttt{comp07} &159.7 & 7.2 		&  56.1 & 4 			& 55.3 & 3.4 		& 25.5 & 2.5 & 17\\
-		\hline
-	\end{tabular}
-\end{center}
+
+\begin{table}[h]
+	\caption{Confronto dei risultati delle metaeuristiche ($t=168$)}
+	\label{tab:intra-results} 
+	\footnotesize
+	\begin{center}
+		\begin{tabular}{| c | c c | c c  | c c |  c c c | c |}
+			\hline
+			\multirow{2}{*}{Dataset} & 
+			\multicolumn{2}{|c|}{$LS_{multi}$} & \multicolumn{2}{c|}{$HC_{multi}$} & \multicolumn{2}{c|}{$TS$}  & \multicolumn{4}{c|}{$SA$ $(+LS)$} \\
+			\cline{2-11}
+			& $avg$ & $\sigma$ & $avg$ & $\sigma$ & 
+			$avg$ & $\sigma$ & $avg$ & $\sigma$ & $best$ & $best_{t=\infty}$ \\
+			\hline  
+			\texttt{comp01} & 20.4 & 1.4 		&  5 & 0 					& 5.4 & 0.5		 		& 5 & 0 & 5 & 5\\
+			\texttt{comp02} & 204.1 & 9.8 		&  119.0 & 5.2		&  135.7 & 21.0 		& 48.0 & 4.3& 42 & 36\\
+			\texttt{comp03} &182.1 & 5.8 		&  117.4 & 5.8 			& 156.8 & 11.5 		& 74.2 & 3.9 &69 & 66 \\
+			\texttt{comp04} &111.4 & 5.4 		&  53.7 & 2.9 			& 60.1 & 8.0 			& 40.9 & 1.3 &39 & 37\\
+			\texttt{comp05} &538.4 & 29.8 		&  515.4 & 15.3		& 722.2 & 103.3 	& 392.9 & 40.4 & 341& 305\\
+			\texttt{comp06} &168.5 & 5.5 		&  87.4 & 5.9 			& 101.2 & 11.5 		& 51.9 & 3.3 & 45 & 40\\
+			\texttt{comp07} &159.7 & 7.2 		&  56.1 & 4 			& 55.3 & 3.4 		& 25.5 & 2.5 & 22& 14\\
+			\hline
+		\end{tabular}
+	\end{center}
 \end{table}
 
-\paragraph{Local Search:} le prime prove effettuate con \textit{Local Search} diedero, come prevedibile, dei risultati non molto soddisfacenti in quanto l'algoritmo si interrompeva al primo minimo locale trovato. L'impiego del \textit{multistart} ha logicamente consentito di migliorare i risultati ottenuti ma, nonostante questo, i risultati forniti sono i peggiori fra le metaeuristiche testate.  \textit{Local Search} si è rivelata comunque utile ai fini del progetto, sia come termine di paragone per le metaeuristiche testate successivamente, sia perchè, seppur a margine,  si affianca a \textit{Simulated Annealing} come sequenza di metaeuristiche utilizzate di default dal risolutore.
 
-\paragraph{Hill Climbing:} nonostante la semplicità della strategia, che si discosta da \textit{Local Search} solo per l'accettare anche mosse che mantengo invariato il costo della soluzione, i risultati ottenuti sono stati tutto sommato soddisfacenti, posizionandosi la $2^a$ migliore fra le metaeuristiche testate. Dalle prove effettuate è risultato evidente che l'accettare \textit{side-moves} consenta all'algoritmo di fuggire da minimi locali poco profondi, garantendo una ricerca in profondità migliore di \textit{Local Search}.
+\paragraph{Local Search:} le prime prove effettuate con $LS$ diedero dei risultati non molto soddisfacenti in quanto l'algoritmo si interrompeva al primo minimo locale trovato. L'impiego del \textit{multistart} ha logicamente consentito di migliorare i risultati ottenuti, ma nonostante questo i risultati forniti sono stati i peggiori fra le metaeuristiche testate.  \textit{Local Search} si è rivelata comunque utile ai fini del progetto, sia come termine di paragone per le metaeuristiche testate successivamente, sia perchè, seppur a margine,  si affianca a \textit{Simulated Annealing} per formare la sequenza di metaeuristiche utilizzate di default dal risolutore.
 
-\paragraph{Tabu Search:} contrariamente alle aspettative, \textit{Tabu Search} non ha fornito risultati particolarmente soddisfacenti, risultando, in un caso, anche peggiore di $LS_{multi}$. Sono state effettuate diverse analisi per comprendere la ragione di tale fenomeno; l'implementazione non dovrebbe essere il problema, considerato che la \textit{Tabu List} è stata anche implementata mediante  matrice ad accesso $o(1)$; la scelta dei parametri sicuramente potrebbe avere spazio di miglioramento, ma nonostante le prove effettuate con \textit{tabu tenure} di diversi ordini di grandezza differenti, i risultati non sono mai migliorati significativamente. Un \textit{profiling} minuzioso di come il tempo di esecuzione fosse speso ha dato luce a quello che sembrerebbe essere il problema: la dimensione del \textit{neighbourhood}. Questo non è un problema per \textit{Hill Climbing} e \textit{Simulated Annealing} in quanto le mosse sono generate ed effettuate casualmente, mentre \textit{Tabu Search} ha la necessità di ispezionare tutto il \textit{neighbourhood} per poter scegliere la mossa \textit{non-tabu} migliore possibile. Come si evince da \cite{bib:tabu-search-guide}, questo è un fenomeno noto; facendo ispezionare all'algoritmo tutto il \textit{neighbourhood} si ottengono soluzioni molto buone ma in tempi proibitivi per istanze medio/grandi (infatti per le istanze semplici, come \texttt{comp01}, anche \textit{Tabu Search} risulta in grado di raggiungere il presunto minimo globale di valore $5$). Come descrivono \textit{Fred Glover} e \textit{Eric Taillard}, esistono diversi modi per risolvere questa problematica, dal conservare, dall'iterazione precedente, una lista di possibili mosse candidate \textit{elite} da ispezionare in modo esclusivo o prima del resto del \textit{neighbourhood}, all'usare strutture di memoria a medio/lungo termine per individuare le caratteristiche delle mosse/traiettorie che hanno portato a miglioramenti più efficaci e circoscrivere la ricerca ad un sottoinsieme del \textit{neighbourhood}. Dato il limitato tempo a disposizione e la complessità di implementare tali idee, non sono stati apportate modifiche alla \textit{Tabu Search} originariamente sviluppata.
+\paragraph{Hill Climbing:} nonostante la semplicità della strategia, che si discosta da \textit{Local Search} solo per l'accettare anche mosse che mantengo invariato il costo della soluzione, i risultati ottenuti da $HC_{multi}$  sono stati tutto sommato soddisfacenti, posizionandosi $2^a$ fra le metaeuristiche testate. Dalle prove effettuate è risultato evidente che l'accettare \textit{side-moves} generate casualmente consenta all'algoritmo di fuggire a minimi locali poco profondi, garantendo una ricerca in profondità migliore di \textit{Local Search}.
+
+\paragraph{Tabu Search:} contrariamente alle aspettative, \textit{Tabu Search} non ha fornito risultati particolarmente soddisfacenti, risultando in un caso anche peggiore di $LS_{multi}$. Sono state effettuate diverse analisi per comprendere la ragione di tale fenomeno; l'implementazione non dovrebbe essere il problema, considerato che la \textit{Tabu List} è stata anche implementata mediante  matrice ad accesso $o(1)$; la scelta dei parametri sicuramente potrebbe avere spazio di miglioramento, ma nonostante le prove effettuate con \textit{tabu tenure} di diversi ordini di grandezza differenti, i risultati non sono mai migliorati significativamente. Un \textit{profiling} attento di come il tempo di esecuzione fosse speso ha dato luce a quello che sembrerebbe essere il problema: la dimensione del \textit{neighbourhood}. Questo non è un problema per \textit{Hill Climbing} e \textit{Simulated Annealing} in quanto le mosse sono generate ed effettuate casualmente, mentre \textit{Tabu Search} ha la necessità di ispezionare tutto il \textit{neighbourhood} per poter scegliere la mossa non \textit{tabu-active} migliore possibile; questo porta \textit{Tabu Search} ad effettuare una quantità di mosse per unità di tempo centinaia se non migliaia di volte minore rispetto alle altre metaeuristiche citate. Come si evince da \cite{bib:tabu-search-guide}, questo è un fenomeno noto; facendo ispezionare all'algoritmo tutto il \textit{neighbourhood} si ottengono soluzioni generalmente buone ma in tempi proibitivi per istanze medio/grandi. Come descritto da \textit{Fred Glover} e \textit{Eric Taillard}, esistono diversi modi per risolvere questa problematica: dal conservare una lista di possibili mosse candidate \textit{elite} da ispezionare in modo esclusivo o prima del resto del \textit{neighbourhood} nell'iterazione successiva, all'usare strutture di memoria a medio/lungo termine per individuare le caratteristiche delle mosse/traiettorie che hanno portato a miglioramenti più efficaci e circoscrivere la ricerca ad un sottoinsieme del \textit{neighbourhood}. Dato il limitato tempo a disposizione e la complessità di tali idee, non sono state apportate modifiche alla \textit{Tabu Search} originariamente sviluppata.
+
+
+\paragraph{Simulated Annealing:} è la metaeuristica che ha fornito i migliori risultati, nonchè la strategia scelta di default per il risolutore. In un primo momento \textit{Simulated Annealing} sembrava non essere in grado di fornire risultati soddisfacenti all'interno degli stretti tempi consentiti; la difficoltà di integrare questa metaeuristica è infatti celata non tanto nell'implementazione, al quanto semplice, quanto nel \textit{tuning} dei parametri della stessa. Dopo diversi tentativi per cercare il giusto connubio fra intensificazione e diversificazione, quindi fra temperatura iniziale, temperatura minima, cooling rate e lunghezza della temperatura, sono stati individuati dei parametri che risultano essere adeguati per le istanze testate (rispetto a tempi di computazione previsti).
+
+ Infine, si evidenziano diverse accortezze che hanno consentito di migliorare i risultati rispetto a $SA$ nella sua forma base.
+Innanzitutto, il risolutore è stato implementato per consentire non uno ma più cicli di $SA$, ognuno dei quali riparte dalla soluzione prodotta dal ciclo precedente con una temperatura iniziale reimpostata a $T_{init}$; questo approccio ha consentito di mantenere una temperatura iniziale abbastanza bassa ed un cooling rate non troppo aggressivo, al fine di non \q{perdere} troppo tempo ad ispezionare soluzioni con costi eccessivi ed effettuare una buona ispezione al termine del ciclo $SA$ delle soluzioni candidate ad essere nuove migliori. \E stato poi introdotto un coefficiente di \textit{reheat}: se al termine di un ciclo di $SA$ il minimo globale non è stato migliorato, la temperatura iniziale del ciclo successivo sarà incrementata a:
+
+\[T_{init, i+1}=T_{init, i} \cdot SA_{reheat}\]
+
+Questo conferisce all'algoritmo una strategia di diversificazione dinamica, consentendogli di cercare più lontano dall'attuale soluzione se questa non è migliorata per un lungo periodo. Ad ogni modo, se dopo un determinato numero di iterazioni (di default $50$) il costo della miglior soluzione non riesce ad essere migliorato, la soluzione migliore è imposta come soluzione corrente e la temperatura è reimpostata a $T_{init}$
+
+
+Altra accortezza introdotta: anche la temperatura minima da raggiungere è variabile; di default è mantenuta ad un valore abbastanza alto di $0.12$, ma è decrementata a circa $0.08$ se il costo della soluzione corrente è abbastanza vicino ($<5\%$) rispetto al costo della miglior soluzione trovata fino a quel momento; in questo modo è possibile evitare computazione nel caso in cui sarebbe improbabile scendere sotto ad un minimo globale, iniziando al più presto il ciclo $SA$ successivo.
+
+Ed infine, si osserva che la strategia utilizzata di default dal risolutore non è solo $SA$ ma è $SA+LS$: una esecuzione di \textit{Local Search} sarà eseguita nel caso in cui il costo della soluzione ottenuta al termine di una ciclo $SA$ sia abbastanza vicino al costo della miglior soluzione trovata fino a quel momento ($<2\%$). Si è osservato che questo ha un impatto praticamente nullo sul tempo di computazione \q{rubato} ad $SA$, ma dà una forte garanzia sul fatto che il valore ottenuto da $SA$ sia effettivamente un minimo locale; nella maggior parte dei casi questo è vero ed il ruolo di $LS$ diventa irrilevante, ma in alcuni casi, essendo $SA$ un processo aleatorio, questo non si verifica ed $LS$ è in grado di decrementare il costo della soluzione (generalmente di qualche unità), ottenendo una nuova miglior soluzione.
+
+\subsection{Confronto con risultati noti}
+
+Per stabilire la bontà dell'algoritmo sviluppato, i risultati ottenuti sono stati confrontati con quelli noti pubblicamente. In particolare, si propongo due confronti:
+
+\begin{enumerate}[I]
+	\item Confronto fra il miglior risultato di 10 esecuzioni (con tempo massimo di 168 secondi) per le istanze \texttt{comp01} $\div$ \texttt{comp07} rispetto ai risultati ottenuti dai partecipanti all'ITC2007 \cite{bib:itc2007-finalists}.
+	\item Confronto fra il miglior risultato ottenuto (senza limite di tempo) ed il miglior risultato ottenuto da T. Müller (vincitore della Track \textit{Course Curriculum Timetabling} dell'ITC2007)  \cite{bib:muller}.
+\end{enumerate}
+
+
+Da entrambi i confronti si evince che l'algoritmo sviluppato compete con l'algoritmo del vincitore della competizione. Per il confronto I, in 4 casi su 7 è stato fornito un risultato migliore o uguale degli altri partecipanti. Per il confronto II, in 5 casi su 7 è stato fornito un risultato migliore (o uguale) a quello ottenuto dal vincitore della competizione.
+
+
+\begin{table}[h]
+	\caption{Confronto I}
+	\label{tab:inter-avg-results} 
+	\small
+	\begin{center}
+		\begin{tabular}{| c | c c c c c c |}
+			\hline
+			Dataset & $SA$ $(+LS)$ & T. Muller & Lu Hao & Atzuna et al &Geiger & Clark et al \\
+			\hline
+			\texttt{comp01} & \textbf{5} &  \textbf{5} & \textbf{5} & \textbf{5 }& \textbf{5} & 10\\
+			\texttt{comp02} &\textbf{42} & 51 &55 & 50& 111&111 \\
+			\texttt{comp03} &\textbf{69}& 84 &71 & 82& 128&119 \\
+			\texttt{comp04} & 39&  37&43 & \textbf{35}& 72& 72\\
+			\texttt{comp05} & 341 &  \textbf{330}& 309&312 & 410 & 426 \\
+			\texttt{comp06} &\textbf{45} & 48& 53& 69&100 & 130 \\
+			\texttt{comp07} &22 & \textbf{20} & 28&42 &57 & 110\\
+			\hline
+		\end{tabular}
+	\end{center}
+\end{table}
+
+
+\begin{table}[h]
+	\caption{\label{tab:inter-best-results} Confronto  II}
+	\small
+	\begin{center}
+		\begin{tabular}{| c | c c |}
+			\hline
+			\multirow{2}{*}{Dataset} & $SA$ $(+LS)$ & T. Muller \cite{bib:muller} \\
+			& $best$ & $best$ \\
+			\hline
+			\texttt{comp01} & \textbf{5}& \textbf{5}\\
+			\texttt{comp02} & \textbf{36}& 43\\
+			\texttt{comp03} & \textbf{66} & 72\\
+			\texttt{comp04} & 37& \textbf{35}\\
+			\texttt{comp05} & 305& \textbf{298}\\
+			\texttt{comp06} & \textbf{40}& 41 \\
+			\texttt{comp07} &\textbf{14}& \textbf{14}\\
+			\hline
+		\end{tabular}
+	\end{center}
+\end{table}
+
+\section{Dettagli implementativi}
+
+L'algoritmo è stato sviluppato in C e non sarà commentato nella sua interezza in questa relazione; ad ogni modo se ne sottolineano gli aspetti chiave.
+
+La struttura dati utilizzata per memorizzare una soluzione è stata di fondamentale importanza; inizialmente è stato sufficiente utilizzare una matrice \texttt{timetable} di dimensione  $C \cdot R \cdot D \cdot S$ in cui ogni elemento rispecchiasse esattamente il significato della variabile $x_{crds}$ del modello formale (il corso $c$ utilizza l'aula $r$ nel giorno $d$, slot $s$). Usare solo questa struttura di memoria, seppur consenta ogni sorta di computazione necessaria, è risultato ben presto poco agevole.
+
+Uno dei punti più critici (i.e. eseguito per la maggior parte del tempo) delle metaeuristiche utilizzate dal risolutore è infatti prevedere se una mossa darà luogo ad una soluzione ammissibile e quale sarà il costo che introdurrà se venisse effettuata; una strategia potrebbe essere applicare la mossa alla soluzione e calcolarne il costo da zero: questo risulta computazionalmente ingestibile, nonchè superfluo, dato che la maggior parte della soluzione rimane invariata in seguito ad una singola mossa. \E stato quindi necessario prevedere il costo della soluzione in base alle singole lezioni coinvolte dalla mossa e per farlo in modo efficiente è risultato conveniente mantenere all'interno della soluzione strutture dati di supporto che memorizzino dati pre-computati, ricavabili dalla matrice \texttt{timetable} (questo naturalmente introduce l'esigenza di mantenere consistenti tali strutture rispetto alla matrice principale).
+
+In seguito all'implementazione di un buon meccanismo di previsione, integrare le metaeuristiche è risultato tutto sommato agevole.
 
 \printbibliography
 

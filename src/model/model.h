@@ -121,8 +121,8 @@ typedef struct model {
     bool *courses_share_curricula;      // [c,c,q]
     bool *courses_same_teacher;         // [c,c]
 
-    // Debug purposes
     const char *_filename;
+    int _id;
 } model;
 
 void model_init(model *model);

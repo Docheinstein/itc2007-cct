@@ -52,7 +52,7 @@ SALS_OPTIONS = [
     "ls.max_distance_from_best_ratio=1.02",
 ]
 
-#   <benchmark_name>  <<input>  <output>  <options>  <seconds>  <runs>
+#   <benchmark_name>  <input>  <output>  <options>  <seconds>  <runs>
 benchmarks = [
     ("toy-ls", "datasets/toy.ctt", "/tmp/toy.out", LS_OPTIONS, 168, 10),
 

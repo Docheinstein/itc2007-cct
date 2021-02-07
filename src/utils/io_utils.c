@@ -68,7 +68,7 @@ char * fileparse(const char *filename,
     FILE *file = fopen(filename, "r");
     if (!file) {
         snprintf(error_reason, MAX_ERROR_LENGTH,
-                 "failed to open '%s' (%s)\n", filename, strerror(errno));
+                 "failed to open '%s' (%s)", filename, strerror(errno));
         goto QUIT;
     }
 

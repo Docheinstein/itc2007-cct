@@ -1,5 +1,5 @@
-#include <math.h>
 #include "hill_climbing.h"
+#include <math.h>
 #include "heuristics/neighbourhoods/swap.h"
 #include "log/verbose.h"
 #include "timeout/timeout.h"

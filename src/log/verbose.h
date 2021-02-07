@@ -4,7 +4,7 @@
 /*
  * Verbose statements.
  * Enabled only if the verbosity level set with set_verbosity
- * is greater than the message level)
+ * is greater than the message level.
  */
 
 void set_verbosity(int level);

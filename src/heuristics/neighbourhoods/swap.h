@@ -68,10 +68,10 @@ bool swap_perform(solution *sol, const swap_move *move,
                   neighbourhood_perform_strategy perform,
                   swap_result *result);
 
-//bool swap_extended(solution *sol, const swap_move *move,
-//                   neighbourhood_predict_feasibility_strategy predict_feasibility,
-//                   neighbourhood_predict_cost_strategy predict_cost,
-//                   neighbourhood_perform_strategy perform,
-//                   swap_result *result);
+bool swap_extended(solution *sol, const swap_move *move,
+                   neighbourhood_predict_feasibility_strategy predict_feasibility,
+                   neighbourhood_predict_cost_strategy predict_cost,
+                   neighbourhood_perform_strategy perform,
+                   swap_result *result);
 
 #endif // SWAP_H

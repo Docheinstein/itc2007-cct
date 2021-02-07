@@ -1,6 +1,5 @@
 #include "model.h"
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <utils/str_utils.h>
@@ -31,6 +30,9 @@ static void teacher_destroy(const teacher *t) {
 }
 
 void model_init(model *model) {
+    static int model_id = 0;
+    model->_id = model_id++;
+
     model->name = NULL;
 
     model->n_courses = 0;

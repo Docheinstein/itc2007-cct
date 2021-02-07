@@ -32,14 +32,11 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
     MODEL(state->model);
     bool sa_stats = get_verbosity() >= 2;
 
-    // The default temperature length is equal the number of lectures (~100/500)
-//    int temperature_length = (int) (state->model->n_lectures * params->temperature_length_coeff);
-    int temperature_length = (int) (L * R * D * S * params->temperature_length_coeff);
-    int temperature_length_5_times = 5 * temperature_length;
+    int t_len = (int) (swap_neighbourhood_maximum_size(model) * params->temperature_length_coeff);
     double t = params->initial_temperature;
     double t_min = params->min_temperature;
-    double cooling_rate = params->cooling_rate;
     double t_min_near_best = t_min * params->min_temperature_near_best_coeff;
+    double cooling_rate = params->cooling_rate;
 
     double reheat = pow(params->reheat_coeff, (double) state->non_improving_best_cycles);
     t *= reheat;
@@ -48,13 +45,12 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
     long idle = 0;
     long iter = 0;
 
-
     // Exit conditions: timeout or below minimum temperature
     while (!timeout &&
             ((state->current_cost < round(params->near_best_ratio * state->best_cost)) ?
                 t > t_min_near_best : t > t_min)) {
         // Perform temperature_length iters with the same temperature
-        for (int it = 0; it < temperature_length; it++) {
+        for (int it = 0; it < t_len; it++) {
             swap_move swap_mv;
             swap_result swap_result;
 
@@ -80,16 +76,16 @@ void simulated_annealing(heuristic_solver_state *state, void *arg) {
 
             if (sa_stats &&
                 ((idle > 0 && idle % 10000) == 0)
-                || iter > 0 && iter % (temperature_length_5_times) == 0) {
+                || iter > 0 && iter % (5 * t_len) == 0) {
                 verbose2("%s: Iter = %ld | Idle = %ld | "
                          "Current = %d | Local best = %d | Global best = %d | "
                          "Temperature = %.5f | p(+1) = %g  p(+5) = %g  p(+10) = %g | "
                          "T_length = %d | Cooling Rate = %.5f",
-                     state->methods_name[state->method],
-                     iter, idle,
-                     state->current_cost, local_best_cost, state->best_cost,
-                     t, SA_ACCEPTANCE(1, t), SA_ACCEPTANCE(5, t), SA_ACCEPTANCE(10, t),
-                     temperature_length, cooling_rate);
+                         state->methods_name[state->method],
+                         iter, idle,
+                         state->current_cost, local_best_cost, state->best_cost,
+                         t, SA_ACCEPTANCE(1, t), SA_ACCEPTANCE(5, t), SA_ACCEPTANCE(10, t),
+                         t_len, cooling_rate);
             }
 
             iter++;

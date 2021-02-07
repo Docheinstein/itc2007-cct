@@ -1124,3 +1124,7 @@
 2126341956 17385308349436769714 2639.7 1603 298170393 1 0 0 10 9 19
 2126341956 14276209430647829234 2639.7 1603 298170405 1 0 0 10 8 18
 2126341956 6798848762908309026 2639.7 1603 298170715 1 0 0 10 7 17
+//  From 17 to 16 with Deep Local Search
+// build/itc2007-cct datasets/comp07.ctt /tmp/sol -i results/races/comp07.ctt.sol -o solver.methods=dls -o solver.max_cycles=1 -r -V -vv
+// From 16 to 14 with Hill Climbing, seed 2063561726
+build/itc2007-cct datasets/comp07.ctt /tmp/sol -i results/races/comp07.ctt.sol -r -V -v -osolver.methods=hc -osolver.restore_best_after_cycles=-1 -ohc.max_idle=1000000

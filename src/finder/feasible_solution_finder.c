@@ -54,7 +54,7 @@ static int *get_courses_difficulty(const model *m) {
         models_courses_difficulty_cache = g_hash_table_new(g_direct_hash, g_direct_equal);
 
     // Check if the courses difficulty of this model has already been computed
-    void *v = g_hash_table_lookup(models_courses_difficulty_cache, GINT_TO_POINTER(GPOINTER_TO_INT(m)));
+    void *v = g_hash_table_lookup(models_courses_difficulty_cache, GINT_TO_POINTER(m->_id));
     if (v)
         return (int *) v;
 
@@ -98,9 +98,8 @@ static int *get_courses_difficulty(const model *m) {
 
     // Cache it for next times (useful for multistart)
     g_hash_table_insert(models_courses_difficulty_cache,
-                        GINT_TO_POINTER(GPOINTER_TO_INT(m)),
+                        GINT_TO_POINTER(m->_id),
                         courses_difficulty);
-
     return courses_difficulty;
 }
 
@@ -210,8 +209,9 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
 
         // The finder failed to provide a feasible solution
         if (!assigned) {
-            verbose2("Failed to found a feasible solution: %d/%d assignments in %d attempts",
-                    n_assignments, model->n_lectures, n_attempts);
+            verbose2("Failed to found a feasible solution: %d/%d assignments in %d attempts (rr=%.2f)",
+                    n_assignments, model->n_lectures, n_attempts, config->ranking_randomness);
+            debug("Failed on lecture %d (course %d)", l, c);
             finder->error = strmake("can't find a feasible solution: %d/%d assignments in %d attempts",
                                     n_assignments, model->n_lectures, n_attempts);
             break;
@@ -236,19 +236,21 @@ bool feasible_solution_finder_try_find(feasible_solution_finder *finder,
 bool feasible_solution_finder_find(feasible_solution_finder *finder,
                                    const feasible_solution_finder_config *config,
                                    solution *sol) {
-    int n_trials = 0;
+    int trial = 0;
     bool found = false;
 
     // Try to generate a feasible solution until it is actually feasible
     while (!timeout && !found) {
-        n_trials++;
+        verbose("Trial %d to find a feasible solution for model %s",
+                trial, sol->model->name);
         found = feasible_solution_finder_try_find(finder, config, sol);
         if (!found)
             solution_clear(sol);
+        trial++;
     }
 
     if (found) {
-        verbose2("Solution have been found after %d trials", n_trials);
+        verbose2("Solution have been found after %d trials", trial);
         solution_assert_consistency(sol);
     }
     else

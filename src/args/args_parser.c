@@ -7,7 +7,7 @@
 #include "utils/io_utils.h"
 #include "log/debug.h"
 
-const char *argp_program_version = "0.1";
+const char *argp_program_version = "1.0";
 static const char *argp_args_doc = "INPUT [OUTPUT]";
 static const char *argp_doc =
     // PRE_DOC
@@ -15,7 +15,7 @@ static const char *argp_doc =
     "\v"
     // POST_DOC
     "The solver supports the following heuristics methods:\n"
-    "Local Search, Hill Climbing, Tabu Search and Simulated Annealing.\n"
+    "Local Search, Hill Climbing, Tabu Search, Simulated Annealing and Deep Local Search.\n"
     "\n"
     "The solver itself and each heuristics can be customized via a config file (-c FILE) "
     "or giving options at the command line (-o KEY=VALUE).\n"
@@ -24,7 +24,7 @@ static const char *argp_doc =
     "\n"
     "SOLVER\n"
     "\n"
-    "# Comma separated list of methods among 'ls', 'hc', 'ts', 'sa'.\n"
+    "# Comma separated list of methods among 'ls', 'hc', 'ts', 'sa', 'dls'.\n"
     "solver.methods=sa,ls\n"
     "\n"
     "# Solve for no more than N seconds.\n"
@@ -111,7 +111,13 @@ static const char *argp_doc =
     "\n"
     "# Consider a solution \"near best\" if the current solution has cost\n"
     "# equal or less ts.near_best_ratio times the best solution cost.\n"
-    "ts.near_best_ratio=1.02"
+    "ts.near_best_ratio=1.02\n"
+    "\n"
+    "DEEP LOCAL SARCH\n"
+    "\n"
+    "# Do nothing if the current solution has cost greater than\n"
+    "# dls.max_distance_from_best_ratio times the best solution cost.\n"
+    "dls.max_distance_from_best_ratio=-1"
 ;
 
 typedef enum itc2007_option {
@@ -150,11 +156,11 @@ static struct argp_option options[] = {
   { "race", OPTION_RACE_MODE, NULL, 0,
         "Race mode: run forever (unless -t is explicitly given).\n"
         "When a new best solution is found, it is handled immediately "
-        "(and depending on other options is printed to stdout, written to OUTPUT, drawn, etc.)." },
+        "(and depending on other options it is printed to stdout, written to OUTPUT, drawn, etc.)." },
   { "quiet", OPTION_QUIET, NULL, 0,
         "Does not print the solution to stdout" },
   { "no-solve", OPTION_DONT_SOLVE, NULL, 0,
-        "Do not solve the model: can be useful with -i to load a solution without solving it" },
+        "Do not solve the model: can be used with -i to load a solution without solving it" },
   { "print-violations", OPTION_PRINT_VIOLATIONS, NULL, 0,
         "Print the costs and the violations of the solution (-VV for print the details of each violation)"},
   { "draw-all", OPTION_DRAW_ALL_DIRECTORY, "DIR", 0,
@@ -185,7 +191,7 @@ static error_t parse_option(int key, char *arg, struct argp_state *state) {
 
 #define PARSE_X(converter, str, var, errmsg, ...) do { \
     if (!converter(str, var)) { \
-        parser->error = strmake(errmsg, #__VA_ARGS__); \
+        parser->error = strmake(errmsg, ##__VA_ARGS__); \
         return EINVAL; \
     } \
 } while(0)

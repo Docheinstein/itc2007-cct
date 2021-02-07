@@ -408,9 +408,9 @@ static void swap_move_compute_cost(
                     sol, mv->helper.c2, mv->d2, mv->s2, mv->helper.c1, mv->helper.d1, mv->helper.s1);
 
     // RoomStability
-    result->delta.min_working_days_cost +=
+    result->delta.room_stability_cost +=
             compute_room_stability_cost(sol, mv->helper.c1, mv->helper.r1, mv->helper.c2, mv->r2);
-    result->delta.min_working_days_cost +=
+    result->delta.room_stability_cost +=
             compute_room_stability_cost(sol, mv->helper.c2, mv->r2, mv->helper.c1, mv->helper.r1);
 
     result->delta.cost =
@@ -592,11 +592,11 @@ int swap_neighbourhood_maximum_size(const model *m) {
     return L * R * D * S;
 }
 
-//bool swap_extended(solution *sol, const swap_move *mv,
-//                   neighbourhood_predict_feasibility_strategy predict_feasibility,
-//                   neighbourhood_predict_cost_strategy predict_cost,
-//                   neighbourhood_perform_strategy perform,
-//                   swap_result *result) {
-//    swap_predict(sol, mv, predict_feasibility, predict_cost, result);
-//    return swap_perform(sol, mv, perform, result);
-//}
+bool swap_extended(solution *sol, const swap_move *mv,
+                   neighbourhood_predict_feasibility_strategy predict_feasibility,
+                   neighbourhood_predict_cost_strategy predict_cost,
+                   neighbourhood_perform_strategy perform,
+                   swap_result *result) {
+    swap_predict(sol, mv, predict_feasibility, predict_cost, result);
+    return swap_perform(sol, mv, perform, result);
+}

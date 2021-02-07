@@ -187,7 +187,7 @@ bool heuristic_solver_solve(heuristic_solver *solver,
         state->stats->methods[i].trend.best.after = g_array_new(false, false, sizeof(int));
     }
 
-    state->stats->starting_time = ms();
+    state->stats->starting_time = ms() - 1; // just for avoid FPE
 
     long now;
 

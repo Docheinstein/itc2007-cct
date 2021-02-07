@@ -16,8 +16,8 @@ void tabu_search_params_default(tabu_search_params *params) {
 }
 
 typedef struct tabu_list_entry {
-    long time; // iteration of the last ban
-    int count; // frequency of the ban
+    long time;
+    int frequency;
 } tabu_list_entry;
 
 typedef struct tabu_list {
@@ -45,17 +45,17 @@ static bool tabu_list_lecture_is_allowed(tabu_list *tabu, int c, int r, int d, i
         return true;
     MODEL(tabu->model);
     tabu_list_entry *entry = &tabu->banned[INDEX4(c, C, r, R, d, D, s, S)];
-    if (!entry->count)
+    if (!entry->frequency)
         return true; // allowed: not in the tabu list
 
-    // The move is allowed after `tt + coeff * count(move)` iteration
-    return entry->time + tabu->tenure + (long) (tabu->frequency_penalty_coeff * entry->count) < time;
+    // The move is allowed after `tt + coeff * freq(move)` iteration
+    return entry->time + tabu->tenure + (long) (tabu->frequency_penalty_coeff * entry->frequency) < time;
 }
 
 static bool tabu_list_move_is_allowed(tabu_list *tabu, const swap_move *mv, long time) {
     /*
-     * A move is allowed if the course c1 does not came back to (r2, d2, s2)
-     * and if the course c2 does not came back to (r1, d1, s1) within tt iterations.
+     * A move is allowed if the course c1 does not come back to (r2, d2, s2)
+     * and if the course c2 does not come back to (r1, d1, s1) within tt iterations.
      */
     return
         tabu_list_lecture_is_allowed(tabu, mv->helper.c1, mv->r2, mv->d2, mv->s2, time) &&
@@ -68,7 +68,7 @@ static void tabu_list_ban_assignment(tabu_list *tabu, int c, int r, int d, int s
     MODEL(tabu->model);
     tabu_list_entry *entry = &tabu->banned[INDEX4(c, C, r, R, d, D, s, S)];
     entry->time = time;
-    entry->count++;
+    entry->frequency++;
 }
 
 static void tabu_list_clear(tabu_list *tabu) {
@@ -137,7 +137,7 @@ void tabu_search(heuristic_solver_state *state, void *arg) {
             }
 
             if (swap_result.delta.cost <= best_swap_cost &&
-                // Accept only if does not belong to the tabu banned
+                // Accept only if move is not tabu-active
                 (tabu_list_move_is_allowed(&tabu, &swap_iter.move, iter) ||
                  // exception: aspiration criteria
                  state->current_cost + swap_result.delta.cost < state->best_cost)) {

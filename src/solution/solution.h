@@ -102,7 +102,6 @@ typedef struct solution {
     // Assignment array of the lectures
     assignment *assignments; // [l]
 
-    // Debug purposes
     int _id;
 } solution;
 

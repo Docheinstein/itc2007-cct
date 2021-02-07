@@ -1,8 +1,8 @@
-#include <heuristics/neighbourhoods/swap.h>
-#include <math.h>
-#include <log/debug.h>
-#include <log/verbose.h>
 #include "deep_local_search.h"
+#include <math.h>
+#include "heuristics/neighbourhoods/swap.h"
+#include "log/debug.h"
+#include "log/verbose.h"
 #include "utils/mem_utils.h"
 #include "timeout/timeout.h"
 
@@ -20,6 +20,7 @@ static int int_compare(const void *_1, const void *_2) {
     int *i2 = (int *) _2;
     return *i2 - *i1;
 }
+
 void deep_local_search(heuristic_solver_state *state, void *arg) {
     deep_local_search_params *params = (deep_local_search_params *) arg;
 
@@ -27,7 +28,6 @@ void deep_local_search(heuristic_solver_state *state, void *arg) {
         state->current_cost > round(state->best_cost * params->max_distance_from_best_ratio)) {
         return; // disabled
     }
-
 
     int diving = 0;
 
@@ -85,7 +85,6 @@ void deep_local_search(heuristic_solver_state *state, void *arg) {
             continue;
         }
 
-        verbose2("No improving move in neighbourhood at distance 1, going deeper...");
         qsort(moves, move_cursor, sizeof(swap_move_result), int_compare);
 
         // Look at the neighbourhood of each move
@@ -107,7 +106,7 @@ void deep_local_search(heuristic_solver_state *state, void *arg) {
             // We have to perform the move to look at the neighbourhood.
             // If every move of the neighbourhood of this neighbourhood
             // does not lead to a pair of move with delta < 0, we'll do
-            // the reverse move to going back.
+            // the reverse move to go back to the original solution.
             swap_perform(state->current_solution, mv1,
                          NEIGHBOURHOOD_PERFORM_ALWAYS, NULL);
 
@@ -142,7 +141,7 @@ void deep_local_search(heuristic_solver_state *state, void *arg) {
                 break;
             }
 
-            // Otherwise, no good pair of move -> going back
+            // Otherwise, no good pair of move -> go back
             swap_move mv1_back;
             swap_move_reverse(mv1, &mv1_back);
 
